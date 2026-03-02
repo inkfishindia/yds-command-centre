@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YDS Command Centre</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body x-data="app()" x-init="init()">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <h1 class="logo">YDS <span class="logo-accent">Command Centre</span></h1>
+    </div>
+    <div class="header-right">
+      <span class="status-dot" :class="connected ? 'status-online' : 'status-offline'"></span>
+      <span class="status-text" x-text="connected ? 'Colin Online' : 'Connecting...'"></span>
+    </div>
+  </header>
+
+  <!-- Main layout -->
+  <div class="layout">
+
+    <!-- Sidebar navigation -->
+    <nav class="sidebar">
+      <button class="nav-btn" :class="view === 'chat' && 'nav-active'" @click="view = 'chat'">
+        <span class="nav-icon">C</span>
+        <span class="nav-label">Chat</span>
+      </button>
+      <button class="nav-btn" :class="view === 'dashboard' && 'nav-active'" @click="view = 'dashboard'; loadDashboard()">
+        <span class="nav-icon">D</span>
+        <span class="nav-label">Dashboard</span>
+      </button>
+      <button class="nav-btn" :class="view === 'team' && 'nav-active'" @click="view = 'team'; loadTeam()">
+        <span class="nav-icon">T</span>
+        <span class="nav-label">Team</span>
+      </button>
+      <button class="nav-btn" :class="view === 'docs' && 'nav-active'" @click="view = 'docs'; loadDocuments()">
+        <span class="nav-icon">F</span>
+        <span class="nav-label">Docs</span>
+      </button>
+      <button class="nav-btn" :class="view === 'notion' && 'nav-active'" @click="view = 'notion'; loadNotion()">
+        <span class="nav-icon">N</span>
+        <span class="nav-label">Notion</span>
+      </button>
+      <div class="nav-spacer"></div>
+      <button class="nav-btn nav-secondary" @click="clearChat()">
+        <span class="nav-icon">+</span>
+        <span class="nav-label">New</span>
+      </button>
+    </nav>
+
+    <!-- Content area -->
+    <main class="content">
+
+      <!-- Chat view -->
+      <div x-show="view === 'chat'" class="chat-layout">
+        <div class="chat-main">
+          <!-- Messages -->
+          <div class="messages" id="messages">
+            <template x-if="messages.length === 0">
+              <div class="welcome">
+                <h2>Colin Bryar, Chief of Staff</h2>
+                <p>Your strategic layer. Ask me anything, or use a skill below.</p>
+              </div>
+            </template>
+            <template x-for="(msg, i) in messages" :key="i">
+              <div class="message" :class="'msg-' + msg.role">
+                <div class="msg-label" x-text="msg.role === 'user' ? 'Dan' : 'Colin'"></div>
+                <div class="msg-body" x-html="msg.role === 'assistant' ? renderMarkdown(msg.content) : escapeHtml(msg.content)"></div>
+              </div>
+            </template>
+            <!-- Streaming indicator -->
+            <template x-if="streaming">
+              <div class="message msg-assistant">
+                <div class="msg-label">Colin</div>
+                <div class="msg-body" x-html="renderMarkdown(streamingText)"></div>
+                <div class="typing-indicator" x-show="streamingText === ''">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+            </template>
+            <!-- Approval cards -->
+            <template x-for="(a, i) in pendingApprovals" :key="a.approvalId">
+              <div class="approval-card">
+                <div class="approval-header">Approval Required</div>
+                <div class="approval-tool" x-text="formatToolName(a.toolName)"></div>
+                <pre class="approval-details" x-text="JSON.stringify(a.toolInput, null, 2)"></pre>
+                <div class="approval-actions">
+                  <button class="btn btn-approve" @click="resolveApproval(a.approvalId, true)">Approve</button>
+                  <button class="btn btn-reject" @click="resolveApproval(a.approvalId, false)">Reject</button>
+                </div>
+              </div>
+            </template>
+            <!-- Tool use indicator -->
+            <template x-if="activeTools.length > 0">
+              <div class="tool-indicator">
+                <template x-for="t in activeTools" :key="t.tool">
+                  <span class="tool-badge" x-text="formatToolName(t.tool)"></span>
+                </template>
+              </div>
+            </template>
+          </div>
+          <!-- Input -->
+          <div class="chat-input-area">
+            <textarea
+              class="chat-input"
+              x-model="inputText"
+              @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
+              placeholder="Message Colin..."
+              :disabled="streaming"
+              rows="1"
+              x-ref="chatInput"
+            ></textarea>
+            <button class="btn btn-send" @click="sendMessage()" :disabled="streaming || !inputText.trim()">
+              Send
+            </button>
+          </div>
+        </div>
+        <!-- Skills sidebar -->
+        <div class="chat-sidebar">
+          <h3 class="sidebar-title">Skills</h3>
+          <template x-for="skill in skills" :key="skill.name">
+            <button
+              class="skill-btn"
+              @click="triggerSkill(skill)"
+              :disabled="streaming"
+            >
+              <span class="skill-icon" x-text="skill.icon"></span>
+              <div class="skill-info">
+                <span class="skill-label" x-text="'/' + skill.name"></span>
+                <span class="skill-desc" x-text="skill.description"></span>
+              </div>
+            </button>
+          </template>
+          <h3 class="sidebar-title" style="margin-top: 1.5rem">Experts</h3>
+          <template x-for="expert in experts" :key="expert.name">
+            <button
+              class="skill-btn skill-expert"
+              @click="routeToExpert(expert)"
+              :disabled="streaming"
+            >
+              <span class="skill-icon" x-text="expert.icon"></span>
+              <div class="skill-info">
+                <span class="skill-label" x-text="expert.name"></span>
+                <span class="skill-desc" x-text="expert.domain"></span>
+              </div>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <!-- Dashboard view -->
+      <div x-show="view === 'dashboard'" class="dashboard-view">
+        <div class="dashboard-header">
+          <h2>Operations Dashboard</h2>
+          <button class="btn btn-small" @click="loadDashboard()">Refresh</button>
+        </div>
+        <template x-if="dashboardLoading">
+          <div class="loading">Loading Notion data...</div>
+        </template>
+        <template x-if="!dashboardLoading && dashboard">
+          <div>
+            <!-- Summary cards -->
+            <div class="summary-row">
+              <div class="summary-card">
+                <div class="summary-number" x-text="dashboard.focusAreas.length"></div>
+                <div class="summary-label">Focus Areas</div>
+              </div>
+              <div class="summary-card summary-warning">
+                <div class="summary-number" x-text="dashboard.overdue.length"></div>
+                <div class="summary-label">Overdue Items</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-number" x-text="dashboard.recentDecisions.length"></div>
+                <div class="summary-label">Recent Decisions</div>
+              </div>
+            </div>
+
+            <!-- Focus Areas -->
+            <h3 class="section-title">Focus Areas</h3>
+            <div class="focus-grid">
+              <template x-for="area in dashboard.focusAreas" :key="area.id">
+                <div class="focus-card" :class="getFocusHealthClass(area)">
+                  <div class="focus-name" x-text="area.Name || 'Untitled'"></div>
+                  <div class="focus-meta">
+                    <span class="focus-status" x-text="area.Status || area.Health || '—'"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- Overdue commitments -->
+            <template x-if="dashboard.overdue.length > 0">
+              <div>
+                <h3 class="section-title">Overdue Commitments</h3>
+                <div class="table-wrap">
+                  <table class="data-table">
+                    <thead>
+                      <tr><th>Task</th><th>Owner</th><th>Due</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="c in dashboard.overdue" :key="c.id">
+                        <tr>
+                          <td x-text="c.Name || 'Untitled'"></td>
+                          <td x-text="Array.isArray(c['Assigned To']) ? c['Assigned To'].length + ' assigned' : '—'"></td>
+                          <td x-text="c['Due Date'] || '—'"></td>
+                          <td><span class="status-badge" :class="'status-' + (c.Status || '').toLowerCase().replace(/\s+/g, '-')" x-text="c.Status || '—'"></span></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </template>
+
+            <!-- Recent decisions -->
+            <template x-if="dashboard.recentDecisions.length > 0">
+              <div>
+                <h3 class="section-title">Recent Decisions</h3>
+                <div class="table-wrap">
+                  <table class="data-table">
+                    <thead>
+                      <tr><th>Decision</th><th>Date</th><th>Owner</th></tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="d in dashboard.recentDecisions" :key="d.id">
+                        <tr>
+                          <td x-text="d.Name || 'Untitled'"></td>
+                          <td x-text="d.Date || '—'"></td>
+                          <td x-text="d.Owner || '—'"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      <!-- Team view -->
+      <div x-show="view === 'team'" class="team-view">
+        <h2>Team Roster</h2>
+        <template x-if="teamLoading">
+          <div class="loading">Loading team data...</div>
+        </template>
+        <template x-if="!teamLoading">
+          <div class="team-grid">
+            <template x-for="person in teamData" :key="person.id">
+              <div class="team-card">
+                <div class="team-name" x-text="person.Name || 'Unknown'"></div>
+                <div class="team-role" x-text="person.Function || person.Role || '—'"></div>
+                <button class="btn btn-small" @click="askColinAbout(person.Name)">Ask Colin</button>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      <!-- Documents view -->
+      <div x-show="view === 'docs'" class="docs-view">
+        <h2>Documents</h2>
+        <div class="docs-tabs">
+          <button class="tab-btn" :class="docsTab === 'briefings' && 'tab-active'" @click="docsTab = 'briefings'">Briefings</button>
+          <button class="tab-btn" :class="docsTab === 'decisions' && 'tab-active'" @click="docsTab = 'decisions'">Decisions</button>
+          <button class="tab-btn" :class="docsTab === 'weekly-reviews' && 'tab-active'" @click="docsTab = 'weekly-reviews'">Weekly Reviews</button>
+        </div>
+        <template x-if="docsLoading">
+          <div class="loading">Loading documents...</div>
+        </template>
+        <template x-if="!docsLoading && !activeDoc">
+          <div>
+            <template x-if="(documents[docsTab] || []).length === 0">
+              <div class="empty-state">No documents yet. Use /brief, /decide, or /review to generate them.</div>
+            </template>
+            <div class="doc-list">
+              <template x-for="doc in (documents[docsTab] || [])" :key="doc.name">
+                <button class="doc-item" @click="openDocument(docsTab, doc.name)">
+                  <span class="doc-name" x-text="doc.name"></span>
+                  <span class="doc-date" x-text="new Date(doc.modified).toLocaleDateString()"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+        </template>
+        <template x-if="activeDoc">
+          <div class="doc-viewer">
+            <div class="doc-viewer-header">
+              <button class="btn btn-small" @click="activeDoc = null">&larr; Back</button>
+              <span class="doc-viewer-title" x-text="activeDoc.filename"></span>
+              <button class="btn btn-small" @click="discussDocument(activeDoc)">Discuss with Colin</button>
+            </div>
+            <div class="doc-content" x-html="renderMarkdown(activeDoc.content)"></div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Notion browser view -->
+      <div x-show="view === 'notion'" class="notion-view">
+        <!-- Breadcrumb / header -->
+        <div class="notion-header">
+          <div class="notion-breadcrumb">
+            <button class="notion-crumb" @click="notionActiveDb = null; notionActivePage = null; notionPageContent = ''" :class="!notionActiveDb && 'crumb-active'">Notion</button>
+            <template x-if="notionActiveDb">
+              <span>
+                <span class="crumb-sep">/</span>
+                <button class="notion-crumb" @click="notionActivePage = null; notionPageContent = ''" :class="!notionActivePage && 'crumb-active'" x-text="notionActiveDb.name"></button>
+              </span>
+            </template>
+            <template x-if="notionActivePage">
+              <span>
+                <span class="crumb-sep">/</span>
+                <span class="notion-crumb crumb-active" x-text="notionActivePage.name"></span>
+              </span>
+            </template>
+          </div>
+          <button class="btn btn-small" @click="loadNotion()">Refresh</button>
+        </div>
+
+        <template x-if="notionLoading && !notionActiveDb && !notionActivePage">
+          <div class="loading">Loading Notion workspace...</div>
+        </template>
+
+        <!-- Database list (home) -->
+        <template x-if="!notionActiveDb && !notionActivePage && !notionLoading">
+          <div>
+            <!-- Key pages -->
+            <template x-if="notionKeyPages.length > 0">
+              <div>
+                <h3 class="section-title">Key Pages</h3>
+                <div class="notion-key-pages">
+                  <template x-for="page in notionKeyPages" :key="page.id">
+                    <button class="notion-key-page-card" @click="openNotionPage(page.id, page.name)">
+                      <div class="notion-kp-name" x-text="page.name"></div>
+                      <div class="notion-kp-desc" x-text="page.description"></div>
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <h3 class="section-title">Databases</h3>
+            <div class="notion-db-grid">
+              <template x-for="db in notionDatabases" :key="db.id">
+                <button class="notion-db-card" @click="openNotionDb(db)">
+                  <div class="notion-db-icon" x-text="db.icon"></div>
+                  <div class="notion-db-info">
+                    <div class="notion-db-name" x-text="db.name"></div>
+                    <div class="notion-db-desc" x-text="db.description"></div>
+                  </div>
+                </button>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- Database entries -->
+        <template x-if="notionActiveDb && !notionActivePage">
+          <div>
+            <template x-if="notionLoading && notionEntries.length === 0">
+              <div class="loading">Loading entries...</div>
+            </template>
+            <template x-if="notionEntries.length === 0 && !notionLoading">
+              <div class="empty-state">No entries found in this database.</div>
+            </template>
+            <div class="notion-entries">
+              <template x-for="entry in notionEntries" :key="entry.id">
+                <button class="notion-entry-row" @click="openNotionPage(entry.id, getEntryName(entry))">
+                  <div class="notion-entry-name" x-text="getEntryName(entry)"></div>
+                  <div class="notion-entry-meta" x-text="getEntryMeta(entry)"></div>
+                </button>
+              </template>
+            </div>
+            <template x-if="notionHasMore">
+              <div style="text-align: center; padding: 1rem;">
+                <button class="btn btn-small" @click="loadMoreEntries()" :disabled="notionLoading">Load more</button>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- Page viewer -->
+        <template x-if="notionActivePage">
+          <div class="notion-page-viewer">
+            <div class="notion-page-header">
+              <h2 class="notion-page-title" x-text="notionActivePage.name"></h2>
+              <div class="notion-page-actions">
+                <template x-if="notionActivePage.url">
+                  <a class="btn btn-small" :href="notionActivePage.url" target="_blank">Open in Notion</a>
+                </template>
+                <button class="btn btn-small" @click="askColinAboutPage(notionActivePage)">Ask Colin</button>
+              </div>
+            </div>
+
+            <!-- Properties -->
+            <template x-if="notionActivePage.properties && getPropertyEntries(notionActivePage.properties).length > 0">
+              <div class="notion-props">
+                <template x-for="[key, val] in getPropertyEntries(notionActivePage.properties)" :key="key">
+                  <div class="notion-prop-row">
+                    <span class="notion-prop-key" x-text="key"></span>
+                    <span class="notion-prop-val" x-text="formatPropertyValue(val)"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <!-- Content -->
+            <template x-if="notionLoading">
+              <div class="loading">Loading page content...</div>
+            </template>
+            <template x-if="!notionLoading && notionPageContent">
+              <div class="notion-content doc-content" x-html="renderMarkdown(notionPageContent)"></div>
+            </template>
+          </div>
+        </template>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

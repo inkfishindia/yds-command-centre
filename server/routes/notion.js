@@ -1,0 +1,140 @@
+const express = require('express');
+const router = express.Router();
+const notionService = require('../services/notion');
+
+/**
+ * GET /api/notion/dashboard
+ * Full dashboard summary — focus areas, overdue commitments, recent decisions, people.
+ */
+router.get('/dashboard', async (req, res) => {
+  try {
+    const summary = await notionService.getDashboardSummary();
+    res.json(summary);
+  } catch (err) {
+    console.error('Dashboard error:', err);
+    res.status(500).json({ error: 'Failed to load dashboard data' });
+  }
+});
+
+/**
+ * GET /api/notion/focus-areas
+ */
+router.get('/focus-areas', async (req, res) => {
+  try {
+    const areas = await notionService.getFocusAreas();
+    res.json({ focusAreas: areas });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load focus areas' });
+  }
+});
+
+/**
+ * GET /api/notion/commitments/overdue
+ */
+router.get('/commitments/overdue', async (req, res) => {
+  try {
+    const overdue = await notionService.getOverdueCommitments();
+    res.json({ commitments: overdue });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load commitments' });
+  }
+});
+
+/**
+ * GET /api/notion/decisions
+ */
+router.get('/decisions', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const decisions = await notionService.getRecentDecisions(days);
+    res.json({ decisions });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load decisions' });
+  }
+});
+
+/**
+ * GET /api/notion/people
+ */
+router.get('/people', async (req, res) => {
+  try {
+    const people = await notionService.getPeople();
+    res.json({ people });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load people' });
+  }
+});
+
+/**
+ * GET /api/notion/databases
+ * List all known databases
+ */
+router.get('/databases', (req, res) => {
+  res.json({ databases: notionService.listDatabases() });
+});
+
+/**
+ * GET /api/notion/databases/:id
+ * Query a specific database
+ */
+router.get('/databases/:id', async (req, res) => {
+  try {
+    const dbId = req.params.id;
+    const options = {};
+    if (req.query.cursor) options.startCursor = req.query.cursor;
+    if (req.query.pageSize) options.pageSize = parseInt(req.query.pageSize);
+
+    const result = await notionService.queryDatabase(dbId, options);
+    res.json(result);
+  } catch (err) {
+    console.error('Database query error:', err);
+    res.status(500).json({ error: 'Failed to query database' });
+  }
+});
+
+/**
+ * GET /api/notion/pages/:id
+ * Get a page's properties
+ */
+router.get('/pages/:id', async (req, res) => {
+  try {
+    const page = await notionService.getPage(req.params.id);
+    if (!page) return res.status(404).json({ error: 'Page not found' });
+    res.json(page);
+  } catch (err) {
+    console.error('Page fetch error:', err);
+    res.status(500).json({ error: 'Failed to load page' });
+  }
+});
+
+/**
+ * GET /api/notion/pages/:id/content
+ * Get a page's block content as markdown
+ */
+router.get('/pages/:id/content', async (req, res) => {
+  try {
+    const content = await notionService.getPageContent(req.params.id);
+    res.json(content);
+  } catch (err) {
+    console.error('Page content error:', err);
+    res.status(500).json({ error: 'Failed to load page content' });
+  }
+});
+
+/**
+ * GET /api/notion/key-pages
+ * List key Notion pages
+ */
+router.get('/key-pages', (req, res) => {
+  res.json({ pages: notionService.getKeyPages() });
+});
+
+/**
+ * POST /api/notion/cache/clear
+ */
+router.post('/cache/clear', (req, res) => {
+  notionService.clearCache();
+  res.json({ status: 'ok', message: 'Notion cache cleared' });
+});
+
+module.exports = router;
