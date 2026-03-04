@@ -922,6 +922,7 @@ tr:hover .table-link { color: var(--accent); }
 .badge[data-priority="medium"]      { background: var(--yellow-dim);  color: var(--yellow); }
 .badge[data-priority="high"]        { background: var(--red-dim);     color: var(--red); }
 .badge[data-priority="critical"]    { background: var(--purple-dim);  color: var(--purple); }
+.badge[data-priority="urgent"]      { background: var(--purple-dim);  color: var(--purple); }
 
 /* === Team === */
 
@@ -1998,4 +1999,213 @@ tr:hover .table-link { color: var(--accent); }
 
 @media (max-width: 768px) {
   .projects-grid { grid-template-columns: 1fr; }
+}
+
+/* === Commitments View === */
+
+.commitments-view {
+  padding: 1.5rem;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.commitment-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* === Kanban Board === */
+
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  gap: 1rem;
+  align-items: start;
+  overflow-x: auto;
+  padding-bottom: 1rem;
+}
+
+.kanban-column {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 120px;
+}
+
+.kanban-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.kanban-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.kanban-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-card);
+}
+
+.kanban-card:hover {
+  background: var(--bg-hover);
+  box-shadow: var(--shadow-elevated);
+  transform: translateY(-1px);
+}
+
+/* Priority-colored left border */
+.kanban-card[data-priority="low"]      { border-left-color: var(--green); }
+.kanban-card[data-priority="medium"]   { border-left-color: var(--amber); }
+.kanban-card[data-priority="high"]     { border-left-color: var(--red); }
+.kanban-card[data-priority="critical"] { border-left-color: var(--purple); }
+.kanban-card[data-priority="urgent"]   { border-left-color: var(--purple); }
+.kanban-card[data-priority="unset"]    { border-left-color: var(--border-light); }
+
+/* Overdue cards */
+.kanban-card.kanban-overdue {
+  border-left-color: var(--red);
+  background: var(--red-glow);
+}
+
+.kanban-card-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 0.3rem;
+  line-height: 1.3;
+}
+
+.kanban-card-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: center;
+  margin-top: 0.4rem;
+}
+
+.kanban-due {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.kanban-overdue-text { color: var(--red) !important; }
+
+.kanban-overdue-row td { background: var(--red-glow); }
+
+.kanban-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 1rem 0;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .kanban-board { grid-template-columns: repeat(2, minmax(200px, 1fr)); }
+}
+
+@media (max-width: 480px) {
+  .kanban-board { grid-template-columns: 1fr; }
+  .commitment-filters { flex-direction: column; }
+}
+
+/* === Workload Chart === */
+
+.workload-chart {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.workload-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.workload-name {
+  width: 100px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workload-bar-container {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.workload-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width var(--transition-slow);
+  min-width: 2px;
+}
+
+.workload-bar.low  { background: var(--green); }
+.workload-bar.med  { background: var(--amber); }
+.workload-bar.high { background: var(--red); }
+
+.workload-count {
+  width: 24px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-align: right;
+  flex-shrink: 0;
 }

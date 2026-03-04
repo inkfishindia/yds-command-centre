@@ -33,6 +33,21 @@ router.get('/focus-areas', async (req, res) => {
 });
 
 /**
+ * GET /api/notion/commitments/all
+ * All commitments (excluding Cancelled) with resolved relations.
+ * Filtering is performed client-side — this route returns the full unfiltered list.
+ */
+router.get('/commitments/all', async (req, res) => {
+  try {
+    const commitments = await notionService.getCommitmentsForKanban();
+    res.json({ commitments });
+  } catch (err) {
+    console.error('Commitments all error:', err);
+    res.status(500).json({ error: 'Failed to load commitments' });
+  }
+});
+
+/**
  * GET /api/notion/commitments/overdue
  */
 router.get('/commitments/overdue', async (req, res) => {

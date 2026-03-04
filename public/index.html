@@ -54,6 +54,10 @@
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"/></svg>
         <span class="nav-label">Proj</span>
       </button>
+      <button class="nav-btn" :class="view === 'commitments' && 'nav-active'" @click="view = 'commitments'; if(!commitments.length) loadCommitments()" aria-label="Commitments" :aria-current="view === 'commitments' ? 'page' : false">
+        <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+        <span class="nav-label">Tasks</span>
+      </button>
       <div class="nav-spacer"></div>
       <button class="nav-btn nav-secondary" @click="clearChat()" aria-label="New chat">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
@@ -337,8 +341,15 @@
             <template x-if="dashboard.recentDecisions.length > 0">
               <div>
                 <h3 class="section-title">Recent Decisions</h3>
+                <div class="filter-bar" style="margin-bottom: 0.75rem; margin-top: 0;">
+                  <button class="filter-pill" :class="{'filter-pill-active': decisionDateRange === 'all'}" @click="decisionDateRange = 'all'">All</button>
+                  <button class="filter-pill" :class="{'filter-pill-active': decisionDateRange === 'month'}" @click="decisionDateRange = 'month'">This Month</button>
+                  <button class="filter-pill" :class="{'filter-pill-active': decisionDateRange === '3months'}" @click="decisionDateRange = '3months'">Last 3 Months</button>
+                  <button class="filter-pill" :class="{'filter-pill-active': decisionDateRange === 'week'}" @click="decisionDateRange = 'week'">This Week</button>
+                  <span class="notion-result-count" style="margin-left: 4px;" x-text="getFilteredDecisions().length + ' decisions'"></span>
+                </div>
                 <div class="decisions-list">
-                  <template x-for="(d, idx) in dashboard.recentDecisions" :key="d.id">
+                  <template x-for="(d, idx) in getFilteredDecisions()" :key="d.id">
                     <div class="decision-card" :class="{'decision-expanded': expandedDecision === idx}">
                       <div class="decision-header" @click="expandedDecision = expandedDecision === idx ? null : idx">
                         <div class="decision-title" x-text="d.Name || 'Untitled'"></div>
@@ -414,63 +425,81 @@
           <div class="empty-state">No team members found.</div>
         </template>
         <template x-if="!teamLoading && teamData.length > 0">
-          <div class="team-grid">
-            <template x-for="person in teamData" :key="person.id">
-              <div class="team-card" :class="{'team-card-expanded': expandedTeamMember === person.id}">
-                <div class="team-card-header" @click="expandedTeamMember = expandedTeamMember === person.id ? null : person.id">
-                  <div class="team-avatar" x-text="getInitials(person.Name)"></div>
-                  <div class="team-info">
-                    <div class="team-name" x-text="person.Name || 'Unknown'"></div>
-                    <div class="team-role" x-text="person.Function || person.Role || '—'"></div>
+          <div>
+            <!-- Workload Overview -->
+            <div class="workload-chart">
+              <h3 class="section-title" style="margin-top: 0; margin-bottom: 0.75rem;">Workload Overview</h3>
+              <template x-for="person in getSortedTeamByWorkload()" :key="person.id">
+                <div class="workload-row">
+                  <div class="workload-name" x-text="person.Name || 'Unknown'"></div>
+                  <div class="workload-bar-container">
+                    <div class="workload-bar"
+                         :class="(person.activeCommitmentCount || 0) <= 3 ? 'low' : (person.activeCommitmentCount || 0) <= 6 ? 'med' : 'high'"
+                         :style="'width: ' + getWorkloadPercent(person.activeCommitmentCount || 0) + '%'"></div>
                   </div>
-                  <div class="team-badges">
-                    <span class="workload-badge"
-                          :class="(person.activeCommitmentCount || 0) <= 2 ? 'workload-low' : (person.activeCommitmentCount || 0) <= 5 ? 'workload-med' : 'workload-high'"
-                          x-text="person.activeCommitmentCount || 0"
-                          :title="(person.activeCommitmentCount || 0) + ' active commitments'"></span>
-                    <span class="project-count-badge" x-show="person.activeProjectCount > 0"
-                          x-text="person.activeProjectCount + 'P'"
-                          :title="person.activeProjectCount + ' active projects'"></span>
+                  <div class="workload-count" x-text="person.activeCommitmentCount || 0"></div>
+                </div>
+              </template>
+            </div>
+
+            <div class="team-grid">
+              <template x-for="person in teamData" :key="person.id">
+                <div class="team-card" :class="{'team-card-expanded': expandedTeamMember === person.id}">
+                  <div class="team-card-header" @click="expandedTeamMember = expandedTeamMember === person.id ? null : person.id">
+                    <div class="team-avatar" x-text="getInitials(person.Name)"></div>
+                    <div class="team-info">
+                      <div class="team-name" x-text="person.Name || 'Unknown'"></div>
+                      <div class="team-role" x-text="person.Function || person.Role || '—'"></div>
+                    </div>
+                    <div class="team-badges">
+                      <span class="workload-badge"
+                            :class="(person.activeCommitmentCount || 0) <= 3 ? 'workload-low' : (person.activeCommitmentCount || 0) <= 6 ? 'workload-med' : 'workload-high'"
+                            x-text="person.activeCommitmentCount || 0"
+                            :title="(person.activeCommitmentCount || 0) + ' active commitments'"></span>
+                      <span class="project-count-badge" x-show="person.activeProjectCount > 0"
+                            x-text="person.activeProjectCount + 'P'"
+                            :title="person.activeProjectCount + ' active projects'"></span>
+                    </div>
+                  </div>
+                  <div class="team-card-body" x-show="expandedTeamMember === person.id" x-transition.duration.200ms>
+                    <template x-if="person.activeProjectNames && person.activeProjectNames.length">
+                      <div class="team-detail-section">
+                        <div class="team-detail-label">Active Projects</div>
+                        <div class="team-detail-tags">
+                          <template x-for="name in person.activeProjectNames" :key="name">
+                            <span class="relation-pill" x-text="name"></span>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="person.focusAreaNames && person.focusAreaNames.length">
+                      <div class="team-detail-section">
+                        <div class="team-detail-label">Focus Areas</div>
+                        <div class="team-detail-tags">
+                          <template x-for="name in person.focusAreaNames" :key="name">
+                            <span class="relation-pill" x-text="name"></span>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="person.commitmentNames && person.commitmentNames.length">
+                      <div class="team-detail-section">
+                        <div class="team-detail-label">Active Commitments</div>
+                        <div class="team-detail-items">
+                          <template x-for="name in person.commitmentNames" :key="name">
+                            <div class="team-detail-item" x-text="name"></div>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                    <div class="team-card-actions">
+                      <button class="btn btn-small" @click.stop="askColinAbout(person.Name)">Ask Colin</button>
+                      <button class="btn btn-small btn-secondary" @click.stop="openDetailPanel(person.id, person.Name)">View Profile</button>
+                    </div>
                   </div>
                 </div>
-                <div class="team-card-body" x-show="expandedTeamMember === person.id" x-transition.duration.200ms>
-                  <template x-if="person.activeProjectNames && person.activeProjectNames.length">
-                    <div class="team-detail-section">
-                      <div class="team-detail-label">Active Projects</div>
-                      <div class="team-detail-tags">
-                        <template x-for="name in person.activeProjectNames" :key="name">
-                          <span class="relation-pill" x-text="name"></span>
-                        </template>
-                      </div>
-                    </div>
-                  </template>
-                  <template x-if="person.focusAreaNames && person.focusAreaNames.length">
-                    <div class="team-detail-section">
-                      <div class="team-detail-label">Focus Areas</div>
-                      <div class="team-detail-tags">
-                        <template x-for="name in person.focusAreaNames" :key="name">
-                          <span class="relation-pill" x-text="name"></span>
-                        </template>
-                      </div>
-                    </div>
-                  </template>
-                  <template x-if="person.commitmentNames && person.commitmentNames.length">
-                    <div class="team-detail-section">
-                      <div class="team-detail-label">Active Commitments</div>
-                      <div class="team-detail-items">
-                        <template x-for="name in person.commitmentNames" :key="name">
-                          <div class="team-detail-item" x-text="name"></div>
-                        </template>
-                      </div>
-                    </div>
-                  </template>
-                  <div class="team-card-actions">
-                    <button class="btn btn-small" @click.stop="askColinAbout(person.Name)">Ask Colin</button>
-                    <button class="btn btn-small btn-secondary" @click.stop="openDetailPanel(person.id, person.Name)">View Profile</button>
-                  </div>
-                </div>
-              </div>
-            </template>
+              </template>
+            </div>
           </div>
         </template>
       </div>
@@ -770,6 +799,123 @@
                 </div>
               </template>
             </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Commitments view -->
+      <div x-show="view === 'commitments'" class="commitments-view" x-cloak>
+        <div class="view-header">
+          <div>
+            <h2 class="view-title">Commitments</h2>
+            <p class="view-header-sub" x-text="getFilteredCommitments().length + ' tasks'"></p>
+          </div>
+          <div style="display:flex; gap:0.5rem; align-items:center;">
+            <button class="filter-pill" :class="{'filter-pill-active': commitmentsView === 'kanban'}" @click="commitmentsView = 'kanban'">Kanban</button>
+            <button class="filter-pill" :class="{'filter-pill-active': commitmentsView === 'list'}" @click="commitmentsView = 'list'">List</button>
+            <button class="btn btn-small btn-icon" @click="loadCommitments()" :class="commitmentsLoading && 'btn-spinning'">
+              <span class="refresh-icon">&#x21bb;</span> Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Commitment Filters -->
+        <div class="commitment-filters" x-show="!commitmentsLoading && commitments.length > 0">
+          <select class="notion-filter-select" x-model="commitmentFilters.focusArea">
+            <option value="">All Focus Areas</option>
+            <template x-for="fa in getCommitmentFilterOptions().focusAreas" :key="fa">
+              <option :value="fa" x-text="fa"></option>
+            </template>
+          </select>
+          <select class="notion-filter-select" x-model="commitmentFilters.person">
+            <option value="">All People</option>
+            <template x-for="p in getCommitmentFilterOptions().people" :key="p">
+              <option :value="p" x-text="p"></option>
+            </template>
+          </select>
+          <select class="notion-filter-select" x-model="commitmentFilters.priority">
+            <option value="">All Priorities</option>
+            <template x-for="pr in getCommitmentFilterOptions().priorities" :key="pr">
+              <option :value="pr" x-text="pr"></option>
+            </template>
+          </select>
+          <select class="notion-filter-select" x-model="commitmentFilters.status">
+            <option value="">All Statuses</option>
+            <option value="Not Started">Not Started</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Blocked">Blocked</option>
+            <option value="Done">Done</option>
+          </select>
+          <button class="btn btn-small" @click="commitmentFilters = { focusArea: '', person: '', priority: '', status: '' }">Clear</button>
+        </div>
+
+        <!-- Loading -->
+        <template x-if="commitmentsLoading">
+          <div class="kanban-board">
+            <div class="kanban-column"><div class="skeleton skeleton-card" style="height:120px;"></div></div>
+            <div class="kanban-column"><div class="skeleton skeleton-card" style="height:120px;"></div></div>
+            <div class="kanban-column"><div class="skeleton skeleton-card" style="height:120px;"></div></div>
+            <div class="kanban-column"><div class="skeleton skeleton-card" style="height:120px;"></div></div>
+          </div>
+        </template>
+
+        <template x-if="!commitmentsLoading && commitments.length === 0">
+          <div class="empty-state">No commitments found. Try refreshing or adjusting filters.</div>
+        </template>
+
+        <!-- Kanban view -->
+        <template x-if="!commitmentsLoading && commitments.length > 0 && commitmentsView === 'kanban'">
+          <div class="kanban-board">
+            <template x-for="col in ['Not Started', 'In Progress', 'Blocked', 'Done']" :key="col">
+              <div class="kanban-column">
+                <div class="kanban-column-header">
+                  <span x-text="col"></span>
+                  <span class="kanban-count" x-text="getCommitmentsByStatus(col).length"></span>
+                </div>
+                <template x-for="c in getCommitmentsByStatus(col)" :key="c.id">
+                  <div class="kanban-card" :class="{'kanban-overdue': isCommitmentOverdue(c)}"
+                       :data-priority="(c.Priority || 'unset').toLowerCase()"
+                       @click="openDetailPanel(c.id, c.Name)">
+                    <div class="kanban-card-name" x-text="c.Name || 'Untitled'"></div>
+                    <div class="kanban-card-meta">
+                      <span x-show="c.assignedNames && c.assignedNames.length" x-text="c.assignedNames.join(', ')"></span>
+                    </div>
+                    <div class="kanban-card-footer">
+                      <span class="badge" :data-priority="(c.Priority || 'unset').toLowerCase()" x-text="c.Priority || 'Unset'" x-show="c.Priority"></span>
+                      <span class="badge" x-show="c.Type && c.Type !== 'Unset'" x-text="c.Type"></span>
+                      <span class="kanban-due" :class="{'kanban-overdue-text': isCommitmentOverdue(c)}"
+                            x-show="c['Due Date']"
+                            x-text="formatDate(c['Due Date'])"></span>
+                    </div>
+                  </div>
+                </template>
+                <template x-if="getCommitmentsByStatus(col).length === 0">
+                  <div class="kanban-empty">No items</div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- List view -->
+        <template x-if="!commitmentsLoading && commitments.length > 0 && commitmentsView === 'list'">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Task</th><th>Owner</th><th>Status</th><th>Priority</th><th>Due</th></tr>
+              </thead>
+              <tbody>
+                <template x-for="c in getFilteredCommitments()" :key="c.id">
+                  <tr @click="openDetailPanel(c.id, c.Name)" :class="{'kanban-overdue-row': isCommitmentOverdue(c)}">
+                    <td><span class="table-link" x-text="c.Name || 'Untitled'"></span></td>
+                    <td x-text="c.assignedNames && c.assignedNames.length ? c.assignedNames.join(', ') : '—'"></td>
+                    <td><span class="badge" :data-status="badgeAttr(c.Status)" x-text="c.Status || '—'"></span></td>
+                    <td><span class="badge" :data-priority="(c.Priority || 'unset').toLowerCase()" x-text="c.Priority || 'Unset'"></span></td>
+                    <td :class="{'kanban-overdue-text': isCommitmentOverdue(c)}" x-text="formatDate(c['Due Date'])"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
           </div>
         </template>
       </div>

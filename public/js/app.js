@@ -54,6 +54,15 @@ function app() {
     teamLoading: false,
     expandedTeamMember: null,
 
+    // Commitments kanban
+    commitments: [],
+    commitmentsLoading: false,
+    commitmentsView: 'kanban', // 'kanban' | 'list'
+    commitmentFilters: { focusArea: '', person: '', priority: '', status: '' },
+
+    // Decisions date filter
+    decisionDateRange: 'all', // 'week' | 'month' | '3months' | 'all'
+
     // Documents
     documents: { briefings: [], decisions: [], 'weekly-reviews': [] },
     docsTab: 'briefings',
@@ -310,6 +319,68 @@ function app() {
       if (health.includes('paused') || health.includes('hold')) return 'focus-paused';
       if (health.includes('needs improvement')) return 'focus-needs-improvement';
       return '';
+    },
+
+    // --- Commitments Kanban ---
+
+    async loadCommitments() {
+      this.commitmentsLoading = true;
+      try {
+        const res = await fetch('/api/notion/commitments/all');
+        const data = await res.json();
+        this.commitments = data.commitments || [];
+      } catch (err) {
+        console.error('Commitments load error:', err);
+      } finally {
+        this.commitmentsLoading = false;
+      }
+    },
+
+    getCommitmentsByStatus(status) {
+      return this.getFilteredCommitments().filter(c => (c.Status || 'Not Started') === status);
+    },
+
+    getFilteredCommitments() {
+      let filtered = this.commitments;
+      if (this.commitmentFilters.focusArea) {
+        const fa = this.commitmentFilters.focusArea;
+        filtered = filtered.filter(c => Array.isArray(c.focusAreaNames) && c.focusAreaNames.includes(fa));
+      }
+      if (this.commitmentFilters.person) {
+        const person = this.commitmentFilters.person;
+        filtered = filtered.filter(c => Array.isArray(c.assignedNames) && c.assignedNames.includes(person));
+      }
+      if (this.commitmentFilters.priority) {
+        filtered = filtered.filter(c => c.Priority === this.commitmentFilters.priority);
+      }
+      if (this.commitmentFilters.status) {
+        filtered = filtered.filter(c => (c.Status || 'Not Started') === this.commitmentFilters.status);
+      }
+      return filtered;
+    },
+
+    isCommitmentOverdue(c) {
+      if (!c['Due Date']) return false;
+      const raw = typeof c['Due Date'] === 'object' ? c['Due Date'].start : c['Due Date'];
+      if (!raw) return false;
+      const due = new Date(raw + 'T00:00:00');
+      return due < new Date() && c.Status !== 'Done';
+    },
+
+    getCommitmentFilterOptions() {
+      const focusAreas = new Set();
+      const people = new Set();
+      const priorities = new Set();
+      for (const c of this.commitments) {
+        if (c.focusAreaNames) c.focusAreaNames.forEach(n => n && focusAreas.add(n));
+        if (c.assignedNames) c.assignedNames.forEach(n => n && people.add(n));
+        if (c.Priority) priorities.add(c.Priority);
+      }
+      return {
+        focusAreas: [...focusAreas].sort(),
+        people: [...people].sort(),
+        priorities: [...priorities].sort(),
+      };
     },
 
     // --- Team ---
@@ -650,6 +721,7 @@ function app() {
         { group: 'Navigation', label: 'Chat', action: 'chat' },
         { group: 'Navigation', label: 'Dashboard', action: 'dashboard' },
         { group: 'Navigation', label: 'Projects', action: 'projects' },
+        { group: 'Navigation', label: 'Commitments', action: 'commitments' },
         { group: 'Navigation', label: 'Team', action: 'team' },
         { group: 'Navigation', label: 'Documents', action: 'docs' },
         { group: 'Navigation', label: 'Notion', action: 'notion' },
@@ -697,6 +769,7 @@ function app() {
         this.view = item.action;
         if (item.action === 'dashboard') this.loadDashboard();
         else if (item.action === 'projects') { if (!this.projects.length) this.loadProjects(); }
+        else if (item.action === 'commitments') this.loadCommitments();
         else if (item.action === 'team') this.loadTeam();
         else if (item.action === 'docs') this.loadDocuments();
         else if (item.action === 'notion') this.loadNotion();
@@ -712,6 +785,48 @@ function app() {
       }
 
       this.closeCmdPalette();
+    },
+
+    // --- Team Workload ---
+
+    getMaxWorkload() {
+      if (!this.teamData || this.teamData.length === 0) return 1;
+      return Math.max(...this.teamData.map(p => p.activeCommitmentCount || 0), 1);
+    },
+
+    getWorkloadPercent(count) {
+      const max = this.getMaxWorkload();
+      return max === 0 ? 0 : Math.round((count / max) * 100);
+    },
+
+    getSortedTeamByWorkload() {
+      return [...this.teamData].sort((a, b) => (b.activeCommitmentCount || 0) - (a.activeCommitmentCount || 0));
+    },
+
+    // --- Decision Date Filter ---
+
+    getFilteredDecisions() {
+      if (!this.dashboard || !this.dashboard.recentDecisions) return [];
+      if (this.decisionDateRange === 'all') return this.dashboard.recentDecisions;
+
+      const now = new Date();
+      let cutoff;
+      if (this.decisionDateRange === 'week') {
+        cutoff = new Date(now);
+        cutoff.setDate(now.getDate() - 7);
+      } else if (this.decisionDateRange === 'month') {
+        cutoff = new Date(now);
+        cutoff.setMonth(now.getMonth() - 1);
+      } else if (this.decisionDateRange === '3months') {
+        cutoff = new Date(now);
+        cutoff.setMonth(now.getMonth() - 3);
+      }
+
+      return this.dashboard.recentDecisions.filter(d => {
+        const raw = d.Date && typeof d.Date === 'object' ? d.Date.start : d.Date;
+        if (!raw) return this.decisionDateRange === 'all';
+        return new Date(raw) >= cutoff;
+      });
     },
 
     // --- Utilities ---

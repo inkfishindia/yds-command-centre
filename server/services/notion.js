@@ -250,8 +250,17 @@ async function getRecentDecisions(days = 30) {
   });
 }
 
+// Known AI Expert Panel page IDs — excluded from people/team queries
+const AI_EXPERT_IDS = new Set([
+  '308247aa0d7b8185b2c1d2b738aee402', // Colin (Chief of Staff)
+  '308247aa0d7b81c1948cf999fd8e3dcf', // Rory (Behavioral)
+  '308247aa0d7b81b1a1fdfd6569d9b202', // JW / Jessica (Creative)
+  '308247aa0d7b810f8322f160169f2344', // Copy Lead / Harry
+  '308247aa0d7b811fa554f1a77b7e20bc', // Tech Advisor
+]);
+
 /**
- * Fetch people (team roster)
+ * Fetch people (real humans only — filters out AI expert panel by page ID).
  */
 async function getPeople() {
   return deduplicatedFetch('people', async () => {
@@ -260,10 +269,12 @@ async function getPeople() {
       database_id: DB.PEOPLE,
       page_size: 30,
     }));
-    return response.results.map(page => ({
-      id: page.id,
-      ...simplify(page.properties),
-    }));
+    return response.results
+      .filter(page => !AI_EXPERT_IDS.has(page.id.replace(/-/g, '')))
+      .map(page => ({
+        id: page.id,
+        ...simplify(page.properties),
+      }));
   }).catch(err => {
     console.error('Failed to fetch people:', err.message);
     return [];
@@ -271,7 +282,8 @@ async function getPeople() {
 }
 
 /**
- * Fetch all projects with Focus Area relations
+ * Fetch all projects with Focus Area relations.
+ * Excludes records where Status is null/empty and records with "TEMPLATE" in the Name.
  */
 async function getProjects() {
   return deduplicatedFetch('projects', async () => {
@@ -283,6 +295,15 @@ async function getProjects() {
         database_id: DB.PROJECTS,
         page_size: 100,
         start_cursor: cursor,
+        filter: {
+          and: [
+            // Exclude entries with no status
+            { property: 'Status', select: { is_not_empty: true } },
+            // Exclude template records
+            { property: 'Name', title: { does_not_contain: 'TEMPLATE' } },
+            { property: 'Name', title: { does_not_contain: 'template' } },
+          ],
+        },
       }));
       projects.push(...response.results.map(page => ({
         id: page.id,
@@ -298,28 +319,102 @@ async function getProjects() {
 }
 
 /**
- * Fetch all commitments (for counts per focus area)
+ * Fetch all commitments (for counts per focus area).
+ * Excludes Cancelled by default. Marks null Priority/Type as "Unset".
+ * @param {boolean} includeCancelled - Pass true to include Cancelled status.
  */
-async function getAllCommitments() {
-  return deduplicatedFetch('all_commitments', async () => {
+async function getAllCommitments(includeCancelled = false) {
+  const cacheKey = includeCancelled ? 'all_commitments_with_cancelled' : 'all_commitments';
+  return deduplicatedFetch(cacheKey, async () => {
     const notion = getClient();
     const commitments = [];
     let cursor;
+    const params = {
+      database_id: DB.COMMITMENTS,
+      page_size: 100,
+    };
+    // Exclude Cancelled unless explicitly requested
+    if (!includeCancelled) {
+      params.filter = { property: 'Status', select: { does_not_equal: 'Cancelled' } };
+    }
     do {
       const response = await withRetry(() => notion.databases.query({
-        database_id: DB.COMMITMENTS,
-        page_size: 100,
+        ...params,
         start_cursor: cursor,
       }));
-      commitments.push(...response.results.map(page => ({
-        id: page.id,
-        ...simplify(page.properties),
-      })));
+      commitments.push(...response.results.map(page => {
+        const simplified = simplify(page.properties);
+        // Mark null Priority and Type as "Unset"
+        if (!simplified.Priority) simplified.Priority = 'Unset';
+        if (!simplified.Type) simplified.Type = 'Unset';
+        return { id: page.id, ...simplified };
+      }));
       cursor = response.has_more ? response.next_cursor : null;
     } while (cursor);
     return commitments;
   }).catch(err => {
     console.error('Failed to fetch all commitments:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Fetch all commitments with resolved relations (for kanban view).
+ * Excludes Cancelled. Returns the full unfiltered list — filtering is done client-side.
+ * Marks null Priority/Type as "Unset".
+ */
+async function getCommitmentsForKanban() {
+  return deduplicatedFetch('kanban_commitments_all', async () => {
+    const notion = getClient();
+    const commitments = [];
+    let cursor;
+    const params = {
+      database_id: DB.COMMITMENTS,
+      page_size: 100,
+      filter: { property: 'Status', select: { does_not_equal: 'Cancelled' } },
+    };
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        ...params,
+        start_cursor: cursor,
+      }));
+      commitments.push(...response.results.map(page => {
+        const simplified = simplify(page.properties);
+        if (!simplified.Priority) simplified.Priority = 'Unset';
+        if (!simplified.Type) simplified.Type = 'Unset';
+        return { id: page.id, url: page.url, ...simplified };
+      }));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    // Fetch people and focus areas for name resolution
+    const [people, focusAreas] = await Promise.all([getPeople(), getFocusAreas()]);
+
+    const peopleLookup = {};
+    for (const p of people) {
+      peopleLookup[p.id.replace(/-/g, '')] = p.Name || 'Unknown';
+    }
+    const faLookup = {};
+    for (const fa of focusAreas) {
+      faLookup[fa.id.replace(/-/g, '')] = fa.Name || 'Unknown';
+    }
+
+    // Resolve relation IDs to human-readable names
+    return commitments.map(c => {
+      const assignedIds = c['Assigned To'] || [];
+      const assignedNames = Array.isArray(assignedIds)
+        ? assignedIds.map(id => peopleLookup[id.replace(/-/g, '')] || id.slice(0, 8))
+        : [];
+
+      const faIds = c['Focus Area'] || c['Focus Areas'] || c['Focus area'] || [];
+      const focusAreaNames = Array.isArray(faIds)
+        ? faIds.map(id => faLookup[id.replace(/-/g, '')] || id.slice(0, 8))
+        : [];
+
+      return { ...c, assignedNames, focusAreaNames };
+    });
+  }).catch(err => {
+    console.error('Failed to fetch kanban commitments:', err.message);
     return [];
   });
 }
@@ -871,6 +966,7 @@ module.exports = {
   getPeople,
   getProjects,
   getAllCommitments,
+  getCommitmentsForKanban,
   getDashboardSummary,
   listDatabases,
   queryDatabase,
