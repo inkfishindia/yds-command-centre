@@ -2,7 +2,7 @@
 
 **Purpose:** Single source of truth for what exists in the app. Read this before building anything. Update this when you change the app.
 
-**Last updated:** 2026-03-04
+**Last updated:** 2026-03-04 (Batch 5: decision timeline — keyword search, focus area/owner filters, month grouping, timeline visual)
 
 ---
 
@@ -25,7 +25,7 @@
 | GET | `/api/notion/commitments/upcoming` | Upcoming commitments (?days=7, max 90) |
 | GET | `/api/notion/decisions` | Recent decisions (?days=30, max 365) |
 | GET | `/api/notion/people` | All people |
-| GET | `/api/notion/projects` | All projects with resolved relations |
+| GET | `/api/notion/projects` | All projects with resolved relations + commitment stats (openCount, overdueCount, doneCount, progressPercent, linkedCommitments[]) |
 | GET | `/api/notion/databases` | List 7 known databases (static) |
 | GET | `/api/notion/databases/:id` | Query database entries (?cursor, ?pageSize) |
 | GET | `/api/notion/pages/:id` | Page properties with resolved relations |
@@ -91,7 +91,13 @@
 `messages[]`, `inputText`, `streaming`, `streamingText`, `pendingApprovals[]`, `activeTools[]`
 
 ### Dashboard
-`dashboard`, `dashboardLoading`, `upcomingCommitments[]`, `expandedDecision`
+`dashboard`, `dashboardLoading`, `upcomingCommitments[]`, `expandedDecision`, `expandedCommitmentRow`, `showCompletedThisWeek`, `lastRefresh`, `refreshIntervalId`
+
+### Decision Filters
+`decisionDateRange` ('all'|'week'|'month'|'3months'), `decisionSearch` (keyword string), `decisionFocusArea` (focus area name), `decisionOwner` (owner name)
+
+### Projects
+`projects[]`, `projectsLoading`, `projectsFilter: 'Active'`, `projectsTypeFilter: ''`, `expandedProject` (null or project id)
 
 ### Team
 `teamData[]`, `teamLoading`

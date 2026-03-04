@@ -35,6 +35,30 @@ Read `.claude/rules/` for frontend and server patterns.
 6. Run `npm test` after backend changes — all tests must pass
 7. After changes, spawn `code-reviewer` agent
 
+## Output Format
+
+After completing work, report:
+
+```
+## Changes
+- [file:line] what changed and why
+
+## Tests
+npm test: PASS / FAIL (with details if fail)
+
+## Handoff
+→ code-reviewer: [summary of what to review]
+→ ux-auditor: [if frontend changed — what to check]
+```
+
+## Revert Protocol
+
+If something breaks mid-build:
+1. Run `git diff` to see what changed
+2. Run `git stash` to shelve broken changes
+3. Diagnose the issue, then `git stash pop` and fix — or `git checkout -- <file>` for specific files
+4. Never force-push or reset without user approval
+
 ## Image Generation
 
 When you need hero images, placeholder visuals, or UI illustrations for the frontend, **delegate to the Pixel agent**. Give it the design context (what section, what mood, what dimensions) and it generates AI images via Nano Banana.

@@ -814,6 +814,39 @@ body {
 .focus-card.focus-paused { border-left-color: var(--text-muted); opacity: 0.6; }
 .focus-card.focus-needs-improvement { border-left-color: var(--red); }
 
+/* Computed health variants */
+.focus-card.focus-health-green { border-left-color: var(--green); }
+.focus-card.focus-health-amber { border-left-color: var(--amber); }
+.focus-card.focus-health-red { border-left-color: var(--red); }
+.focus-card.focus-health-grey { border-left-color: var(--text-muted); opacity: 0.7; }
+
+/* Health dot indicator */
+.health-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.health-dot.green { background: var(--green); }
+.health-dot.amber { background: var(--amber); }
+.health-dot.red { background: var(--red); }
+.health-dot.grey { background: var(--text-muted); }
+
+/* Focus health badge — dot + label inline */
+.focus-health-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Focus area stats line */
+.focus-stats { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+/* Focus overdue items list */
+.focus-overdue-list { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem; list-style: none; padding: 0; }
+.focus-overdue-list li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+/* Focus last activity line */
+.focus-last-activity { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem; }
+
 .focus-name { font-size: 13px; font-weight: 500; margin-bottom: 0.25rem; }
 .focus-meta { font-size: 11px; color: var(--text-secondary); }
 
@@ -1081,6 +1114,85 @@ tr:hover .table-link { color: var(--accent); }
   border-color: var(--text-secondary);
   color: var(--text-primary);
   background: transparent;
+}
+
+/* === Team Health Classes === */
+
+.team-card.health-green {
+  border-left: 3px solid var(--green);
+}
+.team-card.health-amber {
+  border-left: 3px solid var(--amber);
+}
+.team-card.health-red {
+  border-left: 3px solid var(--red);
+}
+
+/* Overdue and blocked mini-badges */
+.overdue-badge,
+.blocked-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  height: 20px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.overdue-badge {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--red);
+}
+.blocked-badge {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--amber);
+}
+
+/* === Team Metrics Bar === */
+
+.team-metrics {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.team-metric-card {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  box-shadow: var(--shadow-card);
+}
+.team-metric-card.danger {
+  border-color: var(--red);
+  background: var(--red-glow);
+}
+.team-metric-card.warning {
+  border-color: var(--amber);
+  background: var(--amber-glow);
+}
+
+.team-metric-number {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+.team-metric-name {
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-metric-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-top: 0.2rem;
 }
 
 /* === Documents === */
@@ -1882,6 +1994,113 @@ tr:hover .table-link { color: var(--accent); }
   gap: 8px;
 }
 
+/* Decision filters */
+.decision-filters {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.decision-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: var(--font-ui);
+}
+
+.decision-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.decision-search::placeholder {
+  color: var(--text-muted);
+}
+
+.decision-filter-select {
+  padding: 0.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+.decision-filter-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Decision timeline */
+.decision-timeline {
+  position: relative;
+  padding-left: 2rem;
+}
+
+.decision-timeline::before {
+  content: '';
+  position: absolute;
+  left: 0.5rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+
+.decision-month-group {
+  margin-bottom: 1.5rem;
+}
+
+.decision-month-header {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 0.25rem;
+}
+
+.decision-month-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Timeline dot per decision card */
+.decision-timeline .decision-card {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.decision-timeline .decision-card::before {
+  content: '';
+  position: absolute;
+  left: -1.55rem;
+  top: 1rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-primary);
+  z-index: 1;
+}
+
+.decision-timeline .decision-expanded::before {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
 /* === Projects View === */
 
 .projects-view {
@@ -1996,6 +2215,142 @@ tr:hover .table-link { color: var(--accent); }
 
 /* Active status badge (already handled by data-status="active" — add it if missing) */
 .badge[data-status="active"] { background: var(--green-dim); color: var(--green); }
+
+/* Project progress bar and commitment summary */
+
+.project-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.project-commitment-summary {
+  display: flex;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.project-overdue-count {
+  color: var(--red);
+  font-weight: 500;
+}
+
+.project-progress-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.project-progress-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 99px;
+  transition: width var(--transition-slow);
+  min-width: 2px;
+}
+
+.project-progress-fill.has-overdue {
+  background: var(--amber);
+}
+
+/* Project card expanded state */
+
+.project-card-expanded {
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 1px var(--accent-dim), var(--shadow-elevated);
+}
+
+.project-card-expanded:hover {
+  transform: none;
+}
+
+.project-detail {
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.project-detail-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.project-detail-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.project-commitments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.project-commitment-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.project-commitment-item:last-child {
+  border-bottom: none;
+}
+
+.project-commitment-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-commitment-due {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.project-audiences {
+  display: flex;
+  flex-direction: column;
+}
+
+.project-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.project-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.project-view-btn {
+  align-self: flex-start;
+  margin-top: 4px;
+}
 
 @media (max-width: 768px) {
   .projects-grid { grid-template-columns: 1fr; }
@@ -2208,4 +2563,190 @@ tr:hover .table-link { color: var(--accent); }
   color: var(--text-muted);
   text-align: right;
   flex-shrink: 0;
+}
+
+/* === Global Metrics Bar === */
+
+.global-metrics {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.25rem;
+  height: 36px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.global-metrics-pills {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.metric-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-pill.danger {
+  background: var(--red-dim);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.global-metrics-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.metric-refresh {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.metric-refresh-btn {
+  padding: 0.1rem 0.4rem;
+  font-size: 12px;
+  min-width: unset;
+}
+
+/* === Relative Dates === */
+
+.relative-date {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.relative-date.overdue {
+  color: var(--red);
+  font-weight: 500;
+}
+
+.relative-date.done {
+  color: var(--text-muted);
+}
+
+/* === Expandable Commitment Rows === */
+
+.commitment-row {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.commitment-row:hover {
+  background: var(--bg-hover);
+}
+
+.commitment-row-expanded {
+  background: var(--bg-hover);
+}
+
+.commitment-row--done td {
+  opacity: 0.6;
+}
+
+.done-strikethrough {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.commitment-detail-row td {
+  background: var(--bg-card);
+  border-top: none;
+  padding: 0;
+}
+
+.commitment-detail {
+  padding: 0.625rem 1rem 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-top: 1px solid var(--border);
+}
+
+.commitment-detail-field {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 12px;
+  align-items: flex-start;
+}
+
+.commitment-detail-key {
+  color: var(--text-muted);
+  font-weight: 500;
+  min-width: 72px;
+  flex-shrink: 0;
+}
+
+.commitment-detail-val {
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.commitment-detail-actions {
+  margin-top: 0.25rem;
+}
+
+/* === Completed This Week Toggle === */
+
+.completed-toggle-row {
+  display: flex;
+  align-items: center;
+  padding: 0.625rem 0;
+  margin-top: 0.25rem;
+}
+
+.completed-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.completed-toggle-label:hover {
+  color: var(--text-secondary);
+}
+
+.completed-toggle-checkbox {
+  accent-color: var(--accent);
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+}
+
+/* Muted table variant for completed items */
+.data-table--muted {
+  opacity: 0.7;
+}
+
+/* Muted section title variant */
+.section-title--muted {
+  color: var(--text-muted);
+}
+
+/* Inline empty state */
+.empty-state--inline {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0.5rem 0;
+  margin: 0;
 }

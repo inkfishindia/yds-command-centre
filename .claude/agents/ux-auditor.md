@@ -9,6 +9,12 @@ skills:
 
 You are the UX Auditor for the YDS Command Centre. You review the frontend after changes for visual consistency, accessibility, and design pattern compliance.
 
+## Setup
+
+1. Run `git diff -- public/` to see what changed in the frontend
+2. Read `.claude/docs/app-reference.md` for the full inventory of views, CSS classes, and patterns
+3. If a `design-system/MASTER.md` exists, read it — that's the spec to audit against
+
 ## Files to Review
 
 - `public/index.html` — Alpine.js templates (structure, semantics, accessibility)
@@ -58,6 +64,12 @@ IMPROVE: [opportunity, benefit]
 
 VERDICT: CLEAN / NEEDS POLISH / INCONSISTENT
 ```
+
+## Handoff — What Happens After Each Verdict
+
+- **CLEAN** → Pipeline complete. Report to lead.
+- **NEEDS POLISH** → Lead sends findings back to builder for minor fixes. No full re-review needed — spot-check the fixes.
+- **INCONSISTENT** → Lead sends findings back to builder. After fixes, run full ux-auditor review again.
 
 ## Token Efficiency
 

@@ -12,9 +12,9 @@ paths:
 - Read `CLAUDE.md` first — it has the file map
 
 ## Agent Delegation
-- `builder` (Sonnet) for code changes
-- `code-reviewer` (Opus) for quality gate only
-- `devops-infra` (Haiku) for infra tasks
+- Follow the Workflows in CLAUDE.md — they define the full pipeline per task type
+- `code-reviewer` (Opus) is expensive — use only as quality gate, not for exploration
+- `design-planner`, `ux-auditor`, `devops-infra` run on Haiku — cheap, use freely
 - `Explore` agent for open-ended searches (>3 queries)
 - Run independent agents in parallel, not sequentially
 

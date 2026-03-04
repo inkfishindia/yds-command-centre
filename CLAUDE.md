@@ -67,6 +67,25 @@ public/
 | Image generation | `pixel` | Sonnet | Hero graphics, social visuals, mockups via Nano Banana |
 | Deploy/infra | `devops-infra` | Haiku | Deployment config, env setup, monitoring |
 
+## Workflows — Follow the Full Pipeline
+
+**UI / Frontend changes:**
+`design-planner` → `pixel` (if visuals needed) → `builder` → `code-reviewer` → `ux-auditor`
+
+**Backend changes:**
+`builder` → `code-reviewer`
+
+**New page or feature:**
+`design-planner` → `pixel` (if visuals needed) → `builder` → `code-reviewer` → `ux-auditor`
+
+**Infrastructure / deploy:**
+`devops-infra` → `code-reviewer`
+
+**Bug fix:**
+`builder` → `code-reviewer`
+
+Do not skip steps. The lead session orchestrates — call each agent in order, passing context forward.
+
 ## How to Run
 
 ```bash

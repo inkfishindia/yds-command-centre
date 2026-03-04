@@ -359,6 +359,49 @@ async function getAllCommitments(includeCancelled = false) {
 }
 
 /**
+ * Fetch commitments completed (Status = Done) in the last N days.
+ * Uses last_edited_time as the recency signal.
+ */
+async function getRecentlyCompletedCommitments(days = 30) {
+  const cacheKey = 'recently_completed_' + days;
+  return deduplicatedFetch(cacheKey, async () => {
+    const notion = getClient();
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const sinceStr = since.toISOString().split('T')[0];
+
+    const results = [];
+    let cursor;
+    const params = {
+      database_id: DB.COMMITMENTS,
+      page_size: 100,
+      filter: {
+        and: [
+          { property: 'Status', select: { equals: 'Done' } },
+          { timestamp: 'last_edited_time', last_edited_time: { on_or_after: sinceStr } },
+        ],
+      },
+    };
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        ...params,
+        start_cursor: cursor,
+      }));
+      results.push(...response.results.map(page => ({
+        id: page.id,
+        last_edited_time: page.last_edited_time,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+    return results;
+  }).catch(err => {
+    console.error('Failed to fetch recently completed commitments:', err.message);
+    return [];
+  });
+}
+
+/**
  * Fetch all commitments with resolved relations (for kanban view).
  * Excludes Cancelled. Returns the full unfiltered list — filtering is done client-side.
  * Marks null Priority/Type as "Unset".
@@ -423,7 +466,7 @@ async function getCommitmentsForKanban() {
  * Get dashboard summary data with health distribution and counts
  */
 async function getDashboardSummary() {
-  const [focusAreas, overdue, decisions, people, projects, allCommitments, upcoming, audiencesResult, platformsResult] = await Promise.all([
+  const [focusAreas, overdue, decisions, people, projects, allCommitments, upcoming, audiencesResult, platformsResult, recentlyCompleted] = await Promise.all([
     getFocusAreas(),
     getOverdueCommitments(),
     getRecentDecisions(7),
@@ -433,6 +476,7 @@ async function getDashboardSummary() {
     getUpcomingCommitments(7),
     queryDatabase(DB.AUDIENCES, { pageSize: 50 }),
     queryDatabase(DB.PLATFORMS, { pageSize: 50 }),
+    getRecentlyCompletedCommitments(30),
   ]);
 
   // Health distribution
@@ -466,12 +510,92 @@ async function getDashboardSummary() {
     }
   }
 
+  // Pre-compute per-focus-area health signals from allCommitments + recentlyCompleted
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // Build per-FA buckets: overdue items, blocked items, all items (for lastActivity)
+  const faOverdue = {};   // nid → [commitment]  (active, due < today)
+  const faBlocked = {};   // nid → count
+  const faAllDates = {};  // nid → [ISO date strings]  (for lastActivity)
+
+  for (const c of allCommitments) {
+    const faIds = c['Focus Area'] || c['Focus Areas'] || c['Focus area'] || [];
+    for (const faId of (Array.isArray(faIds) ? faIds : [])) {
+      const nid = faId.replace(/-/g, '');
+
+      // lastActivity: collect the due date start if present
+      const due = c['Due Date'];
+      const dueStart = due && typeof due === 'object' ? due.start : (due || null);
+      if (dueStart) {
+        if (!faAllDates[nid]) faAllDates[nid] = [];
+        faAllDates[nid].push(dueStart);
+      }
+
+      // Overdue: active, due < today
+      const isActive = c.Status && !['Done', 'Cancelled'].includes(c.Status);
+      if (isActive && dueStart && dueStart < todayStr) {
+        if (!faOverdue[nid]) faOverdue[nid] = [];
+        faOverdue[nid].push(c);
+      }
+
+      // Blocked
+      if (c.Status === 'Blocked') {
+        faBlocked[nid] = (faBlocked[nid] || 0) + 1;
+      }
+    }
+  }
+
+  // completedLast30d: from recentlyCompleted (Status=Done, edited within 30 days)
+  const faCompleted30d = {};
+  for (const c of recentlyCompleted) {
+    const faIds = c['Focus Area'] || c['Focus Areas'] || c['Focus area'] || [];
+    for (const faId of (Array.isArray(faIds) ? faIds : [])) {
+      const nid = faId.replace(/-/g, '');
+      faCompleted30d[nid] = (faCompleted30d[nid] || 0) + 1;
+
+      // Also count their last_edited_time as lastActivity signal
+      if (c.last_edited_time) {
+        if (!faAllDates[nid]) faAllDates[nid] = [];
+        faAllDates[nid].push(c.last_edited_time.split('T')[0]);
+      }
+    }
+  }
+
   // Enrich focus areas
-  const enrichedFocusAreas = focusAreas.map(area => ({
-    ...area,
-    projectCount: projectsByFA[area.id.replace(/-/g, '')] || 0,
-    commitmentCount: commitmentsByFA[area.id.replace(/-/g, '')] || 0,
-  }));
+  const enrichedFocusAreas = focusAreas.map(area => {
+    const nid = area.id.replace(/-/g, '');
+    const overdueItems = faOverdue[nid] || [];
+    const blockedCount = faBlocked[nid] || 0;
+    const completedLast30d = faCompleted30d[nid] || 0;
+
+    // lastActivityDate: most recent date across all commitments for this FA
+    const allDates = faAllDates[nid] || [];
+    const lastActivityDate = allDates.length > 0
+      ? allDates.sort().reverse()[0]
+      : null;
+
+    // topOverdueItems: up to 3, sorted oldest first (smallest dueStart first)
+    const topOverdueItems = overdueItems
+      .slice()
+      .sort((a, b) => {
+        const aDate = (a['Due Date'] && typeof a['Due Date'] === 'object' ? a['Due Date'].start : a['Due Date']) || '';
+        const bDate = (b['Due Date'] && typeof b['Due Date'] === 'object' ? b['Due Date'].start : b['Due Date']) || '';
+        return aDate < bDate ? -1 : aDate > bDate ? 1 : 0;
+      })
+      .slice(0, 3)
+      .map(c => c.Name || 'Untitled');
+
+    return {
+      ...area,
+      projectCount: projectsByFA[nid] || 0,
+      commitmentCount: commitmentsByFA[nid] || 0,
+      overdueCount: overdueItems.length,
+      blockedCount,
+      completedLast30d,
+      lastActivityDate,
+      topOverdueItems,
+    };
+  });
 
   // Build people ID to Name lookup for resolving relations
   const peopleLookup = {};
@@ -510,6 +634,18 @@ async function getDashboardSummary() {
       c.Status && !['Done', 'Cancelled'].includes(c.Status)
     );
 
+    // Count overdue commitments: due < today AND not Done/Cancelled
+    const overdueCount = activeCommitments.filter(c => {
+      const due = c['Due Date'];
+      if (!due) return false;
+      const dueStart = typeof due === 'object' ? due.start : due;
+      if (!dueStart) return false;
+      return dueStart < todayStr;
+    }).length;
+
+    // Count blocked commitments: Status === 'Blocked'
+    const blockedCount = activeCommitments.filter(c => c.Status === 'Blocked').length;
+
     // Find projects owned by this person
     const personProjects = projects.filter(p => {
       const ownerIds = p.Owner || [];
@@ -536,12 +672,21 @@ async function getDashboardSummary() {
     return {
       ...person,
       activeCommitmentCount: activeCommitments.length,
+      overdueCount,
+      blockedCount,
       activeProjectCount: activeProjects.length,
       activeProjectNames: activeProjects.map(p => p.Name).slice(0, 5),
       focusAreaNames: focusAreaNames.slice(0, 5),
       commitmentNames: activeCommitments.map(c => c.Name).slice(0, 5),
     };
   });
+
+  // Count unassigned active commitments (no entries in 'Assigned To')
+  const unassignedCount = allCommitments.filter(c => {
+    if (c.Status && ['Done', 'Cancelled'].includes(c.Status)) return false;
+    const assignedIds = c['Assigned To'] || [];
+    return !Array.isArray(assignedIds) || assignedIds.length === 0;
+  }).length;
 
   return {
     focusAreas: enrichedFocusAreas,
@@ -552,6 +697,7 @@ async function getDashboardSummary() {
     healthDistribution,
     audienceCount: audiencesResult.results.length,
     platformCount: platformsResult.results.length,
+    unassignedCount,
     timestamp: new Date().toISOString(),
   };
 }

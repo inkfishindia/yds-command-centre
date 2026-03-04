@@ -100,16 +100,84 @@ router.get('/people', async (req, res) => {
 /**
  * GET /api/notion/projects
  * All projects with resolved relations (Owner, Focus Area, AI Expert Panel)
+ * and commitment stats (openCount, overdueCount, doneCount, totalCount, progressPercent)
  */
 router.get('/projects', async (req, res) => {
   try {
-    const projects = await notionService.getProjects();
+    const today = new Date().toISOString().split('T')[0];
+
+    // Fetch projects and all commitments in parallel
+    const [projects, allCommitments] = await Promise.all([
+      notionService.getProjects(),
+      notionService.getAllCommitments(false), // excludes Cancelled
+    ]);
+
+    // Build lookup: project ID (no dashes) → commitment stats
+    const commitmentsByProject = {};
+    for (const c of allCommitments) {
+      const projectIds = c['Project'] || [];
+      for (const pid of (Array.isArray(projectIds) ? projectIds : [])) {
+        const nid = pid.replace(/-/g, '');
+        if (!commitmentsByProject[nid]) {
+          commitmentsByProject[nid] = { open: [], done: [], overdue: [] };
+        }
+        const isDone = c.Status === 'Done';
+        const isActive = !isDone; // Cancelled already excluded from getAllCommitments
+        const dueRaw = c['Due Date'];
+        const dueStart = dueRaw && typeof dueRaw === 'object' ? dueRaw.start : dueRaw;
+        const isOverdue = isActive && dueStart && dueStart < today;
+
+        if (isDone) {
+          commitmentsByProject[nid].done.push(c);
+        } else {
+          commitmentsByProject[nid].open.push(c);
+          if (isOverdue) commitmentsByProject[nid].overdue.push(c);
+        }
+      }
+    }
+
+    // Resolve relations and attach commitment stats
     const resolvedProjects = await Promise.all(
       projects.map(async (p) => {
         const resolved = await notionService.resolveRelations(p);
-        return resolved;
+        const nid = p.id.replace(/-/g, '');
+        const stats = commitmentsByProject[nid] || { open: [], done: [], overdue: [] };
+        const openCount = stats.open.length;
+        const doneCount = stats.done.length;
+        const overdueCount = stats.overdue.length;
+        const totalCount = openCount + doneCount;
+        const progressPercent = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+
+        // Attach slim commitment list for expanded view (name, status, due date)
+        const linkedCommitments = [
+          ...stats.open.map(c => ({
+            id: c.id,
+            name: c.Name || 'Untitled',
+            status: c.Status || 'Not Started',
+            dueDate: c['Due Date'] || null,
+            priority: c.Priority || null,
+          })),
+          ...stats.done.map(c => ({
+            id: c.id,
+            name: c.Name || 'Untitled',
+            status: c.Status || 'Done',
+            dueDate: c['Due Date'] || null,
+            priority: c.Priority || null,
+          })),
+        ];
+
+        return {
+          ...resolved,
+          openCount,
+          overdueCount,
+          doneCount,
+          totalCount,
+          progressPercent,
+          linkedCommitments,
+        };
       })
     );
+
     res.json({ projects: resolvedProjects });
   } catch (err) {
     console.error('Projects error:', err);

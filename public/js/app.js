@@ -42,12 +42,17 @@ function app() {
     dashboardLoading: false,
     upcomingCommitments: [],
     expandedDecision: null,
+    expandedCommitmentRow: null,
+    showCompletedThisWeek: false,
+    lastRefresh: null,
+    refreshIntervalId: null,
 
     // Projects
     projects: [],
     projectsLoading: false,
     projectsFilter: 'Active',
     projectsTypeFilter: '',
+    expandedProject: null,
 
     // Team
     teamData: [],
@@ -60,8 +65,11 @@ function app() {
     commitmentsView: 'kanban', // 'kanban' | 'list'
     commitmentFilters: { focusArea: '', person: '', priority: '', status: '' },
 
-    // Decisions date filter
+    // Decisions filters
     decisionDateRange: 'all', // 'week' | 'month' | '3months' | 'all'
+    decisionSearch: '',
+    decisionFocusArea: '',
+    decisionOwner: '',
 
     // Documents
     documents: { briefings: [], decisions: [], 'weekly-reviews': [] },
@@ -126,6 +134,11 @@ function app() {
 
       // Auto-load dashboard on start
       this.loadDashboard();
+
+      // Auto-refresh dashboard every 5 minutes
+      this.refreshIntervalId = setInterval(() => {
+        this.loadDashboard();
+      }, 300000);
     },
 
     // --- Chat ---
@@ -275,16 +288,115 @@ function app() {
 
     async loadDashboard() {
       this.expandedDecision = null;
+      this.expandedCommitmentRow = null;
       this.dashboardLoading = true;
       try {
         const res = await fetch('/api/notion/dashboard');
         this.dashboard = await res.json();
         this.upcomingCommitments = this.dashboard.upcoming || [];
+        this.lastRefresh = new Date();
       } catch (err) {
         console.error('Dashboard error:', err);
       } finally {
         this.dashboardLoading = false;
       }
+    },
+
+    toggleCommitmentRow(key) {
+      this.expandedCommitmentRow = this.expandedCommitmentRow === key ? null : key;
+    },
+
+    getCompletedThisWeek() {
+      // Combines data from commitments (kanban view) if loaded, or falls back to upcoming/overdue from dashboard
+      const all = this.commitments.length > 0 ? this.commitments : [
+        ...(this.dashboard?.overdue || []),
+        ...(this.upcomingCommitments || []),
+      ];
+      const now = new Date();
+      const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - dayOfWeek);
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      return all.filter(c => {
+        if (c.Status !== 'Done') return false;
+        // Check due date or last edited within this week
+        const raw = c['Due Date'] && (typeof c['Due Date'] === 'object' ? c['Due Date'].start : c['Due Date']);
+        if (raw) {
+          const due = new Date(raw + (raw.includes('T') ? '' : 'T00:00:00'));
+          if (due >= startOfWeek) return true;
+        }
+        // Also check last_edited_time if available
+        if (c.last_edited_time) {
+          const edited = new Date(c.last_edited_time);
+          if (edited >= startOfWeek) return true;
+        }
+        return false;
+      });
+    },
+
+    getGlobalMetrics() {
+      if (!this.dashboard) return null;
+      const openCommitments = (this.dashboard.upcoming || []).length + (this.dashboard.overdue || []).length;
+      const overdueCount = (this.dashboard.overdue || []).length;
+      const activeProjects = this.projects.filter(p => p.Status === 'Active').length;
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const decisionsThisMonth = (this.dashboard.recentDecisions || []).filter(d => {
+        const raw = d.Date && (typeof d.Date === 'object' ? d.Date.start : d.Date);
+        if (!raw) return false;
+        return new Date(raw) >= startOfMonth;
+      }).length;
+      return { openCommitments, overdueCount, activeProjects, decisionsThisMonth };
+    },
+
+    getLastRefreshLabel() {
+      if (!this.lastRefresh) return '';
+      const seconds = Math.floor((Date.now() - this.lastRefresh.getTime()) / 1000);
+      if (seconds < 10) return 'Just now';
+      if (seconds < 60) return seconds + 's ago';
+      const minutes = Math.floor(seconds / 60);
+      return minutes + 'm ago';
+    },
+
+    async forceRefresh() {
+      try {
+        await fetch('/api/notion/cache/clear', { method: 'POST' });
+      } catch (err) {
+        console.error('Cache clear error:', err);
+      }
+      await this.loadDashboard();
+      // Also reload projects if they were loaded
+      if (this.projects.length > 0) {
+        this.loadProjects();
+      }
+    },
+
+    formatRelativeDate(dateValue) {
+      if (!dateValue) return '—';
+      const raw = typeof dateValue === 'object' && dateValue !== null && dateValue.start
+        ? dateValue.start
+        : String(dateValue);
+      const dateOnly = raw.split('T')[0];
+      const due = new Date(dateOnly + 'T00:00:00');
+      if (isNaN(due)) return raw;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffMs = due.getTime() - today.getTime();
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDays < -1) return Math.abs(diffDays) + ' days overdue';
+      if (diffDays === -1) return '1 day overdue';
+      if (diffDays === 0) return 'Due today';
+      if (diffDays === 1) return 'Due tomorrow';
+      if (diffDays <= 6) {
+        const dayName = due.toLocaleDateString('en-US', { weekday: 'short' });
+        return 'Due ' + dayName;
+      }
+      const month = due.toLocaleDateString('en-US', { month: 'short' });
+      const day = due.getDate();
+      return 'Due ' + month + ' ' + day;
     },
 
     // --- Projects ---
@@ -313,12 +425,88 @@ function app() {
       return filtered;
     },
 
+    toggleProject(projectId) {
+      this.expandedProject = this.expandedProject === projectId ? null : projectId;
+    },
+
+    viewProjectInNotion(projectId, projectName) {
+      this.expandedProject = null;
+      this.view = 'notion';
+      this.openNotionPage(projectId, projectName);
+    },
+
     getFocusHealthClass(area) {
       const health = (area.Health || area.Status || '').toLowerCase();
       if (health.includes('attention')) return 'focus-attention';
       if (health.includes('paused') || health.includes('hold')) return 'focus-paused';
       if (health.includes('needs improvement')) return 'focus-needs-improvement';
       return '';
+    },
+
+    // Compute health signal from enriched focus area data
+    getComputedHealth(area) {
+      const overdue = area.overdueCount || 0;
+      const blocked = area.blockedCount || 0;
+      const open = area.commitmentCount || 0;
+      const lastActivity = area.lastActivityDate || null;
+
+      // Dormant: no open commitments at all
+      if (open === 0) return { color: 'grey', label: 'Dormant' };
+
+      // Days since last activity
+      let daysSinceActivity = null;
+      if (lastActivity) {
+        const actDate = new Date(lastActivity + 'T00:00:00');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        daysSinceActivity = Math.floor((today.getTime() - actDate.getTime()) / (1000 * 60 * 60 * 24));
+      }
+
+      // Off Track: 3+ overdue OR 2+ blocked OR no activity for 14+ days
+      if (overdue >= 3 || blocked >= 2 || (daysSinceActivity !== null && daysSinceActivity >= 14)) {
+        return { color: 'red', label: 'Off Track' };
+      }
+
+      // At Risk: 1-2 overdue OR 1 blocked OR no activity 7-13 days
+      if (overdue >= 1 || blocked >= 1 || (daysSinceActivity !== null && daysSinceActivity >= 7)) {
+        return { color: 'amber', label: 'At Risk' };
+      }
+
+      // On Track: 0 overdue, 0 blocked, activity within 7 days
+      return { color: 'green', label: 'On Track' };
+    },
+
+    // Sort focus areas: red → amber → green → grey, then overdueCount descending within group
+    getSortedFocusAreas() {
+      if (!this.dashboard || !this.dashboard.focusAreas) return [];
+      const colorOrder = { red: 0, amber: 1, green: 2, grey: 3 };
+      return [...this.dashboard.focusAreas].sort((a, b) => {
+        const ha = this.getComputedHealth(a);
+        const hb = this.getComputedHealth(b);
+        const orderA = colorOrder[ha.color] ?? 4;
+        const orderB = colorOrder[hb.color] ?? 4;
+        if (orderA !== orderB) return orderA - orderB;
+        // Within same health: overdueCount descending
+        return (b.overdueCount || 0) - (a.overdueCount || 0);
+      });
+    },
+
+    // Format a date string as "today", "2 days ago", "12 days ago"
+    formatDaysAgo(dateStr) {
+      if (!dateStr) return '—';
+      const raw = typeof dateStr === 'object' && dateStr.start ? dateStr.start : String(dateStr);
+      const dateOnly = raw.split('T')[0];
+      const d = new Date(dateOnly + 'T00:00:00');
+      if (isNaN(d)) return '—';
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffDays = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return 'today';
+      if (diffDays === 1) return '1 day ago';
+      if (diffDays > 0) return diffDays + ' days ago';
+      // Future date (edge case)
+      if (diffDays === -1) return 'tomorrow';
+      return Math.abs(diffDays) + ' days from now';
     },
 
     // --- Commitments Kanban ---
@@ -799,34 +987,176 @@ function app() {
       return max === 0 ? 0 : Math.round((count / max) * 100);
     },
 
-    getSortedTeamByWorkload() {
-      return [...this.teamData].sort((a, b) => (b.activeCommitmentCount || 0) - (a.activeCommitmentCount || 0));
+    getPersonHealthClass(person) {
+      const overdue = person.overdueCount || 0;
+      const blocked = person.blockedCount || 0;
+      if (overdue >= 3 || blocked >= 2) return 'health-red';
+      if (overdue >= 1 || blocked >= 1) return 'health-amber';
+      return 'health-green';
     },
 
-    // --- Decision Date Filter ---
+    getSortedTeamByWorkload() {
+      return [...this.teamData].sort((a, b) => {
+        // Primary: overdueCount descending
+        const overdueA = a.overdueCount || 0;
+        const overdueB = b.overdueCount || 0;
+        if (overdueB !== overdueA) return overdueB - overdueA;
+        // Secondary: blockedCount descending
+        const blockedA = a.blockedCount || 0;
+        const blockedB = b.blockedCount || 0;
+        if (blockedB !== blockedA) return blockedB - blockedA;
+        // Tertiary: activeCommitmentCount descending
+        return (b.activeCommitmentCount || 0) - (a.activeCommitmentCount || 0);
+      });
+    },
+
+    getTeamMetrics() {
+      if (!this.teamData || this.teamData.length === 0) {
+        return { totalOpen: 0, totalOverdue: 0, mostLoaded: '—', unassigned: 0 };
+      }
+      const totalOpen = this.teamData.reduce((sum, p) => sum + (p.activeCommitmentCount || 0), 0);
+      const totalOverdue = this.teamData.reduce((sum, p) => sum + (p.overdueCount || 0), 0);
+      const mostLoaded = this.teamData.reduce((best, p) =>
+        (p.activeCommitmentCount || 0) > (best.activeCommitmentCount || 0) ? p : best,
+        this.teamData[0]
+      );
+      const unassigned = (this.dashboard && this.dashboard.unassignedCount != null)
+        ? this.dashboard.unassignedCount
+        : 0;
+      return {
+        totalOpen,
+        totalOverdue,
+        mostLoaded: mostLoaded ? (mostLoaded.Name || '—') : '—',
+        unassigned,
+      };
+    },
+
+    // --- Decision Filters ---
 
     getFilteredDecisions() {
       if (!this.dashboard || !this.dashboard.recentDecisions) return [];
-      if (this.decisionDateRange === 'all') return this.dashboard.recentDecisions;
+      let results = this.dashboard.recentDecisions;
 
-      const now = new Date();
-      let cutoff;
-      if (this.decisionDateRange === 'week') {
-        cutoff = new Date(now);
-        cutoff.setDate(now.getDate() - 7);
-      } else if (this.decisionDateRange === 'month') {
-        cutoff = new Date(now);
-        cutoff.setMonth(now.getMonth() - 1);
-      } else if (this.decisionDateRange === '3months') {
-        cutoff = new Date(now);
-        cutoff.setMonth(now.getMonth() - 3);
+      // Date range filter
+      if (this.decisionDateRange !== 'all') {
+        const now = new Date();
+        let cutoff;
+        if (this.decisionDateRange === 'week') {
+          cutoff = new Date(now);
+          cutoff.setDate(now.getDate() - 7);
+        } else if (this.decisionDateRange === 'month') {
+          cutoff = new Date(now);
+          cutoff.setMonth(now.getMonth() - 1);
+        } else if (this.decisionDateRange === '3months') {
+          cutoff = new Date(now);
+          cutoff.setMonth(now.getMonth() - 3);
+        }
+        results = results.filter(d => {
+          const raw = d.Date && typeof d.Date === 'object' ? d.Date.start : d.Date;
+          if (!raw) return false;
+          return new Date(raw) >= cutoff;
+        });
       }
 
-      return this.dashboard.recentDecisions.filter(d => {
-        const raw = d.Date && typeof d.Date === 'object' ? d.Date.start : d.Date;
-        if (!raw) return this.decisionDateRange === 'all';
-        return new Date(raw) >= cutoff;
+      // Keyword search: Name, Context, Decision, Rationale
+      if (this.decisionSearch.trim()) {
+        const q = this.decisionSearch.toLowerCase().trim();
+        results = results.filter(d => {
+          return (
+            (d.Name || '').toLowerCase().includes(q) ||
+            (d.Context || '').toLowerCase().includes(q) ||
+            (d.Decision || '').toLowerCase().includes(q) ||
+            (d.Rationale || '').toLowerCase().includes(q)
+          );
+        });
+      }
+
+      // Focus Area filter: match UUID against dashboard focusAreas lookup
+      if (this.decisionFocusArea) {
+        const focusAreas = (this.dashboard.focusAreas || []);
+        // Find the UUID for the selected name
+        const matchArea = focusAreas.find(a => a.Name === this.decisionFocusArea);
+        if (matchArea) {
+          const matchId = matchArea.id.replace(/-/g, '');
+          results = results.filter(d => {
+            const faIds = d['Focus Area'] || [];
+            return Array.isArray(faIds) && faIds.some(id => id.replace(/-/g, '') === matchId);
+          });
+        }
+      }
+
+      // Owner filter: text field match
+      if (this.decisionOwner) {
+        results = results.filter(d => (d.Owner || '') === this.decisionOwner);
+      }
+
+      return results;
+    },
+
+    getDecisionFilterOptions() {
+      if (!this.dashboard || !this.dashboard.recentDecisions) return { focusAreas: [], owners: [] };
+      const decisions = this.dashboard.recentDecisions;
+      const focusAreas = this.dashboard.focusAreas || [];
+
+      // Collect unique focus area IDs used across all decisions
+      const usedFaIds = new Set();
+      for (const d of decisions) {
+        const faIds = d['Focus Area'] || [];
+        if (Array.isArray(faIds)) faIds.forEach(id => usedFaIds.add(id.replace(/-/g, '')));
+      }
+
+      // Map to names using dashboard focusAreas
+      const uniqueFocusAreas = focusAreas
+        .filter(a => usedFaIds.has(a.id.replace(/-/g, '')))
+        .map(a => a.Name)
+        .filter(Boolean)
+        .sort();
+
+      // Unique owners
+      const ownersSet = new Set();
+      for (const d of decisions) {
+        if (d.Owner) ownersSet.add(d.Owner);
+      }
+      const owners = [...ownersSet].sort();
+
+      return { focusAreas: uniqueFocusAreas, owners };
+    },
+
+    // Group filtered decisions by month, newest first
+    getDecisionsByMonth() {
+      const decisions = this.getFilteredDecisions();
+      const groups = [];
+      const monthMap = {};
+
+      for (const d of decisions) {
+        const raw = d.Date && typeof d.Date === 'object' ? d.Date.start : (d.Date || '');
+        let monthKey = 'Unknown';
+        if (raw) {
+          const dt = new Date(raw.split('T')[0] + 'T00:00:00');
+          if (!isNaN(dt)) {
+            monthKey = dt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          }
+        }
+        if (!monthMap[monthKey]) {
+          monthMap[monthKey] = { month: monthKey, decisions: [], _date: raw };
+          groups.push(monthMap[monthKey]);
+        }
+        monthMap[monthKey].decisions.push(d);
+      }
+
+      // Sort groups newest first
+      groups.sort((a, b) => {
+        if (a.month === 'Unknown') return 1;
+        if (b.month === 'Unknown') return -1;
+        return new Date(b._date) - new Date(a._date);
       });
+
+      // Add count
+      for (const g of groups) {
+        g.count = g.decisions.length;
+      }
+
+      return groups;
     },
 
     // --- Utilities ---
