@@ -12,7 +12,7 @@ marked.setOptions({
 function app() {
   return {
     // Navigation
-    view: 'chat',
+    view: 'dashboard',
 
     // Connection status
     connected: false,
@@ -40,6 +40,7 @@ function app() {
     // Dashboard
     dashboard: null,
     dashboardLoading: false,
+    upcomingCommitments: [],
 
     // Team
     teamData: [],
@@ -61,6 +62,18 @@ function app() {
     notionKeyPages: [],
     notionHasMore: false,
     notionNextCursor: null,
+    notionRelated: {},
+    notionRelatedLoading: false,
+    notionSearchQuery: '',
+    notionFilterStatus: '',
+
+    // Detail panel (slide-in sidebar)
+    detailPanel: null,
+
+    // Command palette
+    cmdPaletteOpen: false,
+    cmdSearch: '',
+    cmdSelectedIndex: 0,
 
     // Initialization
     async init() {
@@ -81,6 +94,20 @@ function app() {
       } catch (err) {
         console.error('Failed to load skills:', err);
       }
+
+      // Command palette keyboard shortcut
+      document.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+          e.preventDefault();
+          this.toggleCmdPalette();
+        }
+        if (e.key === 'Escape' && this.cmdPaletteOpen) {
+          this.closeCmdPalette();
+        }
+      });
+
+      // Auto-load dashboard on start
+      this.loadDashboard();
     },
 
     // --- Chat ---
@@ -222,8 +249,13 @@ function app() {
     async loadDashboard() {
       this.dashboardLoading = true;
       try {
-        const res = await fetch('/api/notion/dashboard');
-        this.dashboard = await res.json();
+        const [dashRes, upcomingRes] = await Promise.all([
+          fetch('/api/notion/dashboard'),
+          fetch('/api/notion/commitments/upcoming'),
+        ]);
+        this.dashboard = await dashRes.json();
+        const upcomingData = await upcomingRes.json();
+        this.upcomingCommitments = upcomingData.commitments || [];
       } catch (err) {
         console.error('Dashboard error:', err);
       } finally {
@@ -318,6 +350,8 @@ function app() {
       this.notionActivePage = null;
       this.notionPageContent = '';
       this.notionEntries = [];
+      this.notionSearchQuery = '';
+      this.notionFilterStatus = '';
       try {
         const res = await fetch(`/api/notion/databases/${db.id}`);
         const data = await res.json();
@@ -329,6 +363,39 @@ function app() {
       } finally {
         this.notionLoading = false;
       }
+    },
+
+    getFilteredEntries() {
+      let entries = this.notionEntries;
+
+      // Filter by search query
+      if (this.notionSearchQuery.trim()) {
+        const q = this.notionSearchQuery.toLowerCase().trim();
+        entries = entries.filter(entry => {
+          const name = this.getEntryName(entry).toLowerCase();
+          const meta = this.getEntryMeta(entry).toLowerCase();
+          return name.includes(q) || meta.includes(q);
+        });
+      }
+
+      // Filter by status
+      if (this.notionFilterStatus) {
+        entries = entries.filter(entry => {
+          const status = (entry.Status || entry.Health || '').toLowerCase();
+          return status === this.notionFilterStatus.toLowerCase();
+        });
+      }
+
+      return entries;
+    },
+
+    getAvailableStatuses() {
+      const statuses = new Set();
+      for (const entry of this.notionEntries) {
+        if (entry.Status) statuses.add(entry.Status);
+        if (entry.Health) statuses.add(entry.Health);
+      }
+      return [...statuses].sort();
     },
 
     async loadMoreEntries() {
@@ -351,6 +418,8 @@ function app() {
       this.notionLoading = true;
       this.notionActivePage = { id: pageId, name: pageName || 'Loading...' };
       this.notionPageContent = '';
+      this.notionRelated = {};
+      this.notionRelatedLoading = true;
       try {
         const [pageRes, contentRes] = await Promise.all([
           fetch(`/api/notion/pages/${pageId}`),
@@ -367,9 +436,17 @@ function app() {
           properties: page.properties,
         };
         this.notionPageContent = content.markdown || '*No content*';
+
+        // Fetch related pages in background
+        fetch(`/api/notion/pages/${pageId}/related`)
+          .then(r => r.json())
+          .then(data => { this.notionRelated = data.related || {}; })
+          .catch(() => { this.notionRelated = {}; })
+          .finally(() => { this.notionRelatedLoading = false; });
       } catch (err) {
         console.error('Page load error:', err);
         this.notionPageContent = '*Failed to load page content*';
+        this.notionRelatedLoading = false;
       } finally {
         this.notionLoading = false;
       }
@@ -379,6 +456,8 @@ function app() {
       if (this.notionActivePage) {
         this.notionActivePage = null;
         this.notionPageContent = '';
+        this.notionRelated = {};
+        this.notionRelatedLoading = false;
       } else if (this.notionActiveDb) {
         this.notionActiveDb = null;
         this.notionEntries = [];
@@ -391,16 +470,28 @@ function app() {
 
     getEntryMeta(entry) {
       const parts = [];
-      if (entry.Status) parts.push(entry.Status);
-      if (entry.Health) parts.push(entry.Health);
-      if (entry.Priority) parts.push(entry.Priority);
       if (entry.Function) parts.push(entry.Function);
       if (entry.Role) parts.push(entry.Role);
       if (entry.Type) parts.push(entry.Type);
-      if (entry['Due Date']) parts.push(`Due: ${entry['Due Date']}`);
+      if (entry['Due Date']) {
+        const d = entry['Due Date'];
+        parts.push(`Due: ${typeof d === 'object' && d !== null && d.start ? d.start : d}`);
+      }
       if (entry.Date) parts.push(entry.Date);
       if (entry.Owner) parts.push(`Owner: ${entry.Owner}`);
       return parts.slice(0, 3).join(' · ');
+    },
+
+    badgeAttr(value) {
+      return (value || '').toLowerCase().trim();
+    },
+
+    hasRelated() {
+      return Object.keys(this.notionRelated).length > 0;
+    },
+
+    getRelatedEntries() {
+      return Object.entries(this.notionRelated).filter(([, pages]) => pages.length > 0);
     },
 
     getPropertyEntries(props) {
@@ -408,8 +499,25 @@ function app() {
       return Object.entries(props).filter(([, v]) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0));
     },
 
+    formatDate(val) {
+      if (!val) return '—';
+      if (typeof val === 'object' && val.start) return val.start;
+      return String(val);
+    },
+
     formatPropertyValue(value) {
-      if (Array.isArray(value)) return value.join(', ');
+      if (Array.isArray(value)) {
+        if (value.length === 0) return '—';
+        // Check if array contains UUIDs (relation IDs) — show count instead of raw IDs
+        if (typeof value[0] === 'string' && /^[0-9a-f-]{32,36}$/.test(value[0])) {
+          return value.length + ' linked';
+        }
+        return value.join(', ');
+      }
+      if (value && typeof value === 'object' && value.start) {
+        // Date object from Notion — show formatted date
+        return value.end ? `${value.start} → ${value.end}` : value.start;
+      }
       if (typeof value === 'boolean') return value ? 'Yes' : 'No';
       return String(value);
     },
@@ -421,12 +529,166 @@ function app() {
       this.$nextTick(() => this.$refs.chatInput?.focus());
     },
 
+    // --- Detail Panel ---
+
+    async openDetailPanel(pageId, pageName) {
+      this.detailPanel = { id: pageId, name: pageName || 'Loading...', loading: true, properties: null, content: null, url: null };
+      try {
+        const [pageRes, contentRes] = await Promise.all([
+          fetch(`/api/notion/pages/${pageId}`),
+          fetch(`/api/notion/pages/${pageId}/content`),
+        ]);
+        const page = await pageRes.json();
+        const content = await contentRes.json();
+        this.detailPanel = {
+          id: pageId,
+          name: pageName || page.properties?.Name || 'Untitled',
+          url: page.url,
+          properties: page.properties,
+          content: content.markdown || '',
+          loading: false,
+        };
+      } catch (err) {
+        console.error('Detail panel error:', err);
+        if (this.detailPanel) {
+          this.detailPanel.loading = false;
+          this.detailPanel.content = '*Failed to load*';
+        }
+      }
+    },
+
+    closeDetailPanel() {
+      this.detailPanel = null;
+    },
+
+    askColinAboutDetail() {
+      if (!this.detailPanel) return;
+      this.view = 'chat';
+      const context = (this.detailPanel.content || '').slice(0, 500);
+      this.inputText = `Tell me about "${this.detailPanel.name}"\n\nContext:\n${context}...`;
+      this.closeDetailPanel();
+      this.$nextTick(() => this.$refs.chatInput?.focus());
+    },
+
+    // --- Command Palette ---
+
+    toggleCmdPalette() {
+      this.cmdPaletteOpen = !this.cmdPaletteOpen;
+      this.cmdSearch = '';
+      this.cmdSelectedIndex = 0;
+      if (this.cmdPaletteOpen) {
+        this.$nextTick(() => this.$refs.cmdInput?.focus());
+      }
+    },
+
+    closeCmdPalette() {
+      this.cmdPaletteOpen = false;
+      this.cmdSearch = '';
+      this.cmdSelectedIndex = 0;
+    },
+
+    getCmdResults() {
+      const q = this.cmdSearch.toLowerCase().trim();
+
+      const tabs = [
+        { group: 'Navigation', label: 'Chat', action: 'chat' },
+        { group: 'Navigation', label: 'Dashboard', action: 'dashboard' },
+        { group: 'Navigation', label: 'Team', action: 'team' },
+        { group: 'Navigation', label: 'Documents', action: 'docs' },
+        { group: 'Navigation', label: 'Notion', action: 'notion' },
+      ];
+
+      const databases = (this.notionDatabases.length > 0 ? this.notionDatabases : [
+        { id: '274fc2b3b6f7430fbb27474320eb0f96', name: 'Focus Areas' },
+        { id: '85c1b29205634f43b50dc16fc7466faa', name: 'Projects' },
+        { id: '0b50073e544942aab1099fc559b390fb', name: 'Commitments' },
+        { id: 'de346469925e4d1a825a849bc9f5269f', name: 'People' },
+        { id: '3c8a9b22ba924f20bfdcab4cc7a46478', name: 'Decisions' },
+        { id: '1fcf264fd2cd4308bcfd28997d171360', name: 'Platforms' },
+        { id: '63ec25cae3b0432093fa639d4c8b5809', name: 'Audiences' },
+      ]).map(db => ({ group: 'Databases', label: db.name, dbRef: db }));
+
+      const keyPages = (this.notionKeyPages.length > 0 ? this.notionKeyPages : [
+        { id: '307247aa0d7b8039bf78d35962815014', name: 'Business Bible' },
+        { id: '307247aa0d7b8102bfa0f8a18d8809d9', name: 'Notion OS Root' },
+        { id: '308247aa0d7b81cea80dca287155b137', name: 'Team Operating Manual' },
+        { id: '315247aa0d7b81c59fddf518c01e8556', name: 'Marketing Context Pack' },
+      ]).map(p => ({ group: 'Key Pages', label: p.name, pageRef: p }));
+
+      const skillItems = this.skills.map(s => ({
+        group: 'Skills', label: `/${s.name} — ${s.description || ''}`, skillRef: s,
+      }));
+
+      const all = [...tabs, ...databases, ...keyPages, ...skillItems];
+
+      if (!q) return all;
+      return all.filter(item => item.label.toLowerCase().includes(q));
+    },
+
+    cmdNavigate(direction) {
+      const results = this.getCmdResults();
+      if (results.length === 0) return;
+      this.cmdSelectedIndex = (this.cmdSelectedIndex + direction + results.length) % results.length;
+    },
+
+    cmdExecute(index) {
+      const results = this.getCmdResults();
+      const item = results[typeof index === 'number' ? index : this.cmdSelectedIndex];
+      if (!item) return;
+
+      if (item.action) {
+        this.view = item.action;
+        if (item.action === 'dashboard') this.loadDashboard();
+        else if (item.action === 'team') this.loadTeam();
+        else if (item.action === 'docs') this.loadDocuments();
+        else if (item.action === 'notion') this.loadNotion();
+      } else if (item.dbRef) {
+        this.view = 'notion';
+        this.openNotionDb(item.dbRef);
+      } else if (item.pageRef) {
+        this.view = 'notion';
+        this.openNotionPage(item.pageRef.id, item.pageRef.name);
+      } else if (item.skillRef) {
+        this.view = 'chat';
+        this.triggerSkill(item.skillRef);
+      }
+
+      this.closeCmdPalette();
+    },
+
     // --- Utilities ---
+
+    getGreeting() {
+      const hour = new Date().getHours();
+      if (hour < 12) return 'Good morning, Dan';
+      if (hour < 18) return 'Good afternoon, Dan';
+      return 'Good evening, Dan';
+    },
+
+    getTodayDate() {
+      return new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    },
+
+    getInitials(name) {
+      if (!name) return '?';
+      return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    },
+
+    autoResize(event) {
+      const el = event.target;
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    },
 
     renderMarkdown(text) {
       if (!text) return '';
       try {
-        return marked.parse(text);
+        return DOMPurify.sanitize(marked.parse(text));
       } catch {
         return this.escapeHtml(text);
       }
@@ -442,6 +704,15 @@ function app() {
       return name
         .replace(/_/g, ' ')
         .replace(/\b\w/g, c => c.toUpperCase());
+    },
+
+    getCacheAge(timestamp) {
+      if (!timestamp) return '';
+      const seconds = Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000);
+      if (seconds < 10) return 'Just now';
+      if (seconds < 60) return seconds + 's ago';
+      const minutes = Math.floor(seconds / 60);
+      return minutes + 'm ago';
     },
 
     scrollToBottom() {

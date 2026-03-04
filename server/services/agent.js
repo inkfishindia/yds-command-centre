@@ -15,6 +15,9 @@ function getClient() {
 // Conversation state — single user, in-memory
 let conversationHistory = [];
 const MAX_MESSAGES = 40; // Keep last 40 messages to manage token window
+const MAX_AGENT_TURNS = 15; // Prevent infinite tool-call loops
+const STREAM_TIMEOUT_MS = 60 * 1000; // 60s timeout per Claude API call
+const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000; // 5-minute timeout for abandoned approvals
 
 /**
  * Process a user message and stream the agent's response.
@@ -50,8 +53,15 @@ async function chat(userMessage, skill, onText, onApproval, onToolUse) {
 
   // Agent loop — keep going until we get a final text response (no more tool calls)
   let fullResponse = '';
+  let turns = 0;
 
   while (true) {
+    turns++;
+    if (turns > MAX_AGENT_TURNS) {
+      onText('\n\n[Agent stopped: maximum tool iterations reached. Please try a more specific request.]');
+      break;
+    }
+
     const stream = anthropic.messages.stream({
       model: config.MODEL,
       max_tokens: 4096,
@@ -60,22 +70,31 @@ async function chat(userMessage, skill, onText, onApproval, onToolUse) {
       messages: conversationHistory,
     });
 
+    // Race the stream against a timeout
+    let streamTimeoutId;
+    const streamTimeout = new Promise((_, reject) => {
+      streamTimeoutId = setTimeout(() => reject(new Error('Claude API call timed out after 60s')), STREAM_TIMEOUT_MS);
+    });
+
     let assistantContent = [];
     let currentText = '';
     let toolUseBlocks = [];
 
-    // Collect the streamed response
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta') {
-        if (event.delta.type === 'text_delta') {
-          currentText += event.delta.text;
-          onText(event.delta.text);
+    // Collect the streamed response (with timeout)
+    const processStream = async () => {
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta') {
+          if (event.delta.type === 'text_delta') {
+            currentText += event.delta.text;
+            onText(event.delta.text);
+          }
         }
       }
-    }
+      return stream.finalMessage();
+    };
 
-    // Get the final message
-    const finalMessage = await stream.finalMessage();
+    const finalMessage = await Promise.race([processStream(), streamTimeout]);
+    clearTimeout(streamTimeoutId);
 
     // Build the content array from the final message
     assistantContent = finalMessage.content;
@@ -110,8 +129,11 @@ async function chat(userMessage, skill, onText, onApproval, onToolUse) {
           toolInput: toolBlock.input,
         });
 
-        // Wait for approval
-        const approved = await promise;
+        // Wait for approval (auto-reject after 5 minutes)
+        const approvalTimeout = new Promise((resolve) =>
+          setTimeout(() => resolve(false), APPROVAL_TIMEOUT_MS)
+        );
+        const approved = await Promise.race([promise, approvalTimeout]);
 
         if (approved) {
           const result = await executeTool(toolBlock.name, toolBlock.input);

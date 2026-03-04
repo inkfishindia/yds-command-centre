@@ -41,11 +41,24 @@ router.get('/commitments/overdue', async (req, res) => {
 });
 
 /**
+ * GET /api/notion/commitments/upcoming
+ */
+router.get('/commitments/upcoming', async (req, res) => {
+  try {
+    const days = Math.min(Math.max(parseInt(req.query.days) || 7, 1), 90);
+    const commitments = await notionService.getUpcomingCommitments(days);
+    res.json({ commitments });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load upcoming commitments' });
+  }
+});
+
+/**
  * GET /api/notion/decisions
  */
 router.get('/decisions', async (req, res) => {
   try {
-    const days = parseInt(req.query.days) || 30;
+    const days = Math.min(Math.max(parseInt(req.query.days) || 30, 1), 365);
     const decisions = await notionService.getRecentDecisions(days);
     res.json({ decisions });
   } catch (err) {
@@ -82,7 +95,7 @@ router.get('/databases/:id', async (req, res) => {
     const dbId = req.params.id;
     const options = {};
     if (req.query.cursor) options.startCursor = req.query.cursor;
-    if (req.query.pageSize) options.pageSize = parseInt(req.query.pageSize);
+    if (req.query.pageSize) options.pageSize = Math.min(parseInt(req.query.pageSize) || 50, 100);
 
     const result = await notionService.queryDatabase(dbId, options);
     res.json(result);
@@ -104,6 +117,20 @@ router.get('/pages/:id', async (req, res) => {
   } catch (err) {
     console.error('Page fetch error:', err);
     res.status(500).json({ error: 'Failed to load page' });
+  }
+});
+
+/**
+ * GET /api/notion/pages/:id/related
+ * Resolve relation properties to page summaries
+ */
+router.get('/pages/:id/related', async (req, res) => {
+  try {
+    const related = await notionService.getRelatedPages(req.params.id);
+    res.json({ related });
+  } catch (err) {
+    console.error('Related pages error:', err);
+    res.status(500).json({ error: 'Failed to load related pages' });
   }
 });
 

@@ -65,8 +65,8 @@ function isWriteTool(toolName) {
  * Returns null if the path escapes the workspace.
  */
 function resolveWorkspacePath(relativePath) {
-  const resolved = path.resolve(config.WORKSPACE_ROOT, relativePath);
-  if (!resolved.startsWith(config.WORKSPACE_ROOT)) {
+  const resolved = path.resolve(config.COLIN_WORKSPACE, relativePath);
+  if (!resolved.startsWith(config.COLIN_WORKSPACE)) {
     return null; // Path traversal attempt
   }
   return resolved;

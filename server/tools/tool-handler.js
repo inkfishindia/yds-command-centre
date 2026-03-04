@@ -2,17 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const notionTools = require('./notion-tools');
 const fileTools = require('./file-tools');
-const config = require('../config');
-
-// Lazy-load Notion client
-let notionClient = null;
-function getNotionClient() {
-  if (!notionClient) {
-    const { Client } = require('@notionhq/client');
-    notionClient = new Client({ auth: config.NOTION_TOKEN });
-  }
-  return notionClient;
-}
+const { getClient: getNotionClient, simplify: simplifyProperties } = require('../services/notion');
 
 /**
  * Get all tool definitions for the Claude API
@@ -69,7 +59,7 @@ async function executeNotionQuery({ database_id, filter, sorts, page_size }) {
     if (sorts) params.sorts = sorts;
 
     const response = await notion.databases.query(params);
-    // Simplify the response — extract property values
+    // Simplify the response -- extract property values
     const pages = response.results.map(page => ({
       id: page.id,
       url: page.url,
@@ -129,53 +119,6 @@ async function executeNotionUpdatePage({ page_id, properties }) {
   } catch (err) {
     return { error: `Notion update failed: ${err.message}` };
   }
-}
-
-/**
- * Simplify Notion property objects into readable values
- */
-function simplifyProperties(properties) {
-  const result = {};
-  for (const [key, prop] of Object.entries(properties)) {
-    switch (prop.type) {
-      case 'title':
-        result[key] = prop.title.map(t => t.plain_text).join('');
-        break;
-      case 'rich_text':
-        result[key] = prop.rich_text.map(t => t.plain_text).join('');
-        break;
-      case 'select':
-        result[key] = prop.select ? prop.select.name : null;
-        break;
-      case 'multi_select':
-        result[key] = prop.multi_select.map(s => s.name);
-        break;
-      case 'date':
-        result[key] = prop.date ? { start: prop.date.start, end: prop.date.end } : null;
-        break;
-      case 'relation':
-        result[key] = prop.relation.map(r => r.id);
-        break;
-      case 'people':
-        result[key] = prop.people.map(p => p.name || p.id);
-        break;
-      case 'checkbox':
-        result[key] = prop.checkbox;
-        break;
-      case 'number':
-        result[key] = prop.number;
-        break;
-      case 'url':
-        result[key] = prop.url;
-        break;
-      case 'status':
-        result[key] = prop.status ? prop.status.name : null;
-        break;
-      default:
-        result[key] = `[${prop.type}]`;
-    }
-  }
-  return result;
 }
 
 /**

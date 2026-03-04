@@ -26,6 +26,68 @@ function setCache(key, data) {
   cache.set(key, { data, time: Date.now() });
 }
 
+// In-flight request deduplication — prevents duplicate Notion API calls for the same cache key
+const inFlight = new Map();
+
+function deduplicatedFetch(cacheKey, fetchFn) {
+  // Check cache first
+  const cached = getCached(cacheKey);
+  if (cached) return Promise.resolve(cached);
+
+  // Check if there's already an in-flight request for this key
+  if (inFlight.has(cacheKey)) return inFlight.get(cacheKey);
+
+  // Start the fetch and store the promise
+  const promise = fetchFn()
+    .then(result => {
+      setCache(cacheKey, result);
+      return result;
+    })
+    .finally(() => {
+      inFlight.delete(cacheKey);
+    });
+
+  inFlight.set(cacheKey, promise);
+  return promise;
+}
+
+// Retry wrapper for transient Notion API errors (429 rate limits, 5xx server errors)
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 1000;
+
+async function withRetry(fn, retries = MAX_RETRIES) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isRateLimit = err.status === 429 || err.code === 'rate_limited';
+      const isServerError = err.status >= 500;
+
+      if ((isRateLimit || isServerError) && attempt < retries) {
+        const retryAfter = err.headers?.['retry-after'];
+        const delay = retryAfter
+          ? parseInt(retryAfter) * 1000
+          : BASE_DELAY_MS * Math.pow(2, attempt);
+        console.warn(`Notion API ${err.status || 'error'}, retrying in ${delay}ms (attempt ${attempt + 1}/${retries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+/**
+ * Stable JSON stringification -- sorts object keys recursively so that
+ * {a:1, b:2} and {b:2, a:1} produce identical strings, giving consistent cache keys.
+ */
+function stableStringify(obj) {
+  if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
+  if (Array.isArray(obj)) return '[' + obj.map(stableStringify).join(',') + ']';
+  const keys = Object.keys(obj).sort();
+  return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify(obj[k])).join(',') + '}';
+}
+
 // Database IDs from notion-hub.md
 const DB = {
   FOCUS_AREAS: '274fc2b3b6f7430fbb27474320eb0f96',
@@ -38,7 +100,9 @@ const DB = {
 };
 
 /**
- * Simplify Notion properties to plain values
+ * Simplify Notion properties to plain values.
+ * Handles all common property types including people, url, and rich date objects.
+ * This is the single canonical implementation used across the entire server.
  */
 function simplify(properties) {
   const result = {};
@@ -57,10 +121,13 @@ function simplify(properties) {
         result[key] = prop.multi_select.map(s => s.name);
         break;
       case 'date':
-        result[key] = prop.date ? prop.date.start : null;
+        result[key] = prop.date ? { start: prop.date.start, end: prop.date.end } : null;
         break;
       case 'relation':
         result[key] = prop.relation.map(r => r.id);
+        break;
+      case 'people':
+        result[key] = prop.people.map(p => p.name || p.id);
         break;
       case 'status':
         result[key] = prop.status ? prop.status.name : null;
@@ -71,8 +138,11 @@ function simplify(properties) {
       case 'checkbox':
         result[key] = prop.checkbox;
         break;
+      case 'url':
+        result[key] = prop.url;
+        break;
       default:
-        result[key] = null;
+        result[key] = '[' + prop.type + ']';
     }
   }
   return result;
@@ -82,57 +152,43 @@ function simplify(properties) {
  * Fetch all focus areas with health status
  */
 async function getFocusAreas() {
-  const cached = getCached('focus_areas');
-  if (cached) return cached;
-
-  try {
+  return deduplicatedFetch('focus_areas', async () => {
     const notion = getClient();
-    const response = await notion.databases.query({
+    const response = await withRetry(() => notion.databases.query({
       database_id: DB.FOCUS_AREAS,
       page_size: 20,
-    });
-
-    const areas = response.results.map(page => ({
+    }));
+    return response.results.map(page => ({
       id: page.id,
       ...simplify(page.properties),
     }));
-
-    setCache('focus_areas', areas);
-    return areas;
-  } catch (err) {
+  }).catch(err => {
     console.error('Failed to fetch focus areas:', err.message);
     return [];
-  }
+  });
 }
 
 /**
  * Fetch commitments with optional filters
  */
 async function getCommitments(filter) {
-  const cacheKey = `commitments_${JSON.stringify(filter || {})}`;
-  const cached = getCached(cacheKey);
-  if (cached) return cached;
-
-  try {
+  const cacheKey = 'commitments_' + stableStringify(filter || {});
+  return deduplicatedFetch(cacheKey, async () => {
     const notion = getClient();
     const params = {
       database_id: DB.COMMITMENTS,
       page_size: 50,
     };
     if (filter) params.filter = filter;
-
-    const response = await notion.databases.query(params);
-    const commitments = response.results.map(page => ({
+    const response = await withRetry(() => notion.databases.query(params));
+    return response.results.map(page => ({
       id: page.id,
       ...simplify(page.properties),
     }));
-
-    setCache(cacheKey, commitments);
-    return commitments;
-  } catch (err) {
+  }).catch(err => {
     console.error('Failed to fetch commitments:', err.message);
     return [];
-  }
+  });
 }
 
 /**
@@ -150,79 +206,196 @@ async function getOverdueCommitments() {
 }
 
 /**
+ * Fetch upcoming commitments (due within N days, not overdue, not done/cancelled)
+ */
+async function getUpcomingCommitments(days = 7) {
+  const today = new Date().toISOString().split('T')[0];
+  const future = new Date();
+  future.setDate(future.getDate() + days);
+  const futureDate = future.toISOString().split('T')[0];
+  return getCommitments({
+    and: [
+      { property: 'Due Date', date: { on_or_after: today } },
+      { property: 'Due Date', date: { on_or_before: futureDate } },
+      { property: 'Status', select: { does_not_equal: 'Done' } },
+      { property: 'Status', select: { does_not_equal: 'Cancelled' } },
+    ],
+  });
+}
+
+/**
  * Fetch recent decisions (last N days)
  */
 async function getRecentDecisions(days = 30) {
-  const cached = getCached(`decisions_${days}`);
-  if (cached) return cached;
-
-  try {
+  return deduplicatedFetch('decisions_' + days, async () => {
     const notion = getClient();
     const since = new Date();
     since.setDate(since.getDate() - days);
-
-    const response = await notion.databases.query({
+    const response = await withRetry(() => notion.databases.query({
       database_id: DB.DECISIONS,
+      filter: {
+        property: 'Date',
+        date: { on_or_after: since.toISOString().split('T')[0] },
+      },
       sorts: [{ property: 'Date', direction: 'descending' }],
       page_size: 10,
-    });
-
-    const decisions = response.results.map(page => ({
+    }));
+    return response.results.map(page => ({
       id: page.id,
       ...simplify(page.properties),
     }));
-
-    setCache(`decisions_${days}`, decisions);
-    return decisions;
-  } catch (err) {
+  }).catch(err => {
     console.error('Failed to fetch decisions:', err.message);
     return [];
-  }
+  });
 }
 
 /**
  * Fetch people (team roster)
  */
 async function getPeople() {
-  const cached = getCached('people');
-  if (cached) return cached;
-
-  try {
+  return deduplicatedFetch('people', async () => {
     const notion = getClient();
-    const response = await notion.databases.query({
+    const response = await withRetry(() => notion.databases.query({
       database_id: DB.PEOPLE,
       page_size: 30,
-    });
-
-    const people = response.results.map(page => ({
+    }));
+    return response.results.map(page => ({
       id: page.id,
       ...simplify(page.properties),
     }));
-
-    setCache('people', people);
-    return people;
-  } catch (err) {
+  }).catch(err => {
     console.error('Failed to fetch people:', err.message);
     return [];
-  }
+  });
 }
 
 /**
- * Get dashboard summary data
+ * Fetch all projects with Focus Area relations
+ */
+async function getProjects() {
+  return deduplicatedFetch('projects', async () => {
+    const notion = getClient();
+    const projects = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.PROJECTS,
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      projects.push(...response.results.map(page => ({
+        id: page.id,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+    return projects;
+  }).catch(err => {
+    console.error('Failed to fetch projects:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Fetch all commitments (for counts per focus area)
+ */
+async function getAllCommitments() {
+  return deduplicatedFetch('all_commitments', async () => {
+    const notion = getClient();
+    const commitments = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.COMMITMENTS,
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      commitments.push(...response.results.map(page => ({
+        id: page.id,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+    return commitments;
+  }).catch(err => {
+    console.error('Failed to fetch all commitments:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Get dashboard summary data with health distribution and counts
  */
 async function getDashboardSummary() {
-  const [focusAreas, overdue, decisions, people] = await Promise.all([
+  const [focusAreas, overdue, decisions, people, projects, allCommitments] = await Promise.all([
     getFocusAreas(),
     getOverdueCommitments(),
     getRecentDecisions(7),
     getPeople(),
+    getProjects(),
+    getAllCommitments(),
   ]);
 
+  // Health distribution
+  const healthDistribution = { onTrack: 0, atRisk: 0, offTrack: 0, other: 0 };
+  for (const area of focusAreas) {
+    const h = (area.Health || area.Status || '').toLowerCase();
+    if (h.includes('on track')) healthDistribution.onTrack++;
+    else if (h.includes('risk') || h.includes('attention')) healthDistribution.atRisk++;
+    else if (h.includes('off track') || h.includes('improvement')) healthDistribution.offTrack++;
+    else healthDistribution.other++;
+  }
+
+  // Count projects per focus area
+  const projectsByFA = {};
+  for (const project of projects) {
+    // Try common relation property names
+    const faIds = project['Focus Area'] || project['Focus Areas'] || project['Focus area'] || [];
+    for (const faId of (Array.isArray(faIds) ? faIds : [])) {
+      const nid = faId.replace(/-/g, '');
+      projectsByFA[nid] = (projectsByFA[nid] || 0) + 1;
+    }
+  }
+
+  // Count commitments per focus area
+  const commitmentsByFA = {};
+  for (const c of allCommitments) {
+    const faIds = c['Focus Area'] || c['Focus Areas'] || c['Focus area'] || [];
+    for (const faId of (Array.isArray(faIds) ? faIds : [])) {
+      const nid = faId.replace(/-/g, '');
+      commitmentsByFA[nid] = (commitmentsByFA[nid] || 0) + 1;
+    }
+  }
+
+  // Enrich focus areas
+  const enrichedFocusAreas = focusAreas.map(area => ({
+    ...area,
+    projectCount: projectsByFA[area.id.replace(/-/g, '')] || 0,
+    commitmentCount: commitmentsByFA[area.id.replace(/-/g, '')] || 0,
+  }));
+
+  // Build people ID to Name lookup for resolving relations
+  const peopleLookup = {};
+  for (const person of people) {
+    peopleLookup[person.id.replace(/-/g, '')] = person.Name || 'Unknown';
+  }
+
+  // Resolve relation IDs in overdue commitments
+  const enrichedOverdue = overdue.map(c => {
+    const assignedIds = c['Assigned To'] || [];
+    const assignedNames = Array.isArray(assignedIds)
+      ? assignedIds.map(id => peopleLookup[id.replace(/-/g, '')] || id.slice(0, 8))
+      : [];
+    return { ...c, assignedNames };
+  });
+
   return {
-    focusAreas,
-    overdue,
+    focusAreas: enrichedFocusAreas,
+    overdue: enrichedOverdue,
     recentDecisions: decisions,
     people,
+    healthDistribution,
     timestamp: new Date().toISOString(),
   };
 }
@@ -246,19 +419,15 @@ function listDatabases() {
  * Query any database by ID with optional filter/sort/pagination
  */
 async function queryDatabase(dbId, { filter, sorts, startCursor, pageSize = 50 } = {}) {
-  const cacheKey = `db_${dbId}_${JSON.stringify({ filter, sorts, startCursor })}`;
-  const cached = getCached(cacheKey);
-  if (cached) return cached;
-
-  try {
+  const cacheKey = 'db_' + dbId + '_' + stableStringify({ filter, sorts, startCursor });
+  return deduplicatedFetch(cacheKey, async () => {
     const notion = getClient();
     const params = { database_id: dbId, page_size: pageSize };
     if (filter) params.filter = filter;
     if (sorts) params.sorts = sorts;
     if (startCursor) params.start_cursor = startCursor;
-
-    const response = await notion.databases.query(params);
-    const result = {
+    const response = await withRetry(() => notion.databases.query(params));
+    return {
       results: response.results.map(page => ({
         id: page.id,
         url: page.url,
@@ -269,47 +438,38 @@ async function queryDatabase(dbId, { filter, sorts, startCursor, pageSize = 50 }
       hasMore: response.has_more,
       nextCursor: response.next_cursor,
     };
-
-    setCache(cacheKey, result);
-    return result;
-  } catch (err) {
-    console.error(`Failed to query database ${dbId}:`, err.message);
+  }).catch(err => {
+    console.error('Failed to query database ' + dbId + ':', err.message);
     return { results: [], hasMore: false, nextCursor: null };
-  }
+  });
 }
 
 /**
  * Get a single page's properties
  */
 async function getPage(pageId) {
-  const cacheKey = `page_${pageId}`;
-  const cached = getCached(cacheKey);
-  if (cached) return cached;
-
-  try {
+  const cacheKey = 'page_' + pageId;
+  return deduplicatedFetch(cacheKey, async () => {
     const notion = getClient();
-    const page = await notion.pages.retrieve({ page_id: pageId });
-    const result = {
+    const page = await withRetry(() => notion.pages.retrieve({ page_id: pageId }));
+    return {
       id: page.id,
       url: page.url,
       created: page.created_time,
       updated: page.last_edited_time,
       properties: simplify(page.properties),
     };
-
-    setCache(cacheKey, result);
-    return result;
-  } catch (err) {
-    console.error(`Failed to get page ${pageId}:`, err.message);
+  }).catch(err => {
+    console.error('Failed to get page ' + pageId + ':', err.message);
     return null;
-  }
+  });
 }
 
 /**
  * Get a page's block children (content) and convert to markdown
  */
 async function getPageContent(pageId) {
-  const cacheKey = `blocks_${pageId}`;
+  const cacheKey = 'blocks_' + pageId;
   const cached = getCached(cacheKey);
   if (cached) return cached;
 
@@ -320,24 +480,65 @@ async function getPageContent(pageId) {
 
     // Paginate through all blocks
     do {
-      const response = await notion.blocks.children.list({
+      const response = await withRetry(() => notion.blocks.children.list({
         block_id: pageId,
         page_size: 100,
         start_cursor: cursor,
-      });
+      }));
       blocks.push(...response.results);
       cursor = response.has_more ? response.next_cursor : null;
     } while (cursor);
 
-    const markdown = blocksToMarkdown(blocks);
+    // Recursively fetch nested content (toggles, columns, etc.)
+    const enrichedBlocks = await fetchBlockChildren(blocks);
+    const markdown = blocksToMarkdown(enrichedBlocks);
     const result = { blocks: blocks.length, markdown };
 
     setCache(cacheKey, result);
     return result;
   } catch (err) {
-    console.error(`Failed to get blocks for ${pageId}:`, err.message);
+    console.error('Failed to get blocks for ' + pageId + ':', err.message);
     return { blocks: 0, markdown: '' };
   }
+}
+
+/**
+ * Recursively fetch children for blocks that have them (toggles, columns, etc.)
+ * Limited to 2 levels deep to avoid excessive API calls.
+ */
+async function fetchBlockChildren(blocks, depth = 0) {
+  if (depth >= 2) return blocks; // Max recursion depth
+
+  const notion = getClient();
+  const enriched = [];
+
+  for (const block of blocks) {
+    enriched.push(block);
+
+    if (block.has_children && ['toggle', 'column_list', 'column', 'bulleted_list_item', 'numbered_list_item', 'to_do', 'callout', 'quote', 'synced_block'].includes(block.type)) {
+      try {
+        const children = [];
+        let cursor;
+        do {
+          const response = await withRetry(() => notion.blocks.children.list({
+            block_id: block.id,
+            page_size: 100,
+            start_cursor: cursor,
+          }));
+          children.push(...response.results);
+          cursor = response.has_more ? response.next_cursor : null;
+        } while (cursor);
+
+        // Recursively fetch grandchildren
+        const enrichedChildren = await fetchBlockChildren(children, depth + 1);
+        block._children = enrichedChildren;
+      } catch (err) {
+        console.warn(`Failed to fetch children for block ${block.id}:`, err.message);
+      }
+    }
+  }
+
+  return enriched;
 }
 
 /**
@@ -353,42 +554,69 @@ function blocksToMarkdown(blocks) {
         lines.push('');
         break;
       case 'heading_1':
-        lines.push(`# ${richTextToPlain(block.heading_1.rich_text)}`);
+        lines.push('# ' + richTextToPlain(block.heading_1.rich_text));
         lines.push('');
         break;
       case 'heading_2':
-        lines.push(`## ${richTextToPlain(block.heading_2.rich_text)}`);
+        lines.push('## ' + richTextToPlain(block.heading_2.rich_text));
         lines.push('');
         break;
       case 'heading_3':
-        lines.push(`### ${richTextToPlain(block.heading_3.rich_text)}`);
+        lines.push('### ' + richTextToPlain(block.heading_3.rich_text));
         lines.push('');
         break;
       case 'bulleted_list_item':
-        lines.push(`- ${richTextToPlain(block.bulleted_list_item.rich_text)}`);
+        lines.push('- ' + richTextToPlain(block.bulleted_list_item.rich_text));
+        if (block._children) {
+          const childMd = blocksToMarkdown(block._children);
+          lines.push(childMd.split('\n').map(l => '  ' + l).join('\n'));
+        }
         break;
       case 'numbered_list_item':
-        lines.push(`1. ${richTextToPlain(block.numbered_list_item.rich_text)}`);
+        lines.push('1. ' + richTextToPlain(block.numbered_list_item.rich_text));
+        if (block._children) {
+          const childMd = blocksToMarkdown(block._children);
+          lines.push(childMd.split('\n').map(l => '  ' + l).join('\n'));
+        }
         break;
       case 'to_do':
-        lines.push(`- [${block.to_do.checked ? 'x' : ' '}] ${richTextToPlain(block.to_do.rich_text)}`);
+        lines.push('- [' + (block.to_do.checked ? 'x' : ' ') + '] ' + richTextToPlain(block.to_do.rich_text));
+        if (block._children) {
+          const childMd = blocksToMarkdown(block._children);
+          lines.push(childMd.split('\n').map(l => '  ' + l).join('\n'));
+        }
         break;
-      case 'toggle':
-        lines.push(`<details><summary>${richTextToPlain(block.toggle.rich_text)}</summary></details>`);
+      case 'toggle': {
+        const toggleContent = block._children ? blocksToMarkdown(block._children) : '';
+        lines.push('<details><summary>' + richTextToPlain(block.toggle.rich_text) + '</summary>');
+        if (toggleContent) {
+          lines.push('');
+          lines.push(toggleContent);
+        }
+        lines.push('</details>');
         lines.push('');
         break;
+      }
       case 'code':
-        lines.push(`\`\`\`${block.code.language || ''}`);
+        lines.push('```' + (block.code.language || ''));
         lines.push(richTextToPlain(block.code.rich_text));
         lines.push('```');
         lines.push('');
         break;
       case 'quote':
-        lines.push(`> ${richTextToPlain(block.quote.rich_text)}`);
+        lines.push('> ' + richTextToPlain(block.quote.rich_text));
+        if (block._children) {
+          const childMd = blocksToMarkdown(block._children);
+          lines.push(childMd.split('\n').map(l => '> ' + l).join('\n'));
+        }
         lines.push('');
         break;
       case 'callout':
-        lines.push(`> ${block.callout.icon?.emoji || ''} ${richTextToPlain(block.callout.rich_text)}`);
+        lines.push('> ' + (block.callout.icon?.emoji || '') + ' ' + richTextToPlain(block.callout.rich_text));
+        if (block._children) {
+          const childMd = blocksToMarkdown(block._children);
+          lines.push(childMd.split('\n').map(l => '> ' + l).join('\n'));
+        }
         lines.push('');
         break;
       case 'divider':
@@ -400,28 +628,39 @@ function blocksToMarkdown(blocks) {
         lines.push('');
         break;
       case 'bookmark':
-        lines.push(`[Bookmark](${block.bookmark.url || ''})`);
+        lines.push('[Bookmark](' + (block.bookmark.url || '') + ')');
         lines.push('');
         break;
-      case 'image':
+      case 'image': {
         const imgUrl = block.image.type === 'file' ? block.image.file.url : block.image.external?.url || '';
-        lines.push(`![Image](${imgUrl})`);
+        lines.push('![Image](' + imgUrl + ')');
         lines.push('');
         break;
+      }
       case 'child_database':
-        lines.push(`**[Database: ${block.child_database.title}]**`);
+        lines.push('**[Database: ' + block.child_database.title + ']**');
         lines.push('');
         break;
       case 'child_page':
-        lines.push(`**[Page: ${block.child_page.title}]**`);
+        lines.push('**[Page: ' + block.child_page.title + ']**');
         lines.push('');
         break;
       case 'column_list':
+        // Render columns as sequential content in markdown
+        if (block._children) {
+          for (const col of block._children) {
+            if (col._children) {
+              lines.push(blocksToMarkdown(col._children));
+              lines.push('');
+            }
+          }
+        }
+        break;
       case 'column':
-        // Skip structural blocks
+        // Individual columns are rendered via their column_list parent
         break;
       default:
-        // Unknown block type — show type name
+        // Unknown block type -- show type name
         if (block[block.type]?.rich_text) {
           lines.push(richTextToPlain(block[block.type].rich_text));
           lines.push('');
@@ -439,13 +678,61 @@ function richTextToPlain(richText) {
   if (!richText || !Array.isArray(richText)) return '';
   return richText.map(t => {
     let text = t.plain_text;
-    if (t.annotations?.bold) text = `**${text}**`;
-    if (t.annotations?.italic) text = `*${text}*`;
-    if (t.annotations?.code) text = `\`${text}\``;
-    if (t.annotations?.strikethrough) text = `~~${text}~~`;
-    if (t.href) text = `[${text}](${t.href})`;
+    if (t.annotations?.bold) text = '**' + text + '**';
+    if (t.annotations?.italic) text = '*' + text + '*';
+    if (t.annotations?.code) text = '`' + text + '`';
+    if (t.annotations?.strikethrough) text = '~~' + text + '~~';
+    if (t.href) text = '[' + text + '](' + t.href + ')';
     return text;
   }).join('');
+}
+
+/**
+ * Get related pages for a given page (resolve relation properties)
+ */
+async function getRelatedPages(pageId) {
+  const cacheKey = 'related_' + pageId;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const notion = getClient();
+    const rawPage = await withRetry(() => notion.pages.retrieve({ page_id: pageId }));
+    const related = {};
+
+    for (const [key, prop] of Object.entries(rawPage.properties)) {
+      if (prop.type === 'relation' && prop.relation.length > 0) {
+        const relatedIds = prop.relation.map(r => r.id).slice(0, 10);
+
+        const resolvedPages = await Promise.all(
+          relatedIds.map(async (relId) => {
+            try {
+              const relPage = await getPage(relId);
+              if (!relPage) return null;
+              return {
+                id: relId,
+                name: relPage.properties.Name || relPage.properties.Title || relPage.properties.name || 'Untitled',
+                status: relPage.properties.Status || null,
+                health: relPage.properties.Health || null,
+                priority: relPage.properties.Priority || null,
+                dueDate: relPage.properties['Due Date'] || null,
+              };
+            } catch {
+              return { id: relId, name: 'Untitled', status: null };
+            }
+          })
+        );
+
+        related[key] = resolvedPages.filter(Boolean);
+      }
+    }
+
+    setCache(cacheKey, related);
+    return related;
+  } catch (err) {
+    console.error('Failed to get related pages for ' + pageId + ':', err.message);
+    return {};
+  }
 }
 
 /**
@@ -466,16 +753,22 @@ function clearCache() {
 
 module.exports = {
   DB,
+  getClient,
+  simplify,
   getFocusAreas,
   getCommitments,
   getOverdueCommitments,
+  getUpcomingCommitments,
   getRecentDecisions,
   getPeople,
+  getProjects,
+  getAllCommitments,
   getDashboardSummary,
   listDatabases,
   queryDatabase,
   getPage,
   getPageContent,
+  getRelatedPages,
   getKeyPages,
   clearCache,
 };
