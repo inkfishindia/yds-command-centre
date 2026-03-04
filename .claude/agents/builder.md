@@ -29,7 +29,8 @@ Read `.claude/rules/` for frontend and server patterns.
 3. Never break the agent loop in `agent.js`
 4. Keep Alpine.js patterns — no React, no build step
 5. All Notion calls through `server/services/notion.js`
-6. After changes, spawn `code-reviewer` agent
+6. Run `npm test` after backend changes — all tests must pass
+7. After changes, spawn `code-reviewer` agent
 
 ## Token Efficiency
 

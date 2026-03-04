@@ -59,6 +59,7 @@ public/
 |------|-------|-------|------|
 | All code changes | `builder` | Sonnet | Feature dev, debugging, refactoring |
 | Quality gate | `code-reviewer` | Opus | After any code changes, before shipping |
+| UX consistency | `ux-auditor` | Haiku | After UI changes, checks visual/a11y patterns |
 | Deploy/infra | `devops-infra` | Haiku | Deployment config, env setup, monitoring |
 
 ## How to Run
@@ -66,6 +67,7 @@ public/
 ```bash
 cp .env.example .env     # Add ANTHROPIC_API_KEY and NOTION_TOKEN
 npm install
+npm test                 # Run tests (40 tests, node built-in runner)
 npm run dev              # http://localhost:3000 (watch mode)
 ```
 

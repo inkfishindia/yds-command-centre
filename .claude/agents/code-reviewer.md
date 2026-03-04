@@ -35,7 +35,12 @@ You are the Quality Gate. Nothing ships without your APPROVE.
 - Every async handler in try/catch?
 - Errors return `{ error: message }` with HTTP status?
 
-### 6. Stack Compliance
+### 6. Tests
+- Run `npm test` — all tests must pass
+- Check that new backend functions have corresponding tests in `test/`
+- Approval gate, tool definitions, path traversal, and simplify() are tested
+
+### 7. Stack Compliance
 - CommonJS only (server), Alpine.js only (frontend)?
 - No build tooling references?
 - Notion calls through cache layer?
