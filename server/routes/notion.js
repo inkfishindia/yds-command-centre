@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const notionService = require('../services/notion');
 
+function isValidNotionId(id) {
+  return /^[a-f0-9]{32}$|^[a-f0-9-]{36}$/.test(id);
+}
+
 /**
  * GET /api/notion/dashboard
  * Full dashboard summary — focus areas, overdue commitments, recent decisions, people.
@@ -79,6 +83,26 @@ router.get('/people', async (req, res) => {
 });
 
 /**
+ * GET /api/notion/projects
+ * All projects with resolved relations (Owner, Focus Area, AI Expert Panel)
+ */
+router.get('/projects', async (req, res) => {
+  try {
+    const projects = await notionService.getProjects();
+    const resolvedProjects = await Promise.all(
+      projects.map(async (p) => {
+        const resolved = await notionService.resolveRelations(p);
+        return resolved;
+      })
+    );
+    res.json({ projects: resolvedProjects });
+  } catch (err) {
+    console.error('Projects error:', err);
+    res.status(500).json({ error: 'Failed to load projects' });
+  }
+});
+
+/**
  * GET /api/notion/databases
  * List all known databases
  */
@@ -91,6 +115,9 @@ router.get('/databases', (req, res) => {
  * Query a specific database
  */
 router.get('/databases/:id', async (req, res) => {
+  if (!isValidNotionId(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid ID format' });
+  }
   try {
     const dbId = req.params.id;
     const options = {};
@@ -110,6 +137,9 @@ router.get('/databases/:id', async (req, res) => {
  * Get a page's properties
  */
 router.get('/pages/:id', async (req, res) => {
+  if (!isValidNotionId(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid ID format' });
+  }
   try {
     const page = await notionService.getPage(req.params.id);
     if (!page) return res.status(404).json({ error: 'Page not found' });
@@ -125,6 +155,9 @@ router.get('/pages/:id', async (req, res) => {
  * Resolve relation properties to page summaries
  */
 router.get('/pages/:id/related', async (req, res) => {
+  if (!isValidNotionId(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid ID format' });
+  }
   try {
     const related = await notionService.getRelatedPages(req.params.id);
     res.json({ related });
@@ -139,6 +172,9 @@ router.get('/pages/:id/related', async (req, res) => {
  * Get a page's block content as markdown
  */
 router.get('/pages/:id/content', async (req, res) => {
+  if (!isValidNotionId(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid ID format' });
+  }
   try {
     const content = await notionService.getPageContent(req.params.id);
     res.json(content);

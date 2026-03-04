@@ -328,13 +328,16 @@ async function getAllCommitments() {
  * Get dashboard summary data with health distribution and counts
  */
 async function getDashboardSummary() {
-  const [focusAreas, overdue, decisions, people, projects, allCommitments] = await Promise.all([
+  const [focusAreas, overdue, decisions, people, projects, allCommitments, upcoming, audiencesResult, platformsResult] = await Promise.all([
     getFocusAreas(),
     getOverdueCommitments(),
     getRecentDecisions(7),
     getPeople(),
     getProjects(),
     getAllCommitments(),
+    getUpcomingCommitments(7),
+    queryDatabase(DB.AUDIENCES, { pageSize: 50 }),
+    queryDatabase(DB.PLATFORMS, { pageSize: 50 }),
   ]);
 
   // Health distribution
@@ -390,14 +393,105 @@ async function getDashboardSummary() {
     return { ...c, assignedNames };
   });
 
+  // Also enrich upcoming commitments with resolved names
+  const enrichedUpcoming = upcoming.map(c => {
+    const assignedIds = c['Assigned To'] || [];
+    const assignedNames = Array.isArray(assignedIds)
+      ? assignedIds.map(id => peopleLookup[id.replace(/-/g, '')] || id.slice(0, 8))
+      : [];
+    return { ...c, assignedNames };
+  });
+
+  // Enrich people with workload data
+  const enrichedPeople = people.map(person => {
+    const pid = person.id.replace(/-/g, '');
+
+    // Count active commitments assigned to this person
+    const personCommitments = allCommitments.filter(c => {
+      const assignedIds = c['Assigned To'] || [];
+      return Array.isArray(assignedIds) && assignedIds.some(id => id.replace(/-/g, '') === pid);
+    });
+    const activeCommitments = personCommitments.filter(c =>
+      c.Status && !['Done', 'Cancelled'].includes(c.Status)
+    );
+
+    // Find projects owned by this person
+    const personProjects = projects.filter(p => {
+      const ownerIds = p.Owner || [];
+      return Array.isArray(ownerIds) && ownerIds.some(id => id.replace(/-/g, '') === pid);
+    });
+    const activeProjects = personProjects.filter(p => p.Status === 'Active');
+
+    // Find focus areas this person works on (from their commitments)
+    const focusAreaIds = new Set();
+    for (const c of personCommitments) {
+      const faIds = c['Focus Area'] || c['Focus Areas'] || c['Focus area'] || [];
+      if (Array.isArray(faIds)) {
+        for (const id of faIds) focusAreaIds.add(id.replace(/-/g, ''));
+      }
+    }
+
+    // Resolve focus area IDs to names using the already-fetched focusAreas
+    const focusAreaNames = [];
+    for (const faId of focusAreaIds) {
+      const fa = focusAreas.find(a => a.id.replace(/-/g, '') === faId);
+      if (fa) focusAreaNames.push(fa.Name);
+    }
+
+    return {
+      ...person,
+      activeCommitmentCount: activeCommitments.length,
+      activeProjectCount: activeProjects.length,
+      activeProjectNames: activeProjects.map(p => p.Name).slice(0, 5),
+      focusAreaNames: focusAreaNames.slice(0, 5),
+      commitmentNames: activeCommitments.map(c => c.Name).slice(0, 5),
+    };
+  });
+
   return {
     focusAreas: enrichedFocusAreas,
     overdue: enrichedOverdue,
+    upcoming: enrichedUpcoming,
     recentDecisions: decisions,
-    people,
+    people: enrichedPeople,
     healthDistribution,
+    audienceCount: audiencesResult.results.length,
+    platformCount: platformsResult.results.length,
     timestamp: new Date().toISOString(),
   };
+}
+
+/**
+ * Resolve relation IDs in simplified properties to {id, name} objects.
+ * Uses cached pages when available, fetches uncached ones in parallel.
+ * This is cheap because getPage() uses the 5-min cache.
+ */
+async function resolveRelations(properties) {
+  const resolved = { ...properties };
+
+  for (const [key, value] of Object.entries(resolved)) {
+    // Relations from simplify() are arrays of ID strings
+    if (!Array.isArray(value) || value.length === 0) continue;
+    // Skip arrays that aren't UUIDs (multi_select values are short human-readable strings)
+    if (typeof value[0] !== 'string' || value[0].length < 30) continue;
+
+    // Resolve each ID to {id, name} — use getPageRaw to avoid recursive resolution
+    const resolvedItems = await Promise.all(
+      value.slice(0, 10).map(async (id) => {
+        try {
+          const page = await getPageRaw(id);
+          if (!page) return { id, name: 'Untitled' };
+          const name = page.properties.Name || page.properties.Title || page.properties.name || 'Untitled';
+          return { id, name };
+        } catch {
+          return { id, name: 'Untitled' };
+        }
+      })
+    );
+    resolved[key] = resolvedItems;
+  }
+
+  return resolved;
 }
 
 /**
@@ -445,9 +539,10 @@ async function queryDatabase(dbId, { filter, sorts, startCursor, pageSize = 50 }
 }
 
 /**
- * Get a single page's properties
+ * Fetch a single page's raw (simplified but not relation-resolved) properties.
+ * Used internally by resolveRelations to avoid recursive resolution.
  */
-async function getPage(pageId) {
+async function getPageRaw(pageId) {
   const cacheKey = 'page_' + pageId;
   return deduplicatedFetch(cacheKey, async () => {
     const notion = getClient();
@@ -463,6 +558,18 @@ async function getPage(pageId) {
     console.error('Failed to get page ' + pageId + ':', err.message);
     return null;
   });
+}
+
+/**
+ * Get a single page's properties with relations resolved to {id, name} objects.
+ */
+async function getPage(pageId) {
+  const raw = await getPageRaw(pageId);
+  if (!raw) return null;
+  return {
+    ...raw,
+    properties: await resolveRelations(raw.properties),
+  };
 }
 
 /**
@@ -707,7 +814,7 @@ async function getRelatedPages(pageId) {
         const resolvedPages = await Promise.all(
           relatedIds.map(async (relId) => {
             try {
-              const relPage = await getPage(relId);
+              const relPage = await getPageRaw(relId);
               if (!relPage) return null;
               return {
                 id: relId,
@@ -755,6 +862,7 @@ module.exports = {
   DB,
   getClient,
   simplify,
+  resolveRelations,
   getFocusAreas,
   getCommitments,
   getOverdueCommitments,

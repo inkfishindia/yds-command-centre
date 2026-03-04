@@ -40,9 +40,12 @@ public/
   js/app.js                        # All frontend state and methods
   css/styles.css                   # Dark theme, responsive layout
 .claude/
-  agents/                          # Agent configs (builder, code-reviewer, devops-infra)
+  agents/                          # Agent configs (builder, code-reviewer, devops-infra, ux-auditor, pixel)
   rules/                           # Coding patterns (frontend, server, token efficiency)
-  docs/                            # Reference docs (notion-hub, tech-brief)
+  skills/ui-ux-pro-max/            # Design intelligence: 50+ styles, 97 palettes, 57 font pairings, UX guidelines
+  docs/app-reference.md            # FULL APP INVENTORY — routes, views, state, methods, CSS, tools. Read before building.
+  docs/notion-hub.md               # Notion database IDs, people IDs, property schemas, write templates
+  docs/tech-brief.md               # Technical architecture brief
 ```
 
 ## Critical Patterns
@@ -57,9 +60,11 @@ public/
 
 | Task | Agent | Model | When |
 |------|-------|-------|------|
+| Design planning | `design-planner` | Haiku | Before UI work — design systems, palettes, typography |
 | All code changes | `builder` | Sonnet | Feature dev, debugging, refactoring |
 | Quality gate | `code-reviewer` | Opus | After any code changes, before shipping |
 | UX consistency | `ux-auditor` | Haiku | After UI changes, checks visual/a11y patterns |
+| Image generation | `pixel` | Sonnet | Hero graphics, social visuals, mockups via Nano Banana |
 | Deploy/infra | `devops-infra` | Haiku | Deployment config, env setup, monitoring |
 
 ## How to Run

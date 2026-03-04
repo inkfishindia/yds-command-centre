@@ -20,8 +20,8 @@
       <button class="cmd-trigger" @click="toggleCmdPalette()" title="Cmd+K">
         <span class="cmd-trigger-key">&#8984;K</span>
       </button>
-      <span class="status-dot" :class="connected ? 'status-online' : 'status-offline'"></span>
-      <span class="status-text" x-text="connected ? 'Colin Online' : 'Connecting...'"></span>
+      <span class="status-dot" :class="connected ? 'status-online' : 'status-offline'" aria-hidden="true"></span>
+      <span class="status-text" role="status" x-text="connected ? 'Colin Online' : 'Connecting...'"></span>
     </div>
   </header>
 
@@ -30,28 +30,32 @@
 
     <!-- Sidebar navigation -->
     <nav class="sidebar">
-      <button class="nav-btn" :class="view === 'chat' && 'nav-active'" @click="view = 'chat'">
+      <button class="nav-btn" :class="view === 'chat' && 'nav-active'" @click="view = 'chat'" aria-label="Chat" :aria-current="view === 'chat' ? 'page' : false">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v6a2 2 0 01-2 2H6l-4 4V5z"/></svg>
         <span class="nav-label">Chat</span>
       </button>
-      <button class="nav-btn" :class="view === 'dashboard' && 'nav-active'" @click="view = 'dashboard'; loadDashboard()">
+      <button class="nav-btn" :class="view === 'dashboard' && 'nav-active'" @click="view = 'dashboard'; loadDashboard()" aria-label="Dashboard" :aria-current="view === 'dashboard' ? 'page' : false">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm9 0a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1V4zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zm9 0a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-3z"/></svg>
         <span class="nav-label">Dash</span>
       </button>
-      <button class="nav-btn" :class="view === 'team' && 'nav-active'" @click="view = 'team'; loadTeam()">
+      <button class="nav-btn" :class="view === 'team' && 'nav-active'" @click="view = 'team'; loadTeam()" aria-label="Team" :aria-current="view === 'team' ? 'page' : false">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zm5 2a2 2 0 11-4 0 2 2 0 014 0zm-4 7a4 4 0 00-8 0v1h8v-1zM6 8a2 2 0 11-4 0 2 2 0 014 0zm10 7a3.99 3.99 0 00-1.46-3.08A3.98 3.98 0 0118 15v1h-2zM3.08 11.92A3.99 3.99 0 002 15v1h2v-1c0-.88.28-1.69.76-2.36-.37-.24-.7-.53-.99-.85l.31.13z"/></svg>
         <span class="nav-label">Team</span>
       </button>
-      <button class="nav-btn" :class="view === 'docs' && 'nav-active'" @click="view = 'docs'; loadDocuments()">
+      <button class="nav-btn" :class="view === 'docs' && 'nav-active'" @click="view = 'docs'; loadDocuments()" aria-label="Documents" :aria-current="view === 'docs' ? 'page' : false">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>
         <span class="nav-label">Docs</span>
       </button>
-      <button class="nav-btn" :class="view === 'notion' && 'nav-active'" @click="view = 'notion'; loadNotion()">
+      <button class="nav-btn" :class="view === 'notion' && 'nav-active'" @click="view = 'notion'; loadNotion()" aria-label="Notion browser" :aria-current="view === 'notion' ? 'page' : false">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2z"/></svg>
         <span class="nav-label">Notion</span>
       </button>
+      <button class="nav-btn" :class="view === 'projects' && 'nav-active'" @click="view = 'projects'; if(!projects.length) loadProjects()" aria-label="Projects" :aria-current="view === 'projects' ? 'page' : false">
+        <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"/></svg>
+        <span class="nav-label">Proj</span>
+      </button>
       <div class="nav-spacer"></div>
-      <button class="nav-btn nav-secondary" @click="clearChat()">
+      <button class="nav-btn nav-secondary" @click="clearChat()" aria-label="New chat">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
         <span class="nav-label">New</span>
       </button>
@@ -64,7 +68,7 @@
       <div x-show="view === 'chat'" class="chat-layout">
         <div class="chat-main">
           <!-- Messages -->
-          <div class="messages" id="messages">
+          <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Conversation">
             <template x-if="messages.length === 0">
               <div class="welcome">
                 <div class="welcome-avatar">C</div>
@@ -91,24 +95,23 @@
               </div>
             </template>
             <!-- Streaming indicator -->
-            <template x-if="streaming">
-              <div class="message msg-assistant">
-                <div class="msg-label">Colin</div>
-                <div class="msg-body" x-html="renderMarkdown(streamingText)"></div>
-                <div class="typing-indicator" x-show="streamingText === ''">
-                  <span></span><span></span><span></span>
-                </div>
+            <div class="message msg-assistant" x-show="streaming" x-cloak>
+              <div class="msg-label">Colin</div>
+              <div class="msg-body" x-show="streamingText !== ''" x-html="renderMarkdown(streamingText)"></div>
+              <div class="typing-indicator" x-show="streamingText === ''">
+                <span></span><span></span><span></span>
               </div>
-            </template>
+            </div>
             <!-- Approval cards -->
             <template x-for="(a, i) in pendingApprovals" :key="a.approvalId">
               <div class="approval-card">
-                <div class="approval-header">Approval Required</div>
+                <div class="approval-header" x-text="a.resolving ? 'Processing...' : 'Approval Required'"></div>
                 <div class="approval-tool" x-text="formatToolName(a.toolName)"></div>
-                <pre class="approval-details" x-text="JSON.stringify(a.toolInput, null, 2)"></pre>
+                <pre class="approval-details" aria-label="Proposed action details" x-text="JSON.stringify(a.toolInput, null, 2)"></pre>
+                <div class="approval-error" x-show="a.error" x-text="a.error"></div>
                 <div class="approval-actions">
-                  <button class="btn btn-approve" @click="resolveApproval(a.approvalId, true)">Approve</button>
-                  <button class="btn btn-reject" @click="resolveApproval(a.approvalId, false)">Reject</button>
+                  <button class="btn btn-approve" @click="resolveApproval(a.approvalId, true)" :disabled="a.resolving">Approve</button>
+                  <button class="btn btn-reject" @click="resolveApproval(a.approvalId, false)" :disabled="a.resolving">Reject</button>
                 </div>
               </div>
             </template>
@@ -154,7 +157,7 @@
               </div>
             </button>
           </template>
-          <h3 class="sidebar-title" style="margin-top: 1.5rem">Experts</h3>
+          <h3 class="sidebar-title sidebar-section-gap">Experts</h3>
           <template x-for="expert in experts" :key="expert.name">
             <button
               class="skill-btn skill-expert"
@@ -193,8 +196,8 @@
               <div class="skeleton skeleton-kpi"></div>
               <div class="skeleton skeleton-kpi"></div>
             </div>
-            <div class="skeleton skeleton-text short" style="margin-top:1.5rem"></div>
-            <div class="focus-grid" style="margin-top:0.75rem">
+            <div class="skeleton skeleton-text short skeleton-gap"></div>
+            <div class="focus-grid skeleton-gap-sm">
               <div class="skeleton skeleton-card"></div>
               <div class="skeleton skeleton-card"></div>
               <div class="skeleton skeleton-card"></div>
@@ -214,6 +217,11 @@
                     <div class="health-segment health-amber" :style="'width:' + ((dashboard.healthDistribution?.atRisk || 0) / Math.max(dashboard.focusAreas.length, 1) * 100) + '%'"></div>
                     <div class="health-segment health-red" :style="'width:' + ((dashboard.healthDistribution?.offTrack || 0) / Math.max(dashboard.focusAreas.length, 1) * 100) + '%'"></div>
                   </div>
+                  <div class="health-legend">
+                    <span class="legend-item"><span class="legend-dot health-green"></span> On Track</span>
+                    <span class="legend-item"><span class="legend-dot health-amber"></span> At Risk</span>
+                    <span class="legend-item"><span class="legend-dot health-red"></span> Off Track</span>
+                  </div>
                 </div>
               </div>
               <div class="kpi-card kpi-accent-amber" :class="dashboard.overdue.length === 0 ? 'kpi-good' : dashboard.overdue.length <= 3 ? 'kpi-warn' : 'kpi-danger'">
@@ -224,9 +232,27 @@
                 <div class="kpi-number" x-text="dashboard.recentDecisions.length"></div>
                 <div class="kpi-label">Recent Decisions</div>
               </div>
-              <div class="kpi-card kpi-accent-green" @click="view = 'team'; loadTeam()" style="cursor:pointer">
+              <div class="kpi-card kpi-card--clickable kpi-accent-green" @click="view = 'team'; loadTeam()">
                 <div class="kpi-number" x-text="(teamData && teamData.length) || '—'"></div>
                 <div class="kpi-label">Team</div>
+              </div>
+            </div>
+
+            <!-- Quick Access: Audiences & Platforms -->
+            <div class="quick-access-row" x-show="dashboard.audienceCount > 0 || dashboard.platformCount > 0">
+              <div class="quick-access-tile" @click="view = 'notion'; openNotionDb({id: '63ec25cae3b0432093fa639d4c8b5809', name: 'Audiences'})">
+                <div class="quick-access-icon">A</div>
+                <div class="quick-access-info">
+                  <div class="quick-access-count" x-text="dashboard.audienceCount || 0"></div>
+                  <div class="quick-access-label">Audiences</div>
+                </div>
+              </div>
+              <div class="quick-access-tile" @click="view = 'notion'; openNotionDb({id: '1fcf264fd2cd4308bcfd28997d171360', name: 'Platforms'})">
+                <div class="quick-access-icon">S</div>
+                <div class="quick-access-info">
+                  <div class="quick-access-count" x-text="dashboard.platformCount || 0"></div>
+                  <div class="quick-access-label">Platforms</div>
+                </div>
               </div>
             </div>
 
@@ -234,7 +260,7 @@
             <h3 class="section-title">Focus Areas</h3>
             <div class="focus-grid">
               <template x-for="area in dashboard.focusAreas" :key="area.id">
-                <div class="focus-card" :class="getFocusHealthClass(area)" @click="detailPanel !== undefined ? openDetailPanel(area.id, area.Name) : (view = 'notion', openNotionPage(area.id, area.Name))">
+                <div class="focus-card" :class="getFocusHealthClass(area)" @click="openDetailPanel(area.id, area.Name)">
                   <div class="focus-card-top">
                     <div class="focus-name" x-text="area.Name || 'Untitled'"></div>
                     <span class="badge" :data-health="badgeAttr(area.Health || area.Status)" x-text="area.Health || area.Status || '—'"></span>
@@ -258,18 +284,22 @@
                 <div class="table-wrap">
                   <table class="data-table">
                     <thead>
-                      <tr><th>Task</th><th>Owner</th><th>Due</th><th>Status</th></tr>
+                      <tr><th>Task</th><th>Owner</th><th>Due</th><th>Priority</th><th>Status</th></tr>
                     </thead>
-                    <tbody>
-                      <template x-for="c in dashboard.overdue" :key="c.id">
-                        <tr @click="detailPanel !== undefined ? openDetailPanel(c.id, c.Name) : null" style="cursor:pointer">
+                    <template x-for="c in dashboard.overdue" :key="c.id">
+                      <tbody>
+                        <tr @click="openDetailPanel(c.id, c.Name)">
                           <td><span class="table-link" x-text="c.Name || 'Untitled'"></span></td>
                           <td x-text="c.assignedNames && c.assignedNames.length ? c.assignedNames.join(', ') : '—'"></td>
                           <td x-text="formatDate(c['Due Date'])"></td>
+                          <td><span class="badge" :data-priority="badgeAttr(c.Priority)" x-text="c.Priority || '—'" x-show="c.Priority"></span></td>
                           <td><span class="badge" :data-status="badgeAttr(c.Status)" x-text="c.Status || '—'"></span></td>
                         </tr>
-                      </template>
-                    </tbody>
+                        <tr x-show="c.Notes" class="notes-preview-row" @click="openDetailPanel(c.id, c.Name)">
+                          <td colspan="5" class="notes-preview" x-text="c.Notes && c.Notes.length > 120 ? c.Notes.substring(0, 120) + '...' : c.Notes"></td>
+                        </tr>
+                      </tbody>
+                    </template>
                   </table>
                 </div>
               </div>
@@ -284,17 +314,20 @@
                     <thead>
                       <tr><th>Task</th><th>Owner</th><th>Due</th><th>Status</th><th>Priority</th></tr>
                     </thead>
-                    <tbody>
-                      <template x-for="c in upcomingCommitments" :key="c.id">
-                        <tr @click="openDetailPanel(c.id, c.Name)" style="cursor:pointer">
+                    <template x-for="c in upcomingCommitments" :key="c.id">
+                      <tbody>
+                        <tr @click="openDetailPanel(c.id, c.Name)">
                           <td><span class="table-link" x-text="c.Name || 'Untitled'"></span></td>
-                          <td x-text="c['Assigned To'] && Array.isArray(c['Assigned To']) ? c['Assigned To'].length + ' assigned' : '—'"></td>
+                          <td x-text="c.assignedNames && c.assignedNames.length ? c.assignedNames.join(', ') : '—'"></td>
                           <td x-text="formatDate(c['Due Date'])"></td>
                           <td><span class="badge" :data-status="badgeAttr(c.Status)" x-text="c.Status || '—'"></span></td>
                           <td><span class="badge" :data-priority="badgeAttr(c.Priority)" x-text="c.Priority || '—'" x-show="c.Priority"></span></td>
                         </tr>
-                      </template>
-                    </tbody>
+                        <tr x-show="c.Notes" class="notes-preview-row" @click="openDetailPanel(c.id, c.Name)">
+                          <td colspan="5" class="notes-preview" x-text="c.Notes && c.Notes.length > 120 ? c.Notes.substring(0, 120) + '...' : c.Notes"></td>
+                        </tr>
+                      </tbody>
+                    </template>
                   </table>
                 </div>
               </div>
@@ -304,21 +337,54 @@
             <template x-if="dashboard.recentDecisions.length > 0">
               <div>
                 <h3 class="section-title">Recent Decisions</h3>
-                <div class="table-wrap">
-                  <table class="data-table">
-                    <thead>
-                      <tr><th>Decision</th><th>Date</th><th>Owner</th></tr>
-                    </thead>
-                    <tbody>
-                      <template x-for="d in dashboard.recentDecisions" :key="d.id">
-                        <tr @click="detailPanel !== undefined ? openDetailPanel(d.id, d.Name) : null" style="cursor:pointer">
-                          <td><span class="table-link" x-text="d.Name || 'Untitled'"></span></td>
-                          <td x-text="formatDate(d.Date)"></td>
-                          <td x-text="d.Owner || '—'"></td>
-                        </tr>
-                      </template>
-                    </tbody>
-                  </table>
+                <div class="decisions-list">
+                  <template x-for="(d, idx) in dashboard.recentDecisions" :key="d.id">
+                    <div class="decision-card" :class="{'decision-expanded': expandedDecision === idx}">
+                      <div class="decision-header" @click="expandedDecision = expandedDecision === idx ? null : idx">
+                        <div class="decision-title" x-text="d.Name || 'Untitled'"></div>
+                        <div class="decision-meta">
+                          <span class="decision-date" x-text="formatDate(d.Date)"></span>
+                          <span class="decision-owner" x-text="d.Owner || '—'"></span>
+                        </div>
+                        <svg class="decision-chevron" :class="{'rotated': expandedDecision === idx}" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+                      </div>
+                      <div class="decision-body" x-show="expandedDecision === idx" x-transition.duration.200ms>
+                        <template x-if="d.Context">
+                          <div class="decision-field">
+                            <div class="decision-field-label">Context</div>
+                            <div class="decision-field-value" x-text="d.Context"></div>
+                          </div>
+                        </template>
+                        <template x-if="d.Decision">
+                          <div class="decision-field">
+                            <div class="decision-field-label">Decision</div>
+                            <div class="decision-field-value" x-text="d.Decision"></div>
+                          </div>
+                        </template>
+                        <template x-if="d.Rationale">
+                          <div class="decision-field">
+                            <div class="decision-field-label">Rationale</div>
+                            <div class="decision-field-value" x-text="d.Rationale"></div>
+                          </div>
+                        </template>
+                        <template x-if="d['Risks Accepted']">
+                          <div class="decision-field decision-risk">
+                            <div class="decision-field-label">Risks Accepted</div>
+                            <div class="decision-field-value" x-text="d['Risks Accepted']"></div>
+                          </div>
+                        </template>
+                        <template x-if="d['Alternatives Considered']">
+                          <div class="decision-field">
+                            <div class="decision-field-label">Alternatives Considered</div>
+                            <div class="decision-field-value" x-text="d['Alternatives Considered']"></div>
+                          </div>
+                        </template>
+                        <div class="decision-actions">
+                          <button class="btn btn-sm" @click.stop="openDetailPanel(d.id, d.Name)">View Full Page</button>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
                 </div>
               </div>
             </template>
@@ -330,30 +396,79 @@
       <div x-show="view === 'team'" class="team-view">
         <div class="view-header">
           <div>
-            <h2 style="font-size:22px; font-weight:700">Team</h2>
+            <h2 class="view-title">Team</h2>
             <p class="view-header-sub" x-text="teamData.length + ' members'"></p>
           </div>
         </div>
         <template x-if="teamLoading">
           <div class="team-grid">
-            <div class="skeleton skeleton-card" style="height:80px"></div>
-            <div class="skeleton skeleton-card" style="height:80px"></div>
-            <div class="skeleton skeleton-card" style="height:80px"></div>
-            <div class="skeleton skeleton-card" style="height:80px"></div>
-            <div class="skeleton skeleton-card" style="height:80px"></div>
-            <div class="skeleton skeleton-card" style="height:80px"></div>
+            <div class="skeleton skeleton-card skeleton-team"></div>
+            <div class="skeleton skeleton-card skeleton-team"></div>
+            <div class="skeleton skeleton-card skeleton-team"></div>
+            <div class="skeleton skeleton-card skeleton-team"></div>
+            <div class="skeleton skeleton-card skeleton-team"></div>
+            <div class="skeleton skeleton-card skeleton-team"></div>
           </div>
         </template>
-        <template x-if="!teamLoading">
+        <template x-if="!teamLoading && teamData.length === 0">
+          <div class="empty-state">No team members found.</div>
+        </template>
+        <template x-if="!teamLoading && teamData.length > 0">
           <div class="team-grid">
             <template x-for="person in teamData" :key="person.id">
-              <div class="team-card" @click="openDetailPanel(person.id, person.Name)">
-                <div class="team-avatar" x-text="getInitials(person.Name)"></div>
-                <div class="team-info">
-                  <div class="team-name" x-text="person.Name || 'Unknown'"></div>
-                  <div class="team-role" x-text="person.Function || person.Role || '—'"></div>
+              <div class="team-card" :class="{'team-card-expanded': expandedTeamMember === person.id}">
+                <div class="team-card-header" @click="expandedTeamMember = expandedTeamMember === person.id ? null : person.id">
+                  <div class="team-avatar" x-text="getInitials(person.Name)"></div>
+                  <div class="team-info">
+                    <div class="team-name" x-text="person.Name || 'Unknown'"></div>
+                    <div class="team-role" x-text="person.Function || person.Role || '—'"></div>
+                  </div>
+                  <div class="team-badges">
+                    <span class="workload-badge"
+                          :class="(person.activeCommitmentCount || 0) <= 2 ? 'workload-low' : (person.activeCommitmentCount || 0) <= 5 ? 'workload-med' : 'workload-high'"
+                          x-text="person.activeCommitmentCount || 0"
+                          :title="(person.activeCommitmentCount || 0) + ' active commitments'"></span>
+                    <span class="project-count-badge" x-show="person.activeProjectCount > 0"
+                          x-text="person.activeProjectCount + 'P'"
+                          :title="person.activeProjectCount + ' active projects'"></span>
+                  </div>
                 </div>
-                <button class="btn btn-small team-ask" @click.stop="askColinAbout(person.Name)">Ask Colin</button>
+                <div class="team-card-body" x-show="expandedTeamMember === person.id" x-transition.duration.200ms>
+                  <template x-if="person.activeProjectNames && person.activeProjectNames.length">
+                    <div class="team-detail-section">
+                      <div class="team-detail-label">Active Projects</div>
+                      <div class="team-detail-tags">
+                        <template x-for="name in person.activeProjectNames" :key="name">
+                          <span class="relation-pill" x-text="name"></span>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="person.focusAreaNames && person.focusAreaNames.length">
+                    <div class="team-detail-section">
+                      <div class="team-detail-label">Focus Areas</div>
+                      <div class="team-detail-tags">
+                        <template x-for="name in person.focusAreaNames" :key="name">
+                          <span class="relation-pill" x-text="name"></span>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="person.commitmentNames && person.commitmentNames.length">
+                    <div class="team-detail-section">
+                      <div class="team-detail-label">Active Commitments</div>
+                      <div class="team-detail-items">
+                        <template x-for="name in person.commitmentNames" :key="name">
+                          <div class="team-detail-item" x-text="name"></div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                  <div class="team-card-actions">
+                    <button class="btn btn-small" @click.stop="askColinAbout(person.Name)">Ask Colin</button>
+                    <button class="btn btn-small btn-secondary" @click.stop="openDetailPanel(person.id, person.Name)">View Profile</button>
+                  </div>
+                </div>
               </div>
             </template>
           </div>
@@ -391,7 +506,7 @@
             <div class="doc-viewer-header">
               <button class="btn btn-small" @click="activeDoc = null">&larr; Back</button>
               <span class="doc-viewer-title" x-text="activeDoc.filename"></span>
-              <button class="btn btn-small" @click="discussDocument(activeDoc)">Discuss with Colin</button>
+              <button class="btn btn-small" @click="discussDocument(activeDoc)" :disabled="streaming">Discuss with Colin</button>
             </div>
             <div class="doc-content" x-html="renderMarkdown(activeDoc.content)"></div>
           </div>
@@ -503,7 +618,7 @@
               </template>
             </div>
             <template x-if="notionHasMore">
-              <div style="text-align: center; padding: 1rem;">
+              <div class="load-more-wrap">
                 <button class="btn btn-small" @click="loadMoreEntries()" :disabled="notionLoading">Load more</button>
               </div>
             </template>
@@ -527,11 +642,11 @@
             <template x-if="notionActivePage.properties && getPropertyEntries(notionActivePage.properties).length > 0">
               <div class="notion-props">
                 <template x-for="[key, val] in getPropertyEntries(notionActivePage.properties)" :key="key">
-                  <div class="notion-prop-row">
-                    <span class="notion-prop-key" x-text="key"></span>
-                    <span class="notion-prop-val">
+                  <div class="prop-row">
+                    <span class="prop-key" x-text="key"></span>
+                    <span class="prop-val">
                       <template x-if="typeof val === 'string' && val.startsWith('http')">
-                        <a :href="val" target="_blank" class="notion-prop-link" x-text="val"></a>
+                        <a :href="val" target="_blank" class="prop-link" x-text="val"></a>
                       </template>
                       <template x-if="!(typeof val === 'string' && val.startsWith('http'))">
                         <span x-text="formatPropertyValue(val)"></span>
@@ -545,7 +660,7 @@
             <!-- Related pages -->
             <template x-if="!notionRelatedLoading && hasRelated()">
               <div class="notion-related">
-                <h3 class="section-title" style="margin-top:0">Related</h3>
+                <h3 class="section-title section-title--flush">Related</h3>
                 <template x-for="[relName, relPages] in getRelatedEntries()" :key="relName">
                   <div class="related-group">
                     <div class="related-group-label" x-text="relName"></div>
@@ -572,7 +687,7 @@
               </div>
             </template>
             <template x-if="notionRelatedLoading">
-              <div class="loading" style="padding: 0.5rem 1.25rem; font-size: 12px;">Loading related...</div>
+              <div class="loading loading--inline">Loading related...</div>
             </template>
 
             <!-- Content -->
@@ -585,6 +700,82 @@
           </div>
         </template>
       </div>
+
+      <!-- Projects view -->
+      <div x-show="view === 'projects'" class="projects-view" x-cloak>
+        <div class="view-header">
+          <div>
+            <h2 class="view-title">Projects</h2>
+            <p class="view-header-sub" x-text="getFilteredProjects().length + ' projects'"></p>
+          </div>
+          <div class="filter-bar">
+            <button class="filter-pill" :class="{'filter-pill-active': projectsFilter === ''}" @click="projectsFilter = ''">All</button>
+            <button class="filter-pill" :class="{'filter-pill-active': projectsFilter === 'Active'}" @click="projectsFilter = 'Active'">Active</button>
+            <button class="filter-pill" :class="{'filter-pill-active': projectsFilter === 'On Hold'}" @click="projectsFilter = 'On Hold'">On Hold</button>
+            <button class="filter-pill" :class="{'filter-pill-active': projectsFilter === 'Done'}" @click="projectsFilter = 'Done'">Done</button>
+            <button class="filter-pill" :class="{'filter-pill-active': projectsFilter === 'Cancelled'}" @click="projectsFilter = 'Cancelled'">Cancelled</button>
+          </div>
+          <div class="filter-bar" style="margin-top: 6px;">
+            <button class="filter-pill" :class="{'filter-pill-active': projectsTypeFilter === ''}" @click="projectsTypeFilter = ''">All Types</button>
+            <button class="filter-pill filter-pill-mission" :class="{'filter-pill-active': projectsTypeFilter === 'Mission Brief'}" @click="projectsTypeFilter = 'Mission Brief'">Mission Brief</button>
+            <button class="filter-pill filter-pill-initiative" :class="{'filter-pill-active': projectsTypeFilter === 'Initiative'}" @click="projectsTypeFilter = 'Initiative'">Initiative</button>
+            <button class="filter-pill filter-pill-experiment" :class="{'filter-pill-active': projectsTypeFilter === 'Experiment'}" @click="projectsTypeFilter = 'Experiment'">Experiment</button>
+          </div>
+        </div>
+
+        <template x-if="projectsLoading">
+          <div class="projects-grid">
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+          </div>
+        </template>
+
+        <template x-if="!projectsLoading">
+          <div>
+            <template x-if="getFilteredProjects().length === 0">
+              <div class="empty-state">No projects match the current filters.</div>
+            </template>
+            <div class="projects-grid">
+              <template x-for="p in getFilteredProjects()" :key="p.id">
+                <div class="project-card" @click="openDetailPanel(p.id, p.Name)">
+                  <div class="project-card-header">
+                    <span class="badge" :data-status="badgeAttr(p.Status)" x-text="p.Status || '—'"></span>
+                    <span class="badge project-type-badge" :data-type="badgeAttr(p.Type)" x-text="p.Type || '—'" x-show="p.Type"></span>
+                  </div>
+                  <div class="project-card-title" x-text="p.Name || 'Untitled'"></div>
+                  <div class="project-card-meta">
+                    <template x-if="p.Owner && Array.isArray(p.Owner) && p.Owner.length">
+                      <div class="project-meta-row">
+                        <span class="meta-label">Owner</span>
+                        <span x-text="typeof p.Owner[0] === 'object' ? p.Owner[0].name : p.Owner[0]"></span>
+                      </div>
+                    </template>
+                    <template x-if="p['Focus Area'] && Array.isArray(p['Focus Area']) && p['Focus Area'].length">
+                      <div class="project-meta-row">
+                        <span class="meta-label">Focus</span>
+                        <span x-text="typeof p['Focus Area'][0] === 'object' ? p['Focus Area'][0].name : p['Focus Area'][0]"></span>
+                      </div>
+                    </template>
+                    <template x-if="p['AI Expert Panel'] && Array.isArray(p['AI Expert Panel']) && p['AI Expert Panel'].length">
+                      <div class="project-meta-row">
+                        <span class="meta-label">Experts</span>
+                        <span x-text="p['AI Expert Panel'].map(e => typeof e === 'object' ? e.name : e).join(', ')"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+
+    <!-- Detail Overlay -->
+    <div class="detail-overlay" x-show="detailPanel" @click="closeDetailPanel()" x-transition.opacity x-cloak></div>
 
     <!-- Detail Sidebar -->
     <div class="detail-sidebar" :class="detailPanel && 'detail-open'" x-show="detailPanel" x-cloak>
@@ -606,16 +797,16 @@
                 <div class="skeleton skeleton-text long"></div>
                 <div class="skeleton skeleton-text medium"></div>
                 <div class="skeleton skeleton-text short"></div>
-                <div class="skeleton skeleton-text long" style="margin-top:1rem"></div>
+                <div class="skeleton skeleton-text long skeleton-gap"></div>
                 <div class="skeleton skeleton-text medium"></div>
               </div>
             </template>
             <template x-if="!detailPanel.loading && detailPanel.properties && getPropertyEntries(detailPanel.properties).length > 0">
               <div class="detail-props">
                 <template x-for="[key, val] in getPropertyEntries(detailPanel.properties)" :key="key">
-                  <div class="detail-prop-row">
-                    <span class="detail-prop-key" x-text="key"></span>
-                    <span class="detail-prop-val" x-text="formatPropertyValue(val)"></span>
+                  <div class="prop-row">
+                    <span class="prop-key" x-text="key"></span>
+                    <span class="prop-val" x-text="formatPropertyValue(val)"></span>
                   </div>
                 </template>
               </div>
@@ -632,8 +823,8 @@
   </div>
 
   <!-- Command Palette -->
-  <div class="cmd-overlay" x-show="cmdPaletteOpen" x-transition.opacity @click.self="closeCmdPalette()" style="display:none;">
-    <div class="cmd-palette" @keydown.arrow-up.prevent="cmdNavigate(-1)" @keydown.arrow-down.prevent="cmdNavigate(1)" @keydown.enter.prevent="cmdExecute()">
+  <div class="cmd-overlay" x-show="cmdPaletteOpen" x-transition.opacity @click.self="closeCmdPalette()" x-cloak>
+    <div class="cmd-palette" role="dialog" aria-modal="true" aria-label="Command palette" @keydown.arrow-up.prevent="cmdNavigate(-1)" @keydown.arrow-down.prevent="cmdNavigate(1)" @keydown.enter.prevent="cmdExecute()">
       <div class="cmd-input-wrap">
         <span class="cmd-icon">&#8984;K</span>
         <input type="text" class="cmd-input" placeholder="Search commands, databases, pages..." x-model="cmdSearch" x-ref="cmdInput" @input="cmdSelectedIndex = 0">

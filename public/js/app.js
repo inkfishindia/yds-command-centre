@@ -41,10 +41,18 @@ function app() {
     dashboard: null,
     dashboardLoading: false,
     upcomingCommitments: [],
+    expandedDecision: null,
+
+    // Projects
+    projects: [],
+    projectsLoading: false,
+    projectsFilter: 'Active',
+    projectsTypeFilter: '',
 
     // Team
     teamData: [],
     teamLoading: false,
+    expandedTeamMember: null,
 
     // Documents
     documents: { briefings: [], decisions: [], 'weekly-reviews': [] },
@@ -101,8 +109,9 @@ function app() {
           e.preventDefault();
           this.toggleCmdPalette();
         }
-        if (e.key === 'Escape' && this.cmdPaletteOpen) {
-          this.closeCmdPalette();
+        if (e.key === 'Escape') {
+          if (this.cmdPaletteOpen) this.closeCmdPalette();
+          else if (this.detailPanel) this.closeDetailPanel();
         }
       });
 
@@ -185,7 +194,7 @@ function app() {
                     this.scrollToBottom();
                     break;
                   case 'tool_use':
-                    this.activeTools = [...this.activeTools, data];
+                    this.activeTools = [...this.activeTools, data].slice(-3);
                     break;
                   case 'error':
                     this.streamingText += `\n\n**Error:** ${data.error}`;
@@ -216,20 +225,29 @@ function app() {
         this.streaming = false;
         this.streamingText = '';
         this.activeTools = [];
+        this.pendingApprovals = [];
         this.scrollToBottom();
       }
     },
 
     async resolveApproval(approvalId, approved) {
+      // Mark as processing to prevent double-clicks
+      const approval = this.pendingApprovals.find(a => a.approvalId === approvalId);
+      if (approval) approval.resolving = true;
       try {
-        await fetch('/api/chat/approve', {
+        const res = await fetch('/api/chat/approve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ approvalId, approved }),
         });
+        if (!res.ok) throw new Error('Server rejected approval');
         this.pendingApprovals = this.pendingApprovals.filter(a => a.approvalId !== approvalId);
       } catch (err) {
         console.error('Approval error:', err);
+        if (approval) {
+          approval.resolving = false;
+          approval.error = 'Failed — try again';
+        }
       }
     },
 
@@ -247,20 +265,43 @@ function app() {
     // --- Dashboard ---
 
     async loadDashboard() {
+      this.expandedDecision = null;
       this.dashboardLoading = true;
       try {
-        const [dashRes, upcomingRes] = await Promise.all([
-          fetch('/api/notion/dashboard'),
-          fetch('/api/notion/commitments/upcoming'),
-        ]);
-        this.dashboard = await dashRes.json();
-        const upcomingData = await upcomingRes.json();
-        this.upcomingCommitments = upcomingData.commitments || [];
+        const res = await fetch('/api/notion/dashboard');
+        this.dashboard = await res.json();
+        this.upcomingCommitments = this.dashboard.upcoming || [];
       } catch (err) {
         console.error('Dashboard error:', err);
       } finally {
         this.dashboardLoading = false;
       }
+    },
+
+    // --- Projects ---
+
+    async loadProjects() {
+      this.projectsLoading = true;
+      try {
+        const res = await fetch('/api/notion/projects');
+        const data = await res.json();
+        this.projects = data.projects || [];
+      } catch (err) {
+        console.error('Projects load error:', err);
+      } finally {
+        this.projectsLoading = false;
+      }
+    },
+
+    getFilteredProjects() {
+      let filtered = this.projects;
+      if (this.projectsFilter) {
+        filtered = filtered.filter(p => p.Status === this.projectsFilter);
+      }
+      if (this.projectsTypeFilter) {
+        filtered = filtered.filter(p => p.Type === this.projectsTypeFilter);
+      }
+      return filtered;
     },
 
     getFocusHealthClass(area) {
@@ -274,11 +315,17 @@ function app() {
     // --- Team ---
 
     async loadTeam() {
+      this.expandedTeamMember = null;
       this.teamLoading = true;
       try {
-        const res = await fetch('/api/notion/people');
-        const data = await res.json();
-        this.teamData = data.people;
+        // Use enriched people from dashboard if already loaded (has workload data)
+        if (this.dashboard && this.dashboard.people && this.dashboard.people.length) {
+          this.teamData = this.dashboard.people;
+        } else {
+          const res = await fetch('/api/notion/people');
+          const data = await res.json();
+          this.teamData = data.people;
+        }
       } catch (err) {
         console.error('Team error:', err);
       } finally {
@@ -316,6 +363,7 @@ function app() {
     },
 
     discussDocument(doc) {
+      if (this.streaming) return;
       this.view = 'chat';
       this.inputText = `I'd like to discuss this document: ${doc.filename}\n\n---\n${doc.content.slice(0, 500)}...`;
       this.$nextTick(() => this.$refs.chatInput?.focus());
@@ -501,22 +549,30 @@ function app() {
 
     formatDate(val) {
       if (!val) return '—';
-      if (typeof val === 'object' && val.start) return val.start;
-      return String(val);
+      const raw = typeof val === 'object' && val.start ? val.start : String(val);
+      const dateOnly = raw.split('T')[0];
+      const d = new Date(dateOnly + 'T00:00:00');
+      if (isNaN(d)) return raw;
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     },
 
     formatPropertyValue(value) {
       if (Array.isArray(value)) {
         if (value.length === 0) return '—';
-        // Check if array contains UUIDs (relation IDs) — show count instead of raw IDs
+        // Resolved relations arrive as [{id, name}] objects
+        if (typeof value[0] === 'object' && value[0] !== null && value[0].name) {
+          return value.map(r => r.name).join(', ');
+        }
+        // Fallback: raw UUID strings that weren't resolved
         if (typeof value[0] === 'string' && /^[0-9a-f-]{32,36}$/.test(value[0])) {
           return value.length + ' linked';
         }
         return value.join(', ');
       }
       if (value && typeof value === 'object' && value.start) {
-        // Date object from Notion — show formatted date
-        return value.end ? `${value.start} → ${value.end}` : value.start;
+        const fmt = this.formatDate(value);
+        if (value.end) return `${fmt} → ${this.formatDate({ start: value.end })}`;
+        return fmt;
       }
       if (typeof value === 'boolean') return value ? 'Yes' : 'No';
       return String(value);
@@ -593,6 +649,7 @@ function app() {
       const tabs = [
         { group: 'Navigation', label: 'Chat', action: 'chat' },
         { group: 'Navigation', label: 'Dashboard', action: 'dashboard' },
+        { group: 'Navigation', label: 'Projects', action: 'projects' },
         { group: 'Navigation', label: 'Team', action: 'team' },
         { group: 'Navigation', label: 'Documents', action: 'docs' },
         { group: 'Navigation', label: 'Notion', action: 'notion' },
@@ -639,6 +696,7 @@ function app() {
       if (item.action) {
         this.view = item.action;
         if (item.action === 'dashboard') this.loadDashboard();
+        else if (item.action === 'projects') { if (!this.projects.length) this.loadProjects(); }
         else if (item.action === 'team') this.loadTeam();
         else if (item.action === 'docs') this.loadDocuments();
         else if (item.action === 'notion') this.loadNotion();
