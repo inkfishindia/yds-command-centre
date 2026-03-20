@@ -46,9 +46,14 @@ async function chat(userMessage, skill, onText, onApproval, onToolUse) {
   // Add user message to history
   conversationHistory.push({ role: 'user', content: fullMessage });
 
-  // Trim history if too long
+  // Trim history if too long — keep first 4 messages (initial context) + most recent
   if (conversationHistory.length > MAX_MESSAGES) {
-    conversationHistory = conversationHistory.slice(-MAX_MESSAGES);
+    const KEEP_FIRST = 4;
+    const keepRecent = MAX_MESSAGES - KEEP_FIRST;
+    conversationHistory = [
+      ...conversationHistory.slice(0, KEEP_FIRST),
+      ...conversationHistory.slice(-keepRecent),
+    ];
   }
 
   // Agent loop — keep going until we get a final text response (no more tool calls)
@@ -114,14 +119,26 @@ async function chat(userMessage, skill, onText, onApproval, onToolUse) {
       break;
     }
 
-    // Process tool calls
-    const toolResults = [];
+    // Process tool calls — run read-only tools in parallel, write tools sequentially
+    const readBlocks = toolUseBlocks.filter(b => !requiresApproval(b.name));
+    const writeBlocks = toolUseBlocks.filter(b => requiresApproval(b.name));
 
-    for (const toolBlock of toolUseBlocks) {
-      onToolUse({ tool: toolBlock.name, input: toolBlock.input });
+    // Fire all read tools in parallel
+    const readResultPromises = readBlocks.map(async (toolBlock) => {
+      try {
+        onToolUse({ tool: toolBlock.name, input: toolBlock.input });
+        const result = await executeTool(toolBlock.name, toolBlock.input);
+        return { type: 'tool_result', tool_use_id: toolBlock.id, content: JSON.stringify(result) };
+      } catch (err) {
+        return { type: 'tool_result', tool_use_id: toolBlock.id, content: JSON.stringify({ error: err.message }) };
+      }
+    });
 
-      if (requiresApproval(toolBlock.name)) {
-        // This is a write operation — need Dan's approval
+    // Process write tools sequentially (each needs approval)
+    const writeResultPromises = (async () => {
+      const results = [];
+      for (const toolBlock of writeBlocks) {
+        onToolUse({ tool: toolBlock.name, input: toolBlock.input });
         const { id, promise } = createApproval(toolBlock.name, toolBlock.input, toolBlock.id);
         onApproval({
           approvalId: id,
@@ -129,36 +146,42 @@ async function chat(userMessage, skill, onText, onApproval, onToolUse) {
           toolInput: toolBlock.input,
         });
 
-        // Wait for approval (auto-reject after 5 minutes)
-        const approvalTimeout = new Promise((resolve) =>
-          setTimeout(() => resolve(false), APPROVAL_TIMEOUT_MS)
-        );
+        // Wait for approval with timeout — clean up timer on resolution
+        let approvalTimeoutId;
+        const approvalTimeout = new Promise((resolve) => {
+          approvalTimeoutId = setTimeout(() => resolve(false), APPROVAL_TIMEOUT_MS);
+        });
         const approved = await Promise.race([promise, approvalTimeout]);
+        clearTimeout(approvalTimeoutId);
 
         if (approved) {
           const result = await executeTool(toolBlock.name, toolBlock.input);
-          toolResults.push({
+          results.push({
             type: 'tool_result',
             tool_use_id: toolBlock.id,
             content: JSON.stringify(result),
           });
         } else {
-          toolResults.push({
+          results.push({
             type: 'tool_result',
             tool_use_id: toolBlock.id,
             content: JSON.stringify({ error: 'User declined this operation.' }),
           });
         }
-      } else {
-        // Read operation — execute immediately
-        const result = await executeTool(toolBlock.name, toolBlock.input);
-        toolResults.push({
-          type: 'tool_result',
-          tool_use_id: toolBlock.id,
-          content: JSON.stringify(result),
-        });
       }
-    }
+      return results;
+    })();
+
+    // Wait for both read and write results
+    const [readResults, writeResults] = await Promise.all([
+      Promise.all(readResultPromises),
+      writeResultPromises,
+    ]);
+
+    // Combine in original order
+    const toolResultMap = new Map();
+    for (const r of [...readResults, ...writeResults]) toolResultMap.set(r.tool_use_id, r);
+    const toolResults = toolUseBlocks.map(b => toolResultMap.get(b.id));
 
     // Add tool results to history and continue the loop
     conversationHistory.push({ role: 'user', content: toolResults });

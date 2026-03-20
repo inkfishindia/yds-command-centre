@@ -68,8 +68,8 @@ VERDICT: CLEAN / NEEDS POLISH / INCONSISTENT
 ## Handoff — What Happens After Each Verdict
 
 - **CLEAN** → Pipeline complete. Report to lead.
-- **NEEDS POLISH** → Lead sends findings back to builder for minor fixes. No full re-review needed — spot-check the fixes.
-- **INCONSISTENT** → Lead sends findings back to builder. After fixes, run full ux-auditor review again.
+- **NEEDS POLISH** → Lead sends findings back to frontend-builder for minor fixes. No full re-review needed — spot-check the fixes.
+- **INCONSISTENT** → Lead sends findings back to frontend-builder. After fixes, run full ux-auditor review again.
 
 ## Token Efficiency
 

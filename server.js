@@ -66,6 +66,8 @@ app.use('/api/registry', require('./server/routes/registry'));
 app.use('/api/notebooks', require('./server/routes/notebooks'));
 app.use('/api/marketing-ops', require('./server/routes/marketing-ops'));
 app.use('/api/tech-team', require('./server/routes/tech-team'));
+app.use('/api/bmc', require('./server/routes/bmc'));
+app.use('/api/crm', require('./server/routes/crm'));
 
 // Health check
 app.get('/api/health', (req, res) => {

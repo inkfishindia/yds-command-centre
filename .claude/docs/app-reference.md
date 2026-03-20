@@ -2,7 +2,7 @@
 
 **Purpose:** Single source of truth for what exists in the app. Read this before building anything. Update this when you change the app.
 
-**Last updated:** 2026-03-20 (Phase 1+2: morning brief, focus area detail, person metrics, action queue, decision creation, sheets pipeline, health strip, inline actions; Productivity sprint: keyboard shortcuts, visibility refresh, nav badges, Cmd+K search, bulk actions; Mobile responsive: @768px @480px bottom nav; Phase 3: decision log view, stale project indicators, team overload badges, getRecentDecisions pagination; Phase 4: Project Registry with 11-project data store, PATCH updates, filter/type toggles, keyboard nav g+r; Knowledge Base feature: notebooks service, registry parser, KB view, search/filter, keyboard nav g+k; Marketing Ops: campaigns/content/sequences/sessions dashboards, 4 new Notion DBs, kanban boards, 5 API endpoints, keyboard nav g+m; Marketing Ops inline actions: PATCH campaigns/:id, campaign commitments link, key metrics endpoint; Marketing Ops enhancements: Sequence Journey Map (table/journey toggle, kanban by stage), Campaign Actions (PATCH inline, loading state), Campaign Commitments (linked detail panel), Key Metrics Callout (collapsible metrics with progress bars); Phase 5: Tech Team module — 10-tab view (command center, sprint board, bugs, specs, decisions, velocity, roadmap, CRM, agents, strategy), 4 new Notion DBs, GitHub service, strategy cascade)
+**Last updated:** 2026-03-20 (Phase 1+2: morning brief, focus area detail, person metrics, action queue, decision creation, sheets pipeline, health strip, inline actions; Productivity sprint: keyboard shortcuts, visibility refresh, nav badges, Cmd+K search, bulk actions; Mobile responsive: @768px @480px bottom nav; Phase 3: decision log view, stale project indicators, team overload badges, getRecentDecisions pagination; Phase 4: Project Registry with 11-project data store, PATCH updates, filter/type toggles, keyboard nav g+r; Knowledge Base feature: notebooks service, registry parser, KB view, search/filter, keyboard nav g+k; Marketing Ops: campaigns/content/sequences/sessions dashboards, 4 new Notion DBs, kanban boards, 5 API endpoints, keyboard nav g+m; Marketing Ops inline actions: PATCH campaigns/:id, campaign commitments link, key metrics endpoint; Marketing Ops enhancements: Sequence Journey Map (table/journey toggle, kanban by stage), Campaign Actions (PATCH inline, loading state), Campaign Commitments (linked detail panel), Key Metrics Callout (collapsible metrics with progress bars); Phase 5: Tech Team module — 10-tab view (command center, sprint board, bugs, specs, decisions, velocity, roadmap, CRM, agents, strategy), 4 new Notion DBs, GitHub service, strategy cascade; Phase 6: Enhanced Sheets Service (SHEET_REGISTRY 25 tabs across 4 spreadsheets), Data Hydration Service (24 FK relationships), Business Model Canvas view (11 sections, parallel load), CRM view (8 endpoints, 6 section tabs), Marketing AI Tools (4 tools: customer_psychology, competitor_analysis, content_strategy, campaign_ideator), Store Expert Tool (knowledge base query/update with path protection))
 
 ---
 
@@ -52,6 +52,10 @@
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/sheets/pipeline` | CRM pipeline data: {available, b2b, dropship, breaches} or {available: false} if not configured |
+| GET | `/api/sheets/:sheetKey` | Fetch all rows from registered sheet; add ?hydrate=true to resolve FK references; valid keys: PROJECTS, TASKS, PEOPLE, CAMPAIGNS, etc. (25 sheets) |
+| POST | `/api/sheets/:sheetKey` | Append a row to a registered sheet; body: JSON object with column names as keys; returns {success, updates} |
+| PATCH | `/api/sheets/:sheetKey/:rowIdx` | Update a specific row (rowIdx 1-based, >= 2); body: JSON object with column values to update; returns update result |
+| DELETE | `/api/sheets/:sheetKey/:rowIdx` | Delete a specific row (rowIdx 1-based, >= 2); requires read-write client |
 
 ### Notebooks (`server/routes/notebooks.js`)
 | Method | Path | Description |
@@ -104,6 +108,24 @@
 | GET | `/api/tech-team/github` | GitHub repo activity (graceful degradation) |
 | PATCH | `/api/tech-team/sprint/:id` | Update sprint item property (Status/Priority/Waiting On) via approval gate |
 
+### Business Model Canvas (`server/routes/bmc.js`)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/bmc` | All 11 BMC sections parallel (segments, business_units, flywheels, revenue_streams, cost_structure, channels, platforms, team, hubs, partners, metrics), hydrated with FK resolution; returns {available, canvas{}, stats{totalSegments, totalBusinessUnits, ...}, timestamp} |
+| GET | `/api/bmc/:section` | Single BMC section, hydrated; valid sections: segments, business_units, flywheels, revenue_streams, cost_structure, channels, platforms, team, hubs, partners, metrics |
+
+### CRM (`server/routes/crm.js`)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/crm` | Aggregated summary: `{pipeline, people[], timestamp}` — pipeline from LEAD_FLOWS sheet, people from PEOPLE sheet registry; graceful degradation when sheets not configured |
+| GET | `/api/crm/people` | Team/people data from PEOPLE sheet, hydrated (resolves manager_id → full_name); `{available, headers, rows}` |
+| GET | `/api/crm/projects` | Projects from PROJECTS sheet, hydrated (owner_User_id → full_name, business_unit_id → bu_name); optional `?status=&owner=` filters |
+| GET | `/api/crm/tasks` | Tasks from TASKS sheet, hydrated (assignee/reporter → full_name, Project id → Project Name); optional `?status=&assignee=&project=` filters |
+| GET | `/api/crm/campaigns` | Campaigns from CAMPAIGNS sheet (Execution spreadsheet); optional `?status=` filter |
+| GET | `/api/crm/business-units` | Business units from BUSINESS_UNITS sheet (Strategy spreadsheet), hydrated (owner → full_name, flywheel_id → flywheel_name) |
+| POST | `/api/crm/tasks` | Create a new task row; body: task field object; returns `201` with append result |
+| PATCH | `/api/crm/tasks/:rowIdx` | Update a task row by sheet row index (must be >= 2); body: partial task fields; returns update result |
+
 ---
 
 ## Frontend Views
@@ -123,6 +145,8 @@
 | `knowledge` | KB | `loadNotebooks()` | GET /api/notebooks |
 | `marketingOps` | Mktg | `loadMarketingOps()` | GET /api/marketing-ops |
 | `techTeam` | Tech | `loadTechTeam()` | GET /api/tech-team + /agents + /strategy + /github |
+| `bmc` | BMC | `loadBMC()` | GET /api/bmc |
+| `crm` | CRM | `loadCRM()` | GET /api/crm + /people + /projects + /tasks |
 
 ### Dashboard shows:
 - Morning Brief (summary: overdue count, top 3 active, flags, waiting on)
@@ -241,6 +265,25 @@
 
 ### Tech Team
 `techTeam`, `techTeamLoading`, `techTeamSection` ('command'|'sprint'|'bugs'|'specs'|'decisions'|'velocity'|'roadmap'|'crm'|'agents'|'strategy'), `techTeamLastRefresh`, `techSystemFilter`, `techPriorityFilter`, `techTypeFilter`, `techSprintSearch`, `techActionLoading`, `techExpandedItem`, `techAgents`, `techStrategy`, `techGithub`
+
+### Business Model Canvas
+`bmc`, `bmcLoading`, `bmcSection` ('overview'|'segments'|'business_units'|'flywheels'|'revenue_streams'|'cost_structure'|'channels'|'platforms'|'team'|'hubs'|'partners'|'metrics'), `bmcStats{}`
+
+#### BMC Methods
+| Method | Purpose |
+|--------|---------|
+| `loadBMC()` | Fetch aggregated BMC data from GET /api/bmc, store in `bmc` with all 11 sections hydrated |
+| `getBMCSectionData(section)` | Return rows from bmc.canvas[section] for current tab |
+
+### CRM
+`crm`, `crmLoading`, `crmSection` ('overview'|'people'|'projects'|'tasks'|'campaigns'|'business-units'), `crmActiveRow` (null or selected row index)
+
+#### CRM Methods
+| Method | Purpose |
+|--------|---------|
+| `loadCRM()` | Fetch aggregated CRM data from GET /api/crm + sub-endpoints in parallel, store in `crm` with pipeline, people, projects, tasks, campaigns, business-units |
+| `getCRMSection(section)` | Return rows from crm[section] for current tab |
+| `filterCRMRows(rows, query)` | Search/filter rows by keyword in human-readable columns |
 
 #### Tech Team Methods
 | Method | Purpose |
@@ -369,14 +412,51 @@
 | Function | Returns | Cached | Notes |
 |----------|---------|--------|-------|
 | `isConfigured()` | boolean | — | Check if Google service account + sheet ID env vars are set |
+| `isSpreadsheetConfigured(key)` | boolean | — | Check if specific spreadsheet (STRATEGY, EXECUTION, APP_LOGGING, BMC) is configured |
 | `getPipelineData()` | {available: true, b2b: {stages, metrics}, dropship: {stages, metrics}, breaches[]} OR {available: false} | Yes | Returns empty structure if not configured; graceful degradation |
 | `getStrategyCascade()` | {available: true, levels[]} OR {available: false} | Yes | Strategy cascade from Google Sheets; graceful degradation |
+| `fetchSheet(sheetKey)` | {available: true, headers[], rows[]} OR {available: false} | Yes | Fetch all rows from SHEET_REGISTRY by key (25 sheets supported); rows include rowIndex |
+| `appendRow(sheetKey, rowData)` | {success: true, updates} | — | Append row to sheet; clears sheet cache |
+| `updateRow(sheetKey, rowIndex, rowData)` | {success: true, updates} | — | Update specific row (1-based, >= 2); clears sheet cache |
+| `deleteRow(sheetKey, rowIndex)` | {success: true, updates} | — | Delete specific row (1-based, >= 2); clears sheet cache |
+| `getReadWriteClient()` | Google Sheets API client or null | — | Get authenticated client for read-write operations; separate from read-only client |
 | `clearCache()` | — | — | Clear in-memory sheets cache |
+
+### SHEET_REGISTRY (25 tabs across 4 spreadsheets)
+**Execution Spreadsheet (7 tabs):** PROJECTS, TASKS, PEOPLE, CAMPAIGNS, EXECUTIVE_DASHBOARD, TIME_TRACKING, LEAD_FLOWS
+**Strategy Spreadsheet (6 tabs):** BUSINESS_UNITS, FLYWHEEL, HUBS, CUSTOMER_SEGMENT, TOUCHPOINTS, APP_STORES
+**App Logging Spreadsheet (2 tabs):** LOGIN, BRAIN_DUMP
+**Business Model Canvas Spreadsheet (11 tabs):** BMC_SEGMENTS, BMC_BUSINESS_UNITS, BMC_FLYWHEELS, BMC_REVENUE_STREAMS, BMC_COST_STRUCTURE, BMC_CHANNELS, BMC_PLATFORMS, BMC_TEAM, BMC_HUBS, BMC_PARTNERS, BMC_METRICS
 
 ### Environment Variables
 - `GOOGLE_SERVICE_ACCOUNT_KEY` (optional) — Path to Google service account JSON file
-- `GOOGLE_SHEETS_ID` (optional) — Spreadsheet ID for CRM pipeline
-- Returns `{available: false}` if either is missing
+- `STRATEGY_SPREADSHEET_ID` (optional) — Strategy spreadsheet ID
+- `EXECUTION_SPREADSHEET_ID` (optional) — Execution spreadsheet ID
+- `APP_LOGGING_SPREADSHEET_ID` (optional) — App logging spreadsheet ID
+- `BMC_SPREADSHEET_ID` (optional) — Business Model Canvas spreadsheet ID
+- Returns `{available: false}` if required env vars are missing
+
+---
+
+## Data Hydration Service (`server/services/hydration.js`)
+
+### Key Functions
+| Function | Returns | Cached | Notes |
+|----------|---------|--------|-------|
+| `normalizeId(id)` | string | — | Normalize ID values for consistent lookup (strips leading zeros from numeric IDs, returns alphanumeric as-is) |
+| `hydrateData(data, sheetKey, allData)` | object[] | — | Resolve FK references in row objects; appends `*_resolved` columns with human-readable values |
+| `hydrateSheetData(sheetKey)` | {available: true, headers[], rows[]} | Yes | Fetch sheet via fetchSheet(), hydrate all FK references, return enriched data |
+
+### HYDRATION_MAP (24 FK relationships)
+Maps foreign key references across sheets:
+- **PROJECTS:** owner_User_id → PEOPLE.full_name, business_unit_id → BUSINESS_UNITS.bu_name
+- **TASKS:** assignee/reporter → PEOPLE.full_name, Project id → PROJECTS.Project Name
+- **PEOPLE:** manager_id → PEOPLE.full_name (self-reference)
+- **BUSINESS_UNITS:** owner → PEOPLE.full_name, flywheel_id → FLYWHEEL.flywheel_name
+- **TOUCHPOINTS:** bu_id → BUSINESS_UNITS.bu_name
+- **BMC sections (11):** Business units → segments, team → hubs/business units, revenue/cost/channels → owner/platform/segment references, etc.
+
+Each hydrated row receives appended columns: `${sourceColumnId}_resolved` with the human-readable value from the target sheet.
 
 ---
 
@@ -439,6 +519,20 @@
 | `write_file` | **Yes** | file_path, content |
 | `list_files` | No | directory |
 
+### Marketing AI Tools (`server/tools/marketing-tools.js`)
+| Tool | Approval | Input | Purpose |
+|------|----------|-------|---------|
+| `customer_psychology_generator` | No | segment, context? | Generate deep customer psychology profile (motivations, fears, decision triggers, messaging angles) |
+| `competitor_analysis` | No | competitor, focus? | Analyze competitor positioning, strengths, weaknesses, pricing, opportunity gaps, counter-positioning |
+| `content_strategy_generator` | No | topic, audience?, goal?, channels? | Generate content pillars, formats, distribution channels, cadence, sample 2-week calendar |
+| `campaign_ideator` | No | product, goal, budget?, timeline? | Generate 3-5 campaign concepts with hook, messaging, channels, budget range, expected outcomes |
+
+### Store Expert Tool (`server/tools/store-tools.js`)
+| Tool | Approval | Input | Purpose |
+|------|----------|-------|---------|
+| `store_expert_query` | No | query, category? | Query YourDesignStore.in knowledge base (products, pricing, policies, delivery, FAQs); category enum: products, pricing, policies, delivery, faq, hours, general |
+| `store_expert_update` | **Yes** | key, content | Update knowledge base (ke.g., kb_products_tshirts, kb_policy_returns, kb_pricing_bulk); writes to COLIN_WORKSPACE/knowledge/store/ with path traversal protection |
+
 ---
 
 ## CSS Architecture (`public/css/styles.css`)
@@ -492,6 +586,8 @@ Header → Layout → Sidebar Nav → Content → Chat Layout → Messages → C
 | `g` + `d` | Navigate to Docs |
 | `g` + `m` | Navigate to Marketing Ops |
 | `g` + `e` | Navigate to Tech Team |
+| `g` + `b` | Navigate to Business Model Canvas |
+| `g` + `i` | Navigate to CRM |
 | `n` + `c` | New commitment (open modal) |
 | `n` + `d` | New decision (open modal) |
 
@@ -530,5 +626,11 @@ Header → Layout → Sidebar Nav → Content → Chat Layout → Messages → C
 | `test/notebooks.test.js` | Route loading, service exports, full parse validation, structure, categories, notebooks array | `server/routes/notebooks.js`, `server/services/notebooks.js` |
 | `test/marketing-ops.test.js` | Route loading, service functions (getCampaigns, getContentCalendar, getSequences, getSessionsLog, getMarketingOpsSummary), 5 endpoints, optional filters | `server/routes/marketing-ops.js`, `server/services/notion.js` |
 | `test/tech-team.test.js` | Route loading, notion service exports (6 functions), GitHub service exports + unconfigured behavior, database registration (4 DBs), PATCH validation (property/value whitelist), sheets cascade export | `server/routes/tech-team.js`, `server/services/notion.js`, `server/services/github.js`, `server/services/sheets.js` |
+| `test/sheets-service.test.js` | Module load, SHEET_REGISTRY (25 sheets), isConfigured(), isSpreadsheetConfigured(), fetchSheet(), appendRow(), updateRow(), getReadWriteClient(), cache behavior | `server/services/sheets.js` |
+| `test/hydration.test.js` | normalizeId() (numeric/alphanumeric handling), hydrateData() (FK resolution), hydrateSheetData() (integration with sheets), HYDRATION_MAP (24 relationships) | `server/services/hydration.js` |
+| `test/bmc.test.js` | Route loading, GET / (all 11 sections parallel), GET /:section (single section), graceful degradation, stats computation, hydration integration | `server/routes/bmc.js`, `server/services/hydration.js` |
+| `test/crm.test.js` | Route loading, 8 endpoints (GET /, /people, /projects, /tasks, /campaigns, /business-units, POST /tasks, PATCH /tasks/:rowIdx), optional filters, hydration integration | `server/routes/crm.js`, `server/services/hydration.js`, `server/services/sheets.js` |
+| `test/marketing-tools.test.js` | 4 tool definitions, approval flags (all No), input schemas, customer_psychology_generator, competitor_analysis, content_strategy_generator, campaign_ideator | `server/tools/marketing-tools.js` |
+| `test/store-tools.test.js` | 2 tool definitions, approval flags (store_expert_query No, store_expert_update Yes), input schemas, path traversal protection | `server/tools/store-tools.js` |
 
 Run: `npm test` (Node built-in runner, ~180ms)

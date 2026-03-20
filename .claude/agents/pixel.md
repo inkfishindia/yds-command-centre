@@ -91,7 +91,7 @@ Return to the delegating agent or user with:
 
 # WHEN DELEGATED FROM OTHER AGENTS
 
-**From Builder**: UI-specific needs — placeholder images, hero sections, feature illustrations. Use the ui-ux-pro-max skill to match the project's design system.
+**From Frontend Builder**: UI-specific needs — placeholder images, hero sections, feature illustrations. Use the ui-ux-pro-max skill to match the project's design system.
 
 **From Design Planner**: Mood boards or visual direction for a new design system. Match the palette and style keywords from the brief.
 

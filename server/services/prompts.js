@@ -3,13 +3,18 @@ const path = require('path');
 const config = require('../config');
 
 let systemPromptCache = null;
+let systemPromptDate = null; // Track the date the prompt was cached
 const skillPromptCache = new Map();
 
 /**
  * Load and concatenate the system prompt from CLAUDE.md + colin.md + notion-hub.md
+ * Re-caches daily so the embedded date stays current.
  */
 function loadSystemPrompt() {
-  if (systemPromptCache) return systemPromptCache;
+  const today = new Date().toISOString().split('T')[0];
+  if (systemPromptCache && systemPromptDate === today) return systemPromptCache;
+  // Invalidate if date changed
+  systemPromptCache = null;
 
   const parts = [];
 
@@ -46,6 +51,7 @@ Today's date is ${new Date().toISOString().split('T')[0]}.
 `);
 
   systemPromptCache = parts.join('\n');
+  systemPromptDate = today;
   return systemPromptCache;
 }
 

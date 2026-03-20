@@ -111,6 +111,14 @@
         <span class="nav-label">Tech</span>
         <span class="nav-badge" x-show="techTeam?.stats?.blocked > 0" x-text="techTeam?.stats?.blocked" x-cloak></span>
       </button>
+      <button class="nav-btn" :class="view === 'bmc' && 'nav-active'" @click="view = 'bmc'; loadBmc()" aria-label="Business Model Canvas" :aria-current="view === 'bmc' ? 'page' : false">
+        <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 5a1 1 0 011-1h5a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1V9zm8 0a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1V9z"/></svg>
+        <span class="nav-label">Canvas</span>
+      </button>
+      <button class="nav-btn" :class="view === 'crm' && 'nav-active'" @click="view = 'crm'; loadCrm()" aria-label="CRM" :aria-current="view === 'crm' ? 'page' : false">
+        <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+        <span class="nav-label">CRM</span>
+      </button>
       <div class="nav-spacer"></div>
       <div class="nav-shortcuts-hint">
         <span class="shortcut-hint">g+h Dash</span>
@@ -3111,6 +3119,7 @@
             <button class="filter-pill" :class="mktopsSection === 'content' && 'filter-pill-active'" @click="mktopsSection = 'content'">Content Studio</button>
             <button class="filter-pill" :class="mktopsSection === 'sequences' && 'filter-pill-active'" @click="mktopsSection = 'sequences'">Sequences</button>
             <button class="filter-pill" :class="mktopsSection === 'sessions' && 'filter-pill-active'" @click="mktopsSection = 'sessions'">Sessions</button>
+            <button class="filter-pill" :class="mktopsSection === 'aitools' && 'filter-pill-active'" @click="mktopsSection = 'aitools'">AI Tools</button>
           </div>
 
           <!-- CAMPAIGNS SECTION -->
@@ -3334,6 +3343,59 @@
               </div>
             </template>
           </div>
+
+          <!-- AI TOOLS SECTION -->
+          <div x-show="mktopsSection === 'aitools'" style="padding: 1rem 0;">
+            <div class="bmc-canvas" style="grid-template-columns: 1fr 1fr; grid-template-rows: auto auto;">
+              <!-- Customer Psychology -->
+              <div class="bmc-block bmc-block--static">
+                <div class="bmc-block-header">
+                  <span class="bmc-block-title">Customer Psychology</span>
+                </div>
+                <div style="padding: 0.75rem;">
+                  <input type="text" class="filter-search" placeholder="Segment (e.g., corporate gifting buyers)" x-model="mktopsAiInputs.segment" style="width: 100%; margin-bottom: 0.5rem;" />
+                  <input type="text" class="filter-search" placeholder="Context (optional)" x-model="mktopsAiInputs.context" style="width: 100%; margin-bottom: 0.75rem;" />
+                  <button class="filter-pill filter-pill-active" @click="runMarketingAiTool('customer_psychology_generator')" :disabled="!mktopsAiInputs.segment">Analyze</button>
+                </div>
+              </div>
+              <!-- Competitor Analysis -->
+              <div class="bmc-block bmc-block--static">
+                <div class="bmc-block-header">
+                  <span class="bmc-block-title">Competitor Analysis</span>
+                </div>
+                <div style="padding: 0.75rem;">
+                  <input type="text" class="filter-search" placeholder="Competitor name or URL" x-model="mktopsAiInputs.competitor" style="width: 100%; margin-bottom: 0.5rem;" />
+                  <input type="text" class="filter-search" placeholder="Focus: pricing, marketing, overall..." x-model="mktopsAiInputs.focus" style="width: 100%; margin-bottom: 0.75rem;" />
+                  <button class="filter-pill filter-pill-active" @click="runMarketingAiTool('competitor_analysis')" :disabled="!mktopsAiInputs.competitor">Analyze</button>
+                </div>
+              </div>
+              <!-- Content Strategy -->
+              <div class="bmc-block bmc-block--static">
+                <div class="bmc-block-header">
+                  <span class="bmc-block-title">Content Strategy</span>
+                </div>
+                <div style="padding: 0.75rem;">
+                  <input type="text" class="filter-search" placeholder="Topic or theme" x-model="mktopsAiInputs.topic" style="width: 100%; margin-bottom: 0.5rem;" />
+                  <input type="text" class="filter-search" placeholder="Audience (optional)" x-model="mktopsAiInputs.audience" style="width: 100%; margin-bottom: 0.5rem;" />
+                  <input type="text" class="filter-search" placeholder="Goal (optional)" x-model="mktopsAiInputs.goal" style="width: 100%; margin-bottom: 0.75rem;" />
+                  <button class="filter-pill filter-pill-active" @click="runMarketingAiTool('content_strategy_generator')" :disabled="!mktopsAiInputs.topic">Generate</button>
+                </div>
+              </div>
+              <!-- Campaign Ideator -->
+              <div class="bmc-block bmc-block--static">
+                <div class="bmc-block-header">
+                  <span class="bmc-block-title">Campaign Ideator</span>
+                </div>
+                <div style="padding: 0.75rem;">
+                  <input type="text" class="filter-search" placeholder="Product or service" x-model="mktopsAiInputs.product" style="width: 100%; margin-bottom: 0.5rem;" />
+                  <input type="text" class="filter-search" placeholder="Goal (optional)" x-model="mktopsAiInputs.goal" style="width: 100%; margin-bottom: 0.5rem;" />
+                  <input type="text" class="filter-search" placeholder="Budget range (optional)" x-model="mktopsAiInputs.budget" style="width: 100%; margin-bottom: 0.75rem;" />
+                  <button class="filter-pill filter-pill-active" @click="runMarketingAiTool('campaign_ideator')" :disabled="!mktopsAiInputs.product">Generate</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </template>
     </div>
@@ -3819,6 +3881,387 @@
 
     </div>
     <!-- ─── /Tech Team ────────────────────────────────────── -->
+
+    <!-- ─── Business Model Canvas ───────────────────────── -->
+    <div x-show="view === 'bmc'" class="bmc-view" x-cloak>
+
+      <div class="view-header">
+        <h2>Business Model Canvas</h2>
+        <button class="btn-ghost btn-sm" @click="loadBmc()" :disabled="bmcLoading" style="margin-left: auto;">
+          <span x-show="!bmcLoading">Refresh</span>
+          <span x-show="bmcLoading">Loading...</span>
+        </button>
+      </div>
+
+      <!-- Loading skeleton -->
+      <div x-show="bmcLoading && !bmc" class="skeleton-stack" style="padding: 1rem 0;">
+        <div class="skeleton skeleton-card" style="height: 60px;"></div>
+        <div class="skeleton skeleton-card" style="height: 300px;"></div>
+      </div>
+
+      <!-- Not configured -->
+      <div x-show="!bmcLoading && bmc && bmc.available === false" class="empty-state" style="margin: 2rem 0;">
+        <p><strong>BMC spreadsheet not connected.</strong></p>
+        <p>Set the BMC_SPREADSHEET_ID environment variable to load the Business Model Canvas.</p>
+      </div>
+
+      <!-- Canvas Grid -->
+      <template x-if="bmc && bmc.available !== false">
+        <div class="bmc-canvas">
+
+          <!-- Row 1+2 col 1: Key Partners (spans 2 rows) -->
+          <div class="bmc-block bmc-partners">
+            <div class="bmc-block-header">
+              <span class="bmc-block-title">Key Partners</span>
+              <span class="bmc-block-count" x-text="getBmcBlockItems('partners').length"></span>
+            </div>
+            <div class="bmc-block-items">
+              <template x-for="item in getBmcBlockItems('partners')" :key="item.rowIndex || JSON.stringify(item)">
+                <div class="bmc-item" @click="bmcDetailItem = item">
+                  <span class="bmc-item-name" x-text="getBmcItemLabel('partners', item)"></span>
+                  <span class="bmc-item-meta" x-show="item.partnerType" x-text="item.partnerType"></span>
+                </div>
+              </template>
+              <div class="bmc-empty" x-show="getBmcBlockItems('partners').length === 0">No data</div>
+            </div>
+          </div>
+
+          <!-- Row 1 col 2: Key Activities -->
+          <div class="bmc-block bmc-activities">
+            <div class="bmc-block-header">
+              <span class="bmc-block-title">Key Activities</span>
+              <span class="bmc-block-count" x-text="getBmcBlockItems('hubs').length"></span>
+            </div>
+            <div class="bmc-block-items">
+              <template x-for="item in getBmcBlockItems('hubs')" :key="item.rowIndex || JSON.stringify(item)">
+                <div class="bmc-item" @click="bmcDetailItem = item">
+                  <span class="bmc-item-name" x-text="getBmcItemLabel('hubs', item)"></span>
+                  <span class="bmc-item-meta" x-show="item.hubType" x-text="item.hubType"></span>
+                </div>
+              </template>
+              <div class="bmc-empty" x-show="getBmcBlockItems('hubs').length === 0">No data</div>
+            </div>
+          </div>
+
+          <!-- Row 1+2 col 3: Value Propositions (spans 2 rows) -->
+          <div class="bmc-block bmc-value-props">
+            <div class="bmc-block-header">
+              <span class="bmc-block-title">Value Propositions</span>
+              <span class="bmc-block-count" x-text="getBmcBlockItems('flywheels').length"></span>
+            </div>
+            <div class="bmc-block-items">
+              <template x-for="item in getBmcBlockItems('flywheels')" :key="item.rowIndex || JSON.stringify(item)">
+                <div class="bmc-item" @click="bmcDetailItem = item">
+                  <span class="bmc-item-name" x-text="getBmcItemLabel('flywheels', item)"></span>
+                  <span class="bmc-item-meta" x-show="item.customerStruggleSolved" x-text="item.customerStruggleSolved"></span>
+                </div>
+              </template>
+              <div class="bmc-empty" x-show="getBmcBlockItems('flywheels').length === 0">No data</div>
+            </div>
+          </div>
+
+          <!-- Row 1 col 4: Channels -->
+          <div class="bmc-block bmc-channels">
+            <div class="bmc-block-header">
+              <span class="bmc-block-title">Channels</span>
+              <span class="bmc-block-count" x-text="getBmcBlockItems('channels').length"></span>
+            </div>
+            <div class="bmc-block-items">
+              <template x-for="item in getBmcBlockItems('channels')" :key="item.rowIndex || JSON.stringify(item)">
+                <div class="bmc-item" @click="bmcDetailItem = item">
+                  <span class="bmc-item-name" x-text="getBmcItemLabel('channels', item)"></span>
+                  <span class="bmc-item-meta" x-show="item.channelType" x-text="item.channelType"></span>
+                </div>
+              </template>
+              <div class="bmc-empty" x-show="getBmcBlockItems('channels').length === 0">No data</div>
+            </div>
+          </div>
+
+          <!-- Row 1+2 col 5: Customer Segments (spans 2 rows) -->
+          <div class="bmc-block bmc-segments">
+            <div class="bmc-block-header">
+              <span class="bmc-block-title">Customer Segments</span>
+              <span class="bmc-block-count" x-text="getBmcBlockItems('segments').length"></span>
+            </div>
+            <div class="bmc-block-items">
+              <template x-for="item in getBmcBlockItems('segments')" :key="item.rowIndex || JSON.stringify(item)">
+                <div class="bmc-item" @click="bmcDetailItem = item">
+                  <span class="bmc-item-name" x-text="getBmcItemLabel('segments', item)"></span>
+                  <span class="bmc-item-meta" x-show="item.status" x-text="item.status"></span>
+                </div>
+              </template>
+              <div class="bmc-empty" x-show="getBmcBlockItems('segments').length === 0">No data</div>
+            </div>
+          </div>
+
+          <!-- Row 2 col 2: Key Resources -->
+          <div class="bmc-block bmc-resources">
+            <div class="bmc-block-header">
+              <span class="bmc-block-title">Key Resources</span>
+              <span class="bmc-block-count" x-text="getBmcBlockItems('team').length"></span>
+            </div>
+            <div class="bmc-block-items">
+              <template x-for="item in getBmcBlockItems('team')" :key="item.rowIndex || JSON.stringify(item)">
+                <div class="bmc-item" @click="bmcDetailItem = item">
+                  <span class="bmc-item-name" x-text="getBmcItemLabel('team', item)"></span>
+                  <span class="bmc-item-meta" x-show="item.role" x-text="item.role"></span>
+                </div>
+              </template>
+              <div class="bmc-empty" x-show="getBmcBlockItems('team').length === 0">No data</div>
+            </div>
+          </div>
+
+          <!-- Row 2 col 4: Business Units -->
+          <div class="bmc-block bmc-bus-units">
+            <div class="bmc-block-header">
+              <span class="bmc-block-title">Business Units</span>
+              <span class="bmc-block-count" x-text="getBmcBlockItems('business_units').length"></span>
+            </div>
+            <div class="bmc-block-items">
+              <template x-for="item in getBmcBlockItems('business_units')" :key="item.rowIndex || JSON.stringify(item)">
+                <div class="bmc-item" @click="bmcDetailItem = item">
+                  <span class="bmc-item-name" x-text="getBmcItemLabel('business_units', item)"></span>
+                  <span class="bmc-item-meta" x-show="item.coreOffering" x-text="item.coreOffering"></span>
+                </div>
+              </template>
+              <div class="bmc-empty" x-show="getBmcBlockItems('business_units').length === 0">No data</div>
+            </div>
+          </div>
+
+          <!-- Row 3: Cost Structure (cols 1-2) | Revenue Streams (cols 3-5) -->
+          <div class="bmc-block bmc-costs">
+            <div class="bmc-block-header">
+              <span class="bmc-block-title">Cost Structure</span>
+              <span class="bmc-block-count" x-text="getBmcBlockItems('cost_structure').length"></span>
+            </div>
+            <div class="bmc-block-items">
+              <template x-for="item in getBmcBlockItems('cost_structure')" :key="item.rowIndex || JSON.stringify(item)">
+                <div class="bmc-item" @click="bmcDetailItem = item">
+                  <span class="bmc-item-name" x-text="getBmcItemLabel('cost_structure', item)"></span>
+                  <span class="bmc-item-meta" x-show="item.monthlyAmount" x-text="'₹' + item.monthlyAmount + '/mo'"></span>
+                </div>
+              </template>
+              <div class="bmc-empty" x-show="getBmcBlockItems('cost_structure').length === 0">No data</div>
+            </div>
+          </div>
+
+          <div class="bmc-block bmc-revenue">
+            <div class="bmc-block-header">
+              <span class="bmc-block-title">Revenue Streams</span>
+              <span class="bmc-block-count" x-text="getBmcBlockItems('revenue_streams').length"></span>
+            </div>
+            <div class="bmc-block-items">
+              <template x-for="item in getBmcBlockItems('revenue_streams')" :key="item.rowIndex || JSON.stringify(item)">
+                <div class="bmc-item" @click="bmcDetailItem = item">
+                  <span class="bmc-item-name" x-text="item.businessUnitId_resolved || item.businessUnitId || 'Stream'"></span>
+                  <span class="bmc-item-meta" x-show="item.nineMonthRevenue" x-text="'₹' + item.nineMonthRevenue"></span>
+                </div>
+              </template>
+              <div class="bmc-empty" x-show="getBmcBlockItems('revenue_streams').length === 0">No data</div>
+            </div>
+          </div>
+
+          <!-- Row 4: Key Metrics (cols 1-2) | Platforms (cols 3-5) -->
+          <div class="bmc-block bmc-metrics-block">
+            <div class="bmc-block-header">
+              <span class="bmc-block-title">Key Metrics</span>
+              <span class="bmc-block-count" x-text="getBmcBlockItems('metrics').length"></span>
+            </div>
+            <div class="bmc-block-items">
+              <template x-for="item in getBmcBlockItems('metrics')" :key="item.rowIndex || JSON.stringify(item)">
+                <div class="bmc-item" @click="bmcDetailItem = item">
+                  <span class="bmc-item-name" x-text="getBmcItemLabel('metrics', item)"></span>
+                  <span class="bmc-item-meta" x-show="item.currentValue" x-text="item.currentValue + (item.target ? ' / ' + item.target : '')"></span>
+                </div>
+              </template>
+              <div class="bmc-empty" x-show="getBmcBlockItems('metrics').length === 0">No data</div>
+            </div>
+          </div>
+
+          <div class="bmc-block bmc-platforms-block">
+            <div class="bmc-block-header">
+              <span class="bmc-block-title">Platforms</span>
+              <span class="bmc-block-count" x-text="getBmcBlockItems('platforms').length"></span>
+            </div>
+            <div class="bmc-block-items">
+              <template x-for="item in getBmcBlockItems('platforms')" :key="item.rowIndex || JSON.stringify(item)">
+                <div class="bmc-item" @click="bmcDetailItem = item">
+                  <span class="bmc-item-name" x-text="getBmcItemLabel('platforms', item)"></span>
+                  <span class="bmc-item-meta" x-show="item.platformType" x-text="item.platformType"></span>
+                </div>
+              </template>
+              <div class="bmc-empty" x-show="getBmcBlockItems('platforms').length === 0">No data</div>
+            </div>
+          </div>
+
+        </div>
+      </template>
+
+      <!-- BMC Item Detail Panel -->
+      <div class="detail-panel" x-show="bmcDetailItem" x-cloak>
+        <div class="detail-panel-header">
+          <h3 x-text="bmcDetailItem ? (Object.values(bmcDetailItem).find(v => typeof v === 'string' && v.length > 0 && v.length < 60) || 'Detail') : ''"></h3>
+          <button class="btn-ghost btn-sm" @click="bmcDetailItem = null" aria-label="Close detail panel">Close</button>
+        </div>
+        <div class="detail-panel-body">
+          <template x-if="bmcDetailItem">
+            <div>
+              <template x-for="[key, value] in Object.entries(bmcDetailItem || {}).filter(([k,v]) => k !== 'rowIndex' && v !== null && v !== undefined && v !== '')" :key="key">
+                <div class="detail-row">
+                  <span class="detail-label" x-text="key.replace(/_/g, ' ')"></span>
+                  <span class="detail-value" x-text="typeof value === 'object' ? JSON.stringify(value) : String(value)"></span>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+      <!-- Overlay to close detail panel -->
+      <div x-show="bmcDetailItem" @click="bmcDetailItem = null" style="position:fixed;inset:0;z-index:49;" x-cloak></div>
+
+    </div>
+    <!-- ─── /Business Model Canvas ───────────────────────── -->
+
+    <!-- ─── CRM / Execution Data ────────────────────────── -->
+    <div x-show="view === 'crm'" class="crm-view" x-cloak>
+      <div class="view-header">
+        <h2>CRM &amp; Execution</h2>
+        <button class="btn-ghost" @click="loadCrm()" :disabled="crmLoading">
+          <span x-show="!crmLoading">Refresh</span>
+          <span x-show="crmLoading">Loading...</span>
+        </button>
+      </div>
+
+      <!-- Section tabs -->
+      <div class="mktops-tabs" style="margin-bottom: 1rem;">
+        <button class="filter-pill" :class="crmSection === 'overview' && 'filter-pill-active'" @click="crmSwitchSection('overview')" aria-label="View Overview section">Overview</button>
+        <button class="filter-pill" :class="crmSection === 'people' && 'filter-pill-active'" @click="crmSwitchSection('people')" aria-label="View People section">People</button>
+        <button class="filter-pill" :class="crmSection === 'projects' && 'filter-pill-active'" @click="crmSwitchSection('projects')" aria-label="View Projects section">Projects</button>
+        <button class="filter-pill" :class="crmSection === 'tasks' && 'filter-pill-active'" @click="crmSwitchSection('tasks')" aria-label="View Tasks section">Tasks</button>
+        <button class="filter-pill" :class="crmSection === 'campaigns' && 'filter-pill-active'" @click="crmSwitchSection('campaigns')" aria-label="View Campaigns section">Campaigns</button>
+        <button class="filter-pill" :class="crmSection === 'business-units' && 'filter-pill-active'" @click="crmSwitchSection('business-units')" aria-label="View Business Units section">Business Units</button>
+      </div>
+
+      <!-- Loading skeleton -->
+      <div x-show="crmLoading && !crm" class="skeleton-stack" style="padding: 1rem 0;">
+        <div class="skeleton skeleton-text" style="width: 60%;"></div>
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
+      </div>
+
+      <!-- Overview section — pipeline + people summary -->
+      <template x-if="crmSection === 'overview' && crm && !crmLoading">
+        <div>
+          <!-- Pipeline stats -->
+          <div x-show="crm.pipeline && crm.pipeline.available" class="crm-pipeline-summary" style="margin-bottom: 1.5rem;">
+            <h3 style="margin-bottom: 0.5rem; font-size: 0.9rem; color: var(--text-secondary);">Pipeline</h3>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+              <div class="stat-card" x-show="crm.pipeline && crm.pipeline.b2b">
+                <span class="stat-value" x-text="crm.pipeline.b2b && crm.pipeline.b2b.totalActive"></span>
+                <span class="stat-label">B2B Active</span>
+              </div>
+              <div class="stat-card" x-show="crm.pipeline && crm.pipeline.dropship">
+                <span class="stat-value" x-text="crm.pipeline.dropship && crm.pipeline.dropship.totalActive"></span>
+                <span class="stat-label">Dropship Active</span>
+              </div>
+              <div class="stat-card" :class="crm.pipeline && crm.pipeline.totalSlaBreaches > 0 && 'stat-card-danger'" x-show="crm.pipeline && crm.pipeline.totalSlaBreaches !== undefined">
+                <span class="stat-value" x-text="crm.pipeline && crm.pipeline.totalSlaBreaches"></span>
+                <span class="stat-label">SLA Breaches</span>
+              </div>
+            </div>
+          </div>
+          <!-- No pipeline configured -->
+          <div x-show="!crm.pipeline || crm.pipeline.available === false" class="empty-state" style="margin-bottom: 1.5rem;">
+            <p>Pipeline data not connected.</p>
+          </div>
+          <!-- People summary -->
+          <div x-show="crm.people && crm.people.length > 0">
+            <h3 style="margin-bottom: 0.5rem; font-size: 0.9rem; color: var(--text-secondary);">Team (<span x-text="crm.people.length"></span>)</h3>
+            <div class="crm-card-grid">
+              <template x-for="person in crm.people.slice(0, 12)" :key="person.rowIndex || JSON.stringify(person)">
+                <div class="crm-person-card" @click="crmExpandedItem = person" role="button" tabindex="0" @keydown.enter="crmExpandedItem = person">
+                  <div class="crm-person-name" x-text="person.full_name || person.User_id || '(unnamed)'"></div>
+                  <div class="crm-person-role" x-text="person.role_title || person.department || ''"></div>
+                </div>
+              </template>
+            </div>
+          </div>
+          <!-- No people -->
+          <div x-show="!crm.people || crm.people.length === 0" class="empty-state" style="margin: 1rem 0;">
+            <p>No people data found. Check that the People spreadsheet is connected.</p>
+          </div>
+        </div>
+      </template>
+
+      <!-- Data table for section views -->
+      <template x-if="crmSection !== 'overview' && crm && !crmLoading">
+        <div>
+          <!-- Not configured -->
+          <div x-show="crm.available === false" class="empty-state" style="margin: 2rem 0;">
+            <p><strong>Spreadsheet not connected.</strong></p>
+            <p>Set the required SPREADSHEET_ID environment variable to see data.</p>
+          </div>
+
+          <!-- Search + row count -->
+          <div x-show="crm.available !== false" class="mktops-filters" style="margin-bottom: 1rem;">
+            <input type="text" class="filter-search" placeholder="Search..." x-model="crmSearch" @input.debounce.300ms="$nextTick()" aria-label="Search CRM rows" />
+            <span class="text-muted" x-show="getCrmRows().length > 0" x-text="getCrmRows().length + ' rows'"></span>
+          </div>
+
+          <!-- Table -->
+          <div x-show="crm.available !== false && getCrmRows().length > 0" class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <template x-for="col in getCrmColumns()" :key="col">
+                    <th x-text="col" style="white-space: nowrap;"></th>
+                  </template>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="row in getCrmRows().slice(0, 100)" :key="row.rowIndex || JSON.stringify(row)">
+                  <tr @click="crmExpandedItem = row" style="cursor: pointer;">
+                    <template x-for="col in getCrmColumns()" :key="col">
+                      <td>
+                        <span x-text="String(row[col + '_resolved'] || row[col] || '').substring(0, 50)"></span>
+                      </td>
+                    </template>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Empty -->
+          <div x-show="crm.available !== false && getCrmRows().length === 0" class="empty-state" style="margin: 2rem 0;">
+            <p>No data found.</p>
+          </div>
+        </div>
+      </template>
+
+      <!-- Detail panel -->
+      <div class="detail-panel" x-show="crmExpandedItem" x-cloak>
+        <div class="detail-panel-header">
+          <h3 x-text="crmExpandedItem ? (crmExpandedItem.full_name || crmExpandedItem['Project Name'] || crmExpandedItem.title || crmExpandedItem.name || 'Detail') : ''"></h3>
+          <button class="btn-ghost" @click="crmExpandedItem = null" aria-label="Close detail panel">Close</button>
+        </div>
+        <div class="detail-panel-body" x-show="crmExpandedItem">
+          <template x-if="crmExpandedItem">
+            <div>
+              <template x-for="[key, value] in Object.entries(crmExpandedItem || {}).filter(([k,v]) => k !== 'rowIndex' && v !== null && v !== undefined && v !== '')" :key="key">
+                <div class="detail-row">
+                  <span class="detail-label" x-text="key.replace(/_/g, ' ')"></span>
+                  <span class="detail-value" x-text="value"></span>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+      <!-- Overlay to close detail panel -->
+      <div x-show="crmExpandedItem" @click="crmExpandedItem = null" style="position:fixed;inset:0;z-index:49;" x-cloak></div>
+    </div>
+    <!-- ─── /CRM / Execution Data ─────────────────────────── -->
 
     <!-- Detail Overlay -->
     <div class="detail-overlay" x-show="detailPanel" @click="closeDetailPanel()" x-transition.opacity x-cloak></div>

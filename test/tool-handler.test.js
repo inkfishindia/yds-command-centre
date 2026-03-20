@@ -16,9 +16,9 @@ describe('Tool Handler — getAllToolDefinitions()', () => {
     assert.strictEqual(typeof toolHandler.getAllToolDefinitions, 'function');
   });
 
-  it('returns exactly 7 tool definitions', () => {
+  it('returns exactly 13 tool definitions', () => {
     const tools = toolHandler.getAllToolDefinitions();
-    assert.strictEqual(tools.length, 7);
+    assert.strictEqual(tools.length, 13);
   });
 
   it('each tool has a name, description, and input_schema', () => {

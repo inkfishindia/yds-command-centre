@@ -1,0 +1,26 @@
+{
+  "revenue": {
+    "current": 600,
+    "target": 2000,
+    "unit": "lakhs",
+    "label": "Revenue"
+  },
+  "repeatRate": {
+    "current": 19.85,
+    "target": 35,
+    "unit": "%",
+    "label": "Repeat Rate"
+  },
+  "customizerToCart": {
+    "current": 24,
+    "target": 60,
+    "unit": "%",
+    "label": "Customizer \u2192 Cart"
+  },
+  "customers": {
+    "current": 4417,
+    "target": null,
+    "unit": "",
+    "label": "B2C Customers"
+  }
+}

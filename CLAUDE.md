@@ -40,7 +40,7 @@ public/
   js/app.js                        # All frontend state and methods
   css/styles.css                   # Dark theme, responsive layout
 .claude/
-  agents/                          # Agent configs (builder, code-reviewer, devops-infra, ux-auditor, pixel)
+  agents/                          # Agent configs (frontend-builder, backend-builder, code-reviewer, devops-infra, ux-auditor, pixel, design-planner, tester, scribe)
   rules/                           # Coding patterns (frontend, server, token efficiency)
   skills/ui-ux-pro-max/            # Design intelligence: 50+ styles, 97 palettes, 57 font pairings, UX guidelines
   docs/app-reference.md            # FULL APP INVENTORY — routes, views, state, methods, CSS, tools. Read before building.
@@ -58,33 +58,44 @@ public/
 
 ## Agent Routing
 
-| Task | Agent | Model | When |
+| Task | Agent | Model | Owns |
 |------|-------|-------|------|
-| Design planning | `design-planner` | Haiku | Before UI work — design systems, palettes, typography |
-| All code changes | `builder` | Sonnet | Feature dev, debugging, refactoring |
-| Quality gate | `code-reviewer` | Opus | After any code changes, before shipping |
-| UX consistency | `ux-auditor` | Haiku | After UI changes, checks visual/a11y patterns |
-| Image generation | `pixel` | Sonnet | Hero graphics, social visuals, mockups via Nano Banana |
-| Deploy/infra | `devops-infra` | Haiku | Deployment config, env setup, monitoring |
+| Design planning | `design-planner` | Haiku | `design-system/` |
+| Frontend code | `frontend-builder` | Sonnet | `public/` (index.html, app.js, styles.css) |
+| Backend code | `backend-builder` | Sonnet | `server/`, `test/`, `server.js` |
+| Quality gate | `code-reviewer` | Sonnet | read-only review |
+| UX consistency | `ux-auditor` | Haiku | read-only audit |
+| Image generation | `pixel` | Sonnet | `~/Documents/nanobanana_generated/` |
+| Deploy/infra | `devops-infra` | Haiku | config files |
+| Integration tests | `tester` | Haiku | `test/integration/` |
+| Documentation | `scribe` | Haiku | `.claude/docs/` |
+
+**File ownership is exclusive** — only one builder agent writes to each file area. This prevents conflicts and keeps context focused.
 
 ## Workflows — Follow the Full Pipeline
 
 **UI / Frontend changes:**
-`design-planner` → `pixel` (if visuals needed) → `builder` → `code-reviewer` → `ux-auditor`
+`design-planner` → `pixel` (if visuals needed) → `frontend-builder` → `code-reviewer` → `ux-auditor`
 
 **Backend changes:**
-`builder` → `code-reviewer`
+`backend-builder` → `code-reviewer`
 
-**New page or feature:**
-`design-planner` → `pixel` (if visuals needed) → `builder` → `code-reviewer` → `ux-auditor`
+**New page or feature (full-stack):**
+`design-planner` → `backend-builder` (API first) → `frontend-builder` (UI that calls it) → `code-reviewer` → `ux-auditor`
+
+**Frontend bug fix:**
+`frontend-builder` → `code-reviewer` → `ux-auditor`
+
+**Backend bug fix:**
+`backend-builder` → `code-reviewer`
 
 **Infrastructure / deploy:**
 `devops-infra` → `code-reviewer`
 
-**Bug fix:**
-`builder` → `code-reviewer`
+**After code changes (always):**
+`code-reviewer` → `tester` (integration tests) → `scribe` (update docs)
 
-Do not skip steps. The lead session orchestrates — call each agent in order, passing context forward.
+Do not skip steps. The lead session orchestrates — call each agent in order, passing context forward. For full-stack features, backend-builder's handoff tells frontend-builder the new endpoint shape.
 
 ## How to Run
 

@@ -105,7 +105,7 @@ Keep the brief concrete. Colors are hex values. Typography includes the import U
 After producing the design brief, close with:
 
 ```
-Spawn the builder agent with this brief. Builder should read design-system/MASTER.md before writing any CSS or HTML.
+Spawn frontend-builder with this brief. frontend-builder should read design-system/MASTER.md before writing any CSS or HTML.
 ```
 
 ## When to Use This Agent

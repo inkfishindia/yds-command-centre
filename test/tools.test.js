@@ -6,9 +6,9 @@ const fileTools = require('../server/tools/file-tools');
 const { getAllToolDefinitions, requiresApproval } = require('../server/tools/tool-handler');
 
 describe('Tool Definitions', () => {
-  it('exports 7 total tool definitions', () => {
+  it('exports 13 total tool definitions', () => {
     const tools = getAllToolDefinitions();
-    assert.equal(tools.length, 7);
+    assert.equal(tools.length, 13);
   });
 
   it('every tool has name, description, and input_schema', () => {
@@ -57,6 +57,14 @@ describe('Approval Gate Classification', () => {
 
   it('list_files does NOT require approval', () => {
     assert.equal(requiresApproval('list_files'), false);
+  });
+
+  it('store_expert_update requires approval', () => {
+    assert.strictEqual(requiresApproval('store_expert_update'), true);
+  });
+
+  it('store_expert_query does NOT require approval', () => {
+    assert.strictEqual(requiresApproval('store_expert_query'), false);
   });
 
   it('unknown tool does NOT require approval', () => {

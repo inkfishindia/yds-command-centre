@@ -13,10 +13,12 @@ paths:
 
 ## Agent Delegation
 - Follow the Workflows in CLAUDE.md — they define the full pipeline per task type
+- `frontend-builder` owns `public/`, `backend-builder` owns `server/` + `test/` — never cross file boundaries
 - `code-reviewer` (Opus) is expensive — use only as quality gate, not for exploration
 - `design-planner`, `ux-auditor`, `devops-infra` run on Haiku — cheap, use freely
+- For full-stack features: `backend-builder` first (API), then `frontend-builder` (UI) — pass endpoint shape in handoff
 - `Explore` agent for open-ended searches (>3 queries)
-- Run independent agents in parallel, not sequentially
+- Run independent agents in parallel when they don't share files
 
 ## Edits
 - Prefer Edit over Write (sends diff, not full file content)

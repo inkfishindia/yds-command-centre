@@ -18,6 +18,10 @@ module.exports = {
   GITHUB_REPO_OWNER: process.env.GITHUB_REPO_OWNER || 'inkfishindia',
   GITHUB_REPO_NAME: process.env.GITHUB_REPO_NAME || 'YD-CRM',
   STRATEGY_SHEETS_ID: process.env.STRATEGY_SHEETS_ID || '',
+  STRATEGY_SPREADSHEET_ID: process.env.STRATEGY_SPREADSHEET_ID || '',
+  EXECUTION_SPREADSHEET_ID: process.env.EXECUTION_SPREADSHEET_ID || '',
+  APP_LOGGING_SPREADSHEET_ID: process.env.APP_LOGGING_SPREADSHEET_ID || '',
+  BMC_SPREADSHEET_ID: process.env.BMC_SPREADSHEET_ID || '',
 
   // Colin's workspace paths
   COLIN_WORKSPACE,

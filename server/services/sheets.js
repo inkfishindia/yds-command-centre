@@ -217,4 +217,245 @@ function clearCache() {
   cache.clear();
 }
 
-module.exports = { getPipelineData, getStrategyCascade, isConfigured, clearCache };
+// ── Sheet Registry ─────────────────────────────────────────────────────────────
+
+const SPREADSHEET_KEYS = {
+  STRATEGY: 'STRATEGY',
+  EXECUTION: 'EXECUTION',
+  APP_LOGGING: 'APP_LOGGING',
+  BMC: 'BMC',
+};
+
+// Maps spreadsheet keys to config env var values
+function getSpreadsheetId(spreadsheetKey) {
+  const map = {
+    STRATEGY: config.STRATEGY_SPREADSHEET_ID,
+    EXECUTION: config.EXECUTION_SPREADSHEET_ID,
+    APP_LOGGING: config.APP_LOGGING_SPREADSHEET_ID,
+    BMC: config.BMC_SPREADSHEET_ID,
+  };
+  return map[spreadsheetKey] || '';
+}
+
+function isSpreadsheetConfigured(spreadsheetKey) {
+  return !!(config.GOOGLE_SERVICE_ACCOUNT_KEY && getSpreadsheetId(spreadsheetKey));
+}
+
+const SHEET_REGISTRY = {
+  // Execution
+  PROJECTS: { spreadsheetKey: 'EXECUTION', sheetName: 'PROJECTS', gid: '784960017' },
+  TASKS: { spreadsheetKey: 'EXECUTION', sheetName: 'TASKS', gid: '268128158' },
+  PEOPLE: { spreadsheetKey: 'EXECUTION', sheetName: 'PEOPLE & CAPACITY', gid: '40806932' },
+  CAMPAIGNS: { spreadsheetKey: 'EXECUTION', sheetName: 'CAMPAIGNS', gid: '2052586943' },
+  EXECUTIVE_DASHBOARD: { spreadsheetKey: 'EXECUTION', sheetName: 'EXECUTIVE DASHBOARD', gid: '1902780278' },
+  TIME_TRACKING: { spreadsheetKey: 'EXECUTION', sheetName: 'TIME TRACKING', gid: '1450207772' },
+  // Strategy
+  BUSINESS_UNITS: { spreadsheetKey: 'STRATEGY', sheetName: 'BUSINESS UNITS', gid: '0' },
+  FLYWHEEL: { spreadsheetKey: 'STRATEGY', sheetName: 'Flywheel', gid: '225662612' },
+  HUBS: { spreadsheetKey: 'STRATEGY', sheetName: 'Hub', gid: '1390706317' },
+  CUSTOMER_SEGMENT: { spreadsheetKey: 'STRATEGY', sheetName: 'Customer Segment & foundation', gid: '1469082015' },
+  TOUCHPOINTS: { spreadsheetKey: 'STRATEGY', sheetName: 'TOUCHPOINTS', gid: '1839538407' },
+  APP_STORES: { spreadsheetKey: 'STRATEGY', sheetName: 'APP STORES', gid: '1447819195' },
+  // App Logging
+  LOGIN: { spreadsheetKey: 'APP_LOGGING', sheetName: 'Login', gid: '288121377' },
+  BRAIN_DUMP: { spreadsheetKey: 'APP_LOGGING', sheetName: 'BrainDump', gid: '0' },
+  // Business Model Canvas
+  BMC_SEGMENTS: { spreadsheetKey: 'BMC', sheetName: 'segments', gid: '1306312699' },
+  BMC_BUSINESS_UNITS: { spreadsheetKey: 'BMC', sheetName: 'business_units', gid: '1781583811' },
+  BMC_FLYWHEELS: { spreadsheetKey: 'BMC', sheetName: 'flywheels', gid: '1180180195' },
+  BMC_REVENUE_STREAMS: { spreadsheetKey: 'BMC', sheetName: 'revenue_streams', gid: '1625184466' },
+  BMC_COST_STRUCTURE: { spreadsheetKey: 'BMC', sheetName: 'cost_structure', gid: '1493870932' },
+  BMC_CHANNELS: { spreadsheetKey: 'BMC', sheetName: 'channels', gid: '715227562' },
+  BMC_PLATFORMS: { spreadsheetKey: 'BMC', sheetName: 'platforms', gid: '1300146116' },
+  BMC_TEAM: { spreadsheetKey: 'BMC', sheetName: 'team', gid: '1710233820' },
+  BMC_HUBS: { spreadsheetKey: 'BMC', sheetName: 'hubs', gid: '906330339' },
+  BMC_PARTNERS: { spreadsheetKey: 'BMC', sheetName: 'partners', gid: '898629063' },
+  BMC_METRICS: { spreadsheetKey: 'BMC', sheetName: 'metrics', gid: '439308533' },
+};
+
+// ── Read/Write Client ──────────────────────────────────────────────────────────
+
+let rwClient = null;
+
+function getReadWriteClient() {
+  if (!config.GOOGLE_SERVICE_ACCOUNT_KEY) return null;
+  if (rwClient) return rwClient;
+  try {
+    const { google } = require('googleapis');
+    const auth = new google.auth.GoogleAuth({
+      keyFile: config.GOOGLE_SERVICE_ACCOUNT_KEY,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+    rwClient = google.sheets({ version: 'v4', auth });
+    return rwClient;
+  } catch (err) {
+    console.error('Sheets RW client init failed:', err.message);
+    return null;
+  }
+}
+
+// ── CRUD Methods ───────────────────────────────────────────────────────────────
+
+const HEADER_CACHE_TTL = 60 * 60 * 1000; // 60 min for headers
+
+async function getSheetHeaders(sheetKey) {
+  const entry = SHEET_REGISTRY[sheetKey];
+  if (!entry) throw new Error(`Unknown sheet key: ${sheetKey}`);
+
+  const cacheKey = `headers_${sheetKey}`;
+  const headerEntry = cache.get(cacheKey);
+  if (headerEntry && Date.now() - headerEntry.timestamp < HEADER_CACHE_TTL) {
+    return headerEntry.data;
+  }
+
+  const spreadsheetId = getSpreadsheetId(entry.spreadsheetKey);
+  if (!spreadsheetId) throw new Error(`Spreadsheet ${entry.spreadsheetKey} not configured`);
+
+  const client = getReadWriteClient();
+  if (!client) throw new Error('Sheets client not available');
+
+  const sheetName = entry.sheetName.includes(' ') ? `'${entry.sheetName}'` : entry.sheetName;
+  const response = await client.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${sheetName}!1:1`,
+  });
+
+  const headers = (response.data.values && response.data.values[0]) || [];
+  cache.set(cacheKey, { data: headers, timestamp: Date.now() });
+  return headers;
+}
+
+async function fetchSheet(sheetKey) {
+  const entry = SHEET_REGISTRY[sheetKey];
+  if (!entry) throw new Error(`Unknown sheet key: ${sheetKey}`);
+  if (!isSpreadsheetConfigured(entry.spreadsheetKey)) {
+    return { available: false };
+  }
+
+  const cacheKey = `sheet_reg_${sheetKey}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+
+  const spreadsheetId = getSpreadsheetId(entry.spreadsheetKey);
+  const client = getReadWriteClient();
+  if (!client) return { available: false };
+
+  const sheetName = entry.sheetName.includes(' ') ? `'${entry.sheetName}'` : entry.sheetName;
+  const response = await client.spreadsheets.values.get({
+    spreadsheetId,
+    range: sheetName,
+  });
+
+  const rows = response.data.values || [];
+  if (rows.length < 2) {
+    const result = { available: true, headers: rows[0] || [], rows: [] };
+    setCache(cacheKey, result);
+    return result;
+  }
+
+  const headers = rows[0];
+  const data = rows.slice(1).map((row, index) => {
+    const obj = { rowIndex: index + 2 }; // 1-based, +1 for header row
+    headers.forEach((h, i) => { obj[h] = row[i] || null; });
+    return obj;
+  });
+
+  const result = { available: true, headers, rows: data };
+  setCache(cacheKey, result);
+  return result;
+}
+
+async function appendRow(sheetKey, rowData) {
+  const entry = SHEET_REGISTRY[sheetKey];
+  if (!entry) throw new Error(`Unknown sheet key: ${sheetKey}`);
+
+  const spreadsheetId = getSpreadsheetId(entry.spreadsheetKey);
+  if (!spreadsheetId) throw new Error(`Spreadsheet ${entry.spreadsheetKey} not configured`);
+
+  const client = getReadWriteClient();
+  if (!client) throw new Error('Sheets client not available');
+
+  const headers = await getSheetHeaders(sheetKey);
+  const rowArray = headers.map(h => rowData[h] ?? '');
+
+  const sheetName = entry.sheetName.includes(' ') ? `'${entry.sheetName}'` : entry.sheetName;
+  const response = await client.spreadsheets.values.append({
+    spreadsheetId,
+    range: sheetName,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [rowArray] },
+  });
+
+  // Invalidate cache for this sheet
+  cache.delete(`sheet_reg_${sheetKey}`);
+
+  return { success: true, updates: response.data.updates };
+}
+
+async function updateRow(sheetKey, rowIndex, rowData) {
+  const entry = SHEET_REGISTRY[sheetKey];
+  if (!entry) throw new Error(`Unknown sheet key: ${sheetKey}`);
+
+  const spreadsheetId = getSpreadsheetId(entry.spreadsheetKey);
+  if (!spreadsheetId) throw new Error(`Spreadsheet ${entry.spreadsheetKey} not configured`);
+
+  const client = getReadWriteClient();
+  if (!client) throw new Error('Sheets client not available');
+
+  const headers = await getSheetHeaders(sheetKey);
+  const rowArray = headers.map(h => rowData[h] ?? '');
+
+  const sheetName = entry.sheetName.includes(' ') ? `'${entry.sheetName}'` : entry.sheetName;
+  const response = await client.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!A${rowIndex}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [rowArray] },
+  });
+
+  cache.delete(`sheet_reg_${sheetKey}`);
+
+  return { success: true, updatedCells: response.data.updatedCells };
+}
+
+async function deleteRow(sheetKey, rowIndex) {
+  const entry = SHEET_REGISTRY[sheetKey];
+  if (!entry) throw new Error(`Unknown sheet key: ${sheetKey}`);
+
+  const spreadsheetId = getSpreadsheetId(entry.spreadsheetKey);
+  if (!spreadsheetId) throw new Error(`Spreadsheet ${entry.spreadsheetKey} not configured`);
+
+  const client = getReadWriteClient();
+  if (!client) throw new Error('Sheets client not available');
+
+  await client.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{
+        deleteDimension: {
+          range: {
+            sheetId: parseInt(entry.gid, 10),
+            dimension: 'ROWS',
+            startIndex: rowIndex - 1, // 0-based for API
+            endIndex: rowIndex,
+          },
+        },
+      }],
+    },
+  });
+
+  cache.delete(`sheet_reg_${sheetKey}`);
+
+  return { success: true };
+}
+
+module.exports = {
+  // Existing
+  getPipelineData, getStrategyCascade, isConfigured, clearCache,
+  // New — registry
+  SHEET_REGISTRY, SPREADSHEET_KEYS, isSpreadsheetConfigured, getSpreadsheetId,
+  // New — CRUD
+  fetchSheet, appendRow, updateRow, deleteRow, getSheetHeaders,
+  // New — internal (for hydration service)
+  parseRows,
+};

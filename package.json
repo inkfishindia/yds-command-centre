@@ -4,17 +4,20 @@
   "description": "YDS Command Centre — Web interface for Colin (Chief of Staff)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
+    "build": "node scripts/build-assets.mjs",
+    "start": "npm run build && node server.js",
+    "dev": "npm run build && node --watch server.js",
     "test": "node --test 'test/*.test.js'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@notionhq/client": "^2.2.15",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "express-rate-limit": "^8.2.1",
+    "googleapis": "^171.4.0",
     "helmet": "^8.1.0"
   }
 }

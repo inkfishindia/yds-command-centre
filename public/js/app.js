@@ -52,36 +52,6 @@ function app() {
     notebooksCategory: '',
     notebooksExpanded: null,
 
-    // Marketing Ops
-    mktops: null,
-    mktopsLoading: false,
-    mktopsSection: 'campaigns',
-    mktopsCampaignSearch: '',
-    mktopsStatusFilter: '',
-    mktopsJourneyFilter: '',
-    mktopsLastRefresh: null,
-    mktopsSequenceView: 'table',
-    mktopsActionLoading: null,
-    mktopsCampaignCommitments: null,
-    mktopsCampaignCommitmentsLoading: false,
-    mktopsMetrics: null,
-    mktopsMetricsExpanded: false,
-
-    // Tech Team
-    techTeam: null,
-    techTeamLoading: false,
-    techTeamSection: 'command',
-    techTeamLastRefresh: null,
-    techSystemFilter: '',
-    techPriorityFilter: '',
-    techTypeFilter: '',
-    techSprintSearch: '',
-    techActionLoading: null,
-    techExpandedItem: null,
-    techAgents: null,
-    techStrategy: null,
-    techGithub: null,
-
     // Projects
     projects: [],
     projectsLoading: false,
@@ -137,6 +107,33 @@ function app() {
     showSnoozeFor: null,
     showReassignFor: null,
     actionFeedback: null,
+
+    // BMC (Business Model Canvas)
+    bmc: null,
+    bmcLoading: false,
+    bmcDetailItem: null,
+
+    // CRM
+    crm: null,
+    crmLoading: false,
+    crmSection: 'overview',
+    crmSearch: '',
+    crmExpandedItem: null,
+    crmSectionData: null,
+
+    // Marketing Ops
+    mktops: null,
+    mktopsLoading: false,
+    mktopsSection: 'overview',
+    mktopsLastRefresh: null,
+
+    // Marketing AI Tools inputs
+    mktopsAiInputs: { segment: '', context: '', competitor: '', focus: '', topic: '', audience: '', goal: '', product: '', budget: '' },
+
+    // Tech Team
+    techTeam: null,
+    techTeamLoading: false,
+    techTeamSection: 'overview',
 
     // Action Queue
     actionQueue: null,
@@ -271,8 +268,9 @@ function app() {
             case 'gl': this.view = 'decisions'; this.loadDecisions(); break;
             case 'gr': this.view = 'registry'; this.loadRegistry(); break;
             case 'gk': this.view = 'knowledge'; this.loadNotebooks(); break;
+            case 'gb': this.view = 'bmc'; this.loadBmc(); break;
+            case 'gi': this.view = 'crm'; this.loadCrm(); break;
             case 'gm': this.view = 'marketingOps'; this.loadMarketingOps(); break;
-            case 'ge': this.view = 'techTeam'; this.loadTechTeam(); break;
             case 'nc': this.showCreateCommitment = true; break;
             case 'nd': this.showCreateDecision = true; break;
           }
@@ -668,250 +666,6 @@ function app() {
 
     getTotalFilteredNotebooks() {
       return this.getFilteredNotebooks().reduce((sum, c) => sum + c.notebooks.length, 0);
-    },
-
-    // --- Marketing Ops ---
-
-    async loadMarketingOps() {
-      const signal = this.beginRequest('mktops');
-      this.mktopsLoading = true;
-      try {
-        const [data, metricsRes] = await Promise.all([
-          fetch('/api/marketing-ops', { signal }).then(r => r.ok ? r.json() : null).catch(() => null),
-          fetch('/api/marketing-ops/metrics', { signal }).then(r => r.ok ? r.json() : null).catch(() => null)
-        ]);
-        if (!data) return;
-        this.mktops = data;
-        this.mktopsMetrics = metricsRes ? Object.values(metricsRes).map(m => ({ ...m })) : null;
-        this.mktopsLastRefresh = new Date();
-      } catch (e) {
-        if (this.isAbortError(e)) return;
-        console.error('Marketing ops error:', e);
-      } finally {
-        this.mktopsLoading = false;
-        this.endRequest('mktops', signal);
-      }
-    },
-
-    getCampaignsByStage(stage) {
-      if (!this.mktops?.campaigns) return [];
-      return this.mktops.campaigns.filter(c => {
-        if (c.Stage !== stage) return false;
-        if (this.mktopsStatusFilter && c.Status !== this.mktopsStatusFilter) return false;
-        if (this.mktopsCampaignSearch) {
-          const q = this.mktopsCampaignSearch.toLowerCase();
-          const name = (c.Name || '').toLowerCase();
-          const owners = (c.ownerNames || []).join(' ').toLowerCase();
-          if (!name.includes(q) && !owners.includes(q)) return false;
-        }
-        return true;
-      });
-    },
-
-    getContentByStatus(status) {
-      if (!this.mktops?.content) return [];
-      return this.mktops.content.filter(c => c.Status === status);
-    },
-
-    getSequenceHealth(seq) {
-      if ((seq['Unsub Rate'] || 0) > 2) return 'critical';
-      if ((seq['Open Rate'] || 100) < 15) return 'warning';
-      return 'healthy';
-    },
-
-    getFilteredSequences() {
-      if (!this.mktops?.sequences) return [];
-      if (!this.mktopsJourneyFilter) return this.mktops.sequences;
-      return this.mktops.sequences.filter(s => s['Journey Stage'] === this.mktopsJourneyFilter);
-    },
-
-    getMktopsRefreshLabel() {
-      if (!this.mktopsLastRefresh) return '';
-      const seconds = Math.floor((Date.now() - this.mktopsLastRefresh.getTime()) / 1000);
-      if (seconds < 10) return 'Just now';
-      if (seconds < 60) return seconds + 's ago';
-      const minutes = Math.floor(seconds / 60);
-      return minutes + 'm ago';
-    },
-
-    formatMktDate(dateVal) {
-      if (!dateVal) return '';
-      const d = typeof dateVal === 'string' ? dateVal : dateVal.start;
-      if (!d) return '';
-      return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-    },
-
-    getSequencesByJourneyStage(stage) {
-      if (!this.mktops?.sequences) return [];
-      return this.getFilteredSequences().filter(s => (s['Journey Stage'] || 'Awareness') === stage);
-    },
-
-    async campaignAction(id, property, value) {
-      this.mktopsActionLoading = id;
-      try {
-        const res = await fetch(`/api/marketing-ops/campaigns/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ property, value })
-        });
-        if (!res.ok) throw new Error('Action failed');
-        await this.loadMarketingOps();
-      } catch (e) {
-        console.error('Campaign action failed:', e);
-      } finally {
-        this.mktopsActionLoading = null;
-      }
-    },
-
-    getCampaignActions(c) {
-      const actions = [];
-      const stage = c.Stage || '';
-      if (stage === 'Briefing') actions.push({ label: 'Start', property: 'Stage', value: 'In Progress' });
-      if (stage === 'In Progress') actions.push({ label: 'To Review', property: 'Stage', value: 'Review' });
-      if (stage === 'Review') actions.push({ label: 'Go Live', property: 'Stage', value: 'Live' });
-      if (stage === 'Live') actions.push({ label: 'Complete', property: 'Stage', value: 'Complete' });
-      if (c.Status !== 'Blocked') actions.push({ label: 'Block', property: 'Status', value: 'Blocked' });
-      return actions;
-    },
-
-    async loadCampaignCommitments(id) {
-      const signal = this.beginRequest('campaignCommitments');
-      this.mktopsCampaignCommitmentsLoading = true;
-      this.mktopsCampaignCommitments = null;
-      try {
-        const res = await fetch(`/api/marketing-ops/campaigns/${id}/commitments`, { signal });
-        if (res.ok) this.mktopsCampaignCommitments = await res.json();
-      } catch (e) {
-        if (this.isAbortError(e)) return;
-        console.error('Failed to load campaign commitments:', e);
-      } finally {
-        this.mktopsCampaignCommitmentsLoading = false;
-        this.endRequest('campaignCommitments', signal);
-      }
-    },
-
-    // --- Tech Team ---
-
-    async loadTechTeam() {
-      const signal = this.beginRequest('techTeam');
-      this.techTeamLoading = true;
-      try {
-        const [data, agentsRes, strategyRes, githubRes] = await Promise.all([
-          fetch('/api/tech-team', { signal }).then(r => r.ok ? r.json() : null).catch(() => null),
-          fetch('/api/tech-team/agents', { signal }).then(r => r.ok ? r.json() : null).catch(() => null),
-          fetch('/api/tech-team/strategy', { signal }).then(r => r.ok ? r.json() : null).catch(() => null),
-          fetch('/api/tech-team/github', { signal }).then(r => r.ok ? r.json() : null).catch(() => null),
-        ]);
-        if (!data) return;
-        this.techTeam = data;
-        this.techAgents = agentsRes;
-        this.techStrategy = strategyRes;
-        this.techGithub = githubRes;
-        this.techTeamLastRefresh = new Date();
-      } catch (e) {
-        if (this.isAbortError(e)) return;
-        console.error('Tech team error:', e);
-      } finally {
-        this.techTeamLoading = false;
-        this.endRequest('techTeam', signal);
-      }
-    },
-
-    getSprintItemsByStatus(status) {
-      if (!this.techTeam?.sprintItems) return [];
-      return this.techTeam.sprintItems.filter(i => {
-        if (i.Status !== status) return false;
-        if (this.techSystemFilter && i.System !== this.techSystemFilter) return false;
-        if (this.techPriorityFilter && i.Priority !== this.techPriorityFilter) return false;
-        if (this.techTypeFilter && i.Type !== this.techTypeFilter) return false;
-        if (this.techSprintSearch) {
-          const q = this.techSprintSearch.toLowerCase();
-          const name = (i.Name || '').toLowerCase();
-          const bugId = (i['Bug ID'] || '').toLowerCase();
-          if (!name.includes(q) && !bugId.includes(q)) return false;
-        }
-        return true;
-      });
-    },
-
-    getTechBugs() {
-      if (!this.techTeam?.sprintItems) return [];
-      return this.techTeam.sprintItems.filter(i => i.Type === 'Bug' && i.Status !== 'Cancelled');
-    },
-
-    getTechBugStats() {
-      const bugs = this.getTechBugs().filter(b => b.Status !== 'Done');
-      const stats = { total: bugs.length, byPriority: {}, bySystem: {} };
-      bugs.forEach(b => {
-        const p = b.Priority || 'Unset';
-        const s = b.System || 'Unset';
-        stats.byPriority[p] = (stats.byPriority[p] || 0) + 1;
-        stats.bySystem[s] = (stats.bySystem[s] || 0) + 1;
-      });
-      return stats;
-    },
-
-    getSpecsByStatus(status) {
-      if (!this.techTeam?.specs) return [];
-      return this.techTeam.specs.filter(s => s.Status === status);
-    },
-
-    getRoadmapByHorizon(horizon) {
-      if (!this.techTeam?.sprintItems) return [];
-      return this.techTeam.sprintItems.filter(i => i.Horizon === horizon && i.Status !== 'Done' && i.Status !== 'Cancelled');
-    },
-
-    getVelocityData() {
-      if (!this.techTeam?.sprintArchive) return [];
-      return this.techTeam.sprintArchive.filter(s => s['Items Planned']).map(s => ({
-        name: s['Sprint Name'] || `Sprint ${s['Sprint Number']}`,
-        planned: s['Items Planned'] || 0,
-        completed: s['Items Completed'] || 0,
-        hoursPlanned: s['Total Hours Planned'] || 0,
-        hoursCompleted: s['Total Hours Completed'] || 0,
-        pct: s['Items Planned'] ? Math.round((s['Items Completed'] / s['Items Planned']) * 100) : 0,
-      }));
-    },
-
-    getTechRefreshLabel() {
-      if (!this.techTeamLastRefresh) return '';
-      const mins = Math.floor((Date.now() - this.techTeamLastRefresh) / 60000);
-      if (mins < 1) return 'Just now';
-      return `${mins}m ago`;
-    },
-
-    async techSprintAction(id, property, value) {
-      this.techActionLoading = id;
-      try {
-        const res = await fetch(`/api/tech-team/sprint/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ property, value })
-        });
-        if (res.ok) await this.loadTechTeam();
-      } catch (e) {
-        console.error('Tech sprint action error:', e);
-      } finally {
-        this.techActionLoading = null;
-      }
-    },
-
-    getTechSystems() {
-      if (!this.techTeam?.sprintItems) return [];
-      return [...new Set(this.techTeam.sprintItems.map(i => i.System).filter(Boolean))].sort();
-    },
-
-    getTechPriorityClass(priority) {
-      if (!priority) return '';
-      if (priority.startsWith('P0')) return 'tech-priority-critical';
-      if (priority.startsWith('P1')) return 'tech-priority-high';
-      if (priority.startsWith('P2')) return 'tech-priority-medium';
-      return 'tech-priority-low';
-    },
-
-    getTechTypeClass(type) {
-      if (!type) return '';
-      return 'tech-type-' + type.toLowerCase();
     },
 
     // --- Projects ---
@@ -1895,9 +1649,11 @@ function app() {
         { group: 'Navigation', label: 'Decision Log', action: 'decisions' },
         { group: 'Navigation', label: 'Project Registry', action: 'registry' },
         { group: 'Navigation', label: 'Knowledge Base', action: 'knowledge' },
+        { group: 'Navigation', label: 'Notion', action: 'notion' },
+        { group: 'Navigation', label: 'Business Model Canvas', action: 'bmc' },
+        { group: 'Navigation', label: 'CRM', action: 'crm' },
         { group: 'Navigation', label: 'Marketing Ops', action: 'marketingOps' },
         { group: 'Navigation', label: 'Tech Team', action: 'techTeam' },
-        { group: 'Navigation', label: 'Notion', action: 'notion' },
       ];
 
       const databases = (this.notionDatabases.length > 0 ? this.notionDatabases : [
@@ -1945,27 +1701,6 @@ function app() {
         });
       }
 
-      // Add campaigns from marketing ops
-      if (this.mktops && this.mktops.campaigns) {
-        this.mktops.campaigns.forEach(c => {
-          all.push({ group: 'Campaigns', label: c.Name || 'Untitled', campaignRef: c });
-        });
-      }
-
-      // Add content from marketing ops
-      if (this.mktops && this.mktops.content) {
-        this.mktops.content.forEach(c => {
-          all.push({ group: 'Content', label: c.Name || 'Untitled', contentRef: c });
-        });
-      }
-
-      // Add sprint items from tech team
-      if (this.techTeam?.sprintItems) {
-        this.techTeam.sprintItems.slice(0, 50).forEach(item => {
-          all.push({ group: 'Sprint Items', label: `${item['Bug ID'] ? item['Bug ID'] + ' ' : ''}${item.Name || 'Untitled'}`, techItemRef: item });
-        });
-      }
-
       if (!q) return all;
       return all.filter(item => item.label.toLowerCase().includes(q));
     },
@@ -1991,8 +1726,6 @@ function app() {
         else if (item.action === 'decisions') this.loadDecisions();
         else if (item.action === 'registry') this.loadRegistry();
         else if (item.action === 'knowledge') this.loadNotebooks();
-        else if (item.action === 'marketingOps') this.loadMarketingOps();
-        else if (item.action === 'techTeam') this.loadTechTeam();
         else if (item.action === 'notion') this.loadNotion();
       } else if (item.dbRef) {
         this.view = 'notion';
@@ -2009,20 +1742,6 @@ function app() {
         this.openFocusAreaView(item.focusAreaRef);
       } else if (item.commitmentRef) {
         this.openDetailPanel(item.commitmentRef.id, item.commitmentRef.Name || item.commitmentRef.name);
-      } else if (item.campaignRef) {
-        this.view = 'marketingOps';
-        if (!this.mktops) this.loadMarketingOps();
-        this.mktopsSection = 'campaigns';
-        this.openDetailPanel(item.campaignRef.id, item.campaignRef.Name);
-      } else if (item.contentRef) {
-        this.view = 'marketingOps';
-        if (!this.mktops) this.loadMarketingOps();
-        this.mktopsSection = 'content';
-        this.openDetailPanel(item.contentRef.id, item.contentRef.Name);
-      } else if (item.techItemRef) {
-        this.view = 'techTeam';
-        this.loadTechTeam();
-        this.techTeamSection = 'sprint';
       }
 
       this.closeCmdPalette();
@@ -2971,6 +2690,186 @@ function app() {
         this.factoryEditingOperating = false;
       }
     },
+
+    // ── BMC ──────────────────────────────────────────────────────────────
+
+    async loadBmc() {
+      const signal = this.beginRequest('bmc');
+      this.bmcLoading = true;
+      try {
+        const res = await fetch('/api/bmc', { signal });
+        if (res.ok) this.bmc = await res.json();
+      } catch (err) {
+        if (this.isAbortError(err)) return;
+        console.error('BMC load error:', err);
+      } finally {
+        this.endRequest('bmc', signal);
+        this.bmcLoading = false;
+      }
+    },
+
+    getBmcBlockItems(blockKey) {
+      if (!this.bmc || !this.bmc.canvas) return [];
+      return this.bmc.canvas[blockKey] || [];
+    },
+
+    getBmcItemLabel(blockKey, item) {
+      const nameFields = {
+        partners: ['name', 'partnerName'],
+        hubs: ['name', 'hubName'],
+        flywheels: ['name', 'flywheelName'],
+        channels: ['name', 'channelName'],
+        segments: ['name', 'segmentName'],
+        team: ['full_name', 'fullName', 'name'],
+        business_units: ['name', 'businessUnitName'],
+        cost_structure: ['category', 'name'],
+        revenue_streams: ['businessUnitId_resolved', 'businessUnitId', 'name'],
+        metrics: ['name', 'metricName'],
+        platforms: ['name', 'platformName'],
+      };
+      const fields = nameFields[blockKey] || ['name'];
+      for (const f of fields) {
+        if (item[f]) return item[f];
+      }
+      for (const v of Object.values(item)) {
+        if (typeof v === 'string' && v.length > 0 && v.length < 60) return v;
+      }
+      return '(unnamed)';
+    },
+
+    // ── CRM ──────────────────────────────────────────────────────────────
+
+    async loadCrm() {
+      const signal = this.beginRequest('crm');
+      this.crmLoading = true;
+      try {
+        const res = await fetch('/api/crm', { signal });
+        if (res.ok) this.crm = await res.json();
+      } catch (err) {
+        if (this.isAbortError(err)) return;
+        console.error('CRM load error:', err);
+      } finally {
+        this.endRequest('crm', signal);
+        this.crmLoading = false;
+      }
+    },
+
+    async crmSwitchSection(section) {
+      this.crmSection = section;
+      if (section === 'overview') {
+        if (!this.crm) await this.loadCrm();
+        return;
+      }
+      const signal = this.beginRequest('crmSection');
+      this.crmLoading = true;
+      this.crmSectionData = null;
+      try {
+        const res = await fetch('/api/crm/' + section, { signal });
+        if (res.ok) {
+          this.crmSectionData = await res.json();
+          this.crm = { ...this.crm, ...this.crmSectionData };
+        }
+      } catch (err) {
+        if (this.isAbortError(err)) return;
+        console.error('CRM section error:', err);
+      } finally {
+        this.endRequest('crmSection', signal);
+        this.crmLoading = false;
+      }
+    },
+
+    getCrmRows() {
+      if (!this.crm) return [];
+      if (this.crmSection !== 'overview' && this.crmSectionData && this.crmSectionData.rows) {
+        let rows = this.crmSectionData.rows;
+        if (this.crmSearch) {
+          const q = this.crmSearch.toLowerCase();
+          rows = rows.filter(r => Object.values(r).some(v => String(v || '').toLowerCase().includes(q)));
+        }
+        return rows;
+      }
+      return [];
+    },
+
+    getCrmColumns() {
+      if (!this.crm || this.crmSection === 'overview') return [];
+      if (this.crmSectionData && this.crmSectionData.rows && this.crmSectionData.rows.length > 0) {
+        return Object.keys(this.crmSectionData.rows[0]).filter(k => k !== 'rowIndex' && !k.endsWith('_resolved'));
+      }
+      return [];
+    },
+
+    // ── Marketing AI Tools ───────────────────────────────────────────────
+
+    runMarketingAiTool(toolName) {
+      const inputs = this.mktopsAiInputs;
+      let prompt = '';
+      switch (toolName) {
+        case 'customer_psychology_generator':
+          prompt = `Use the customer_psychology_generator tool to analyze the segment "${inputs.segment}"${inputs.context ? '. Context: ' + inputs.context : ''}`;
+          break;
+        case 'competitor_analysis':
+          prompt = `Use the competitor_analysis tool to analyze "${inputs.competitor}"${inputs.focus ? '. Focus on: ' + inputs.focus : ''}`;
+          break;
+        case 'content_strategy_generator':
+          prompt = `Use the content_strategy_generator tool for topic "${inputs.topic}"${inputs.audience ? '. Audience: ' + inputs.audience : ''}${inputs.goal ? '. Goal: ' + inputs.goal : ''}`;
+          break;
+        case 'campaign_ideator':
+          prompt = `Use the campaign_ideator tool for product "${inputs.product}"${inputs.goal ? '. Goal: ' + inputs.goal : ''}${inputs.budget ? '. Budget: ' + inputs.budget : ''}`;
+          break;
+      }
+      if (prompt) {
+        this.inputText = prompt;
+        this.view = 'chat';
+        this.$nextTick(() => this.sendMessage());
+      }
+    },
+
+    // ── Marketing Ops ────────────────────────────────────────────────────
+
+    async loadMarketingOps() {
+      const signal = this.beginRequest('marketingOps');
+      this.mktopsLoading = true;
+      try {
+        const res = await fetch('/api/marketing-ops', { signal });
+        if (res.ok) {
+          this.mktops = await res.json();
+          this.mktopsLastRefresh = new Date();
+        }
+      } catch (err) {
+        if (this.isAbortError(err)) return;
+        console.error('Marketing Ops load error:', err);
+      } finally {
+        this.endRequest('marketingOps', signal);
+        this.mktopsLoading = false;
+      }
+    },
+
+    getMktopsRefreshLabel() {
+      if (!this.mktopsLastRefresh) return 'Never refreshed';
+      const diff = Math.round((Date.now() - this.mktopsLastRefresh.getTime()) / 1000);
+      if (diff < 60) return `Refreshed ${diff}s ago`;
+      if (diff < 3600) return `Refreshed ${Math.round(diff / 60)}m ago`;
+      return `Refreshed ${Math.round(diff / 3600)}h ago`;
+    },
+
+    // ── Tech Team ────────────────────────────────────────────────────────
+
+    async loadTechTeam() {
+      const signal = this.beginRequest('techTeam');
+      this.techTeamLoading = true;
+      try {
+        const res = await fetch('/api/tech-team', { signal });
+        if (res.ok) this.techTeam = await res.json();
+      } catch (err) {
+        if (this.isAbortError(err)) return;
+        console.error('Tech Team load error:', err);
+      } finally {
+        this.endRequest('techTeam', signal);
+        this.techTeamLoading = false;
+      }
+    },
+
   };
 }
 

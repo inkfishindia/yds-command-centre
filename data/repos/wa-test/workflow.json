@@ -1,0 +1,80 @@
+{
+  "nodes": [
+    {
+      "id": "start",
+      "type": "flow-node",
+      "position": { "x": 300, "y": 100 },
+      "data": {
+        "node_type": "start",
+        "config": {}
+      }
+    },
+    {
+      "id": "decide_1710100000000",
+      "type": "flow-node",
+      "position": { "x": 300, "y": 300 },
+      "data": {
+        "node_type": "decide",
+        "config": {
+          "decision_type": "ai",
+          "provider_model_id": "PROVIDER_MODEL_ID",
+          "conditions": [
+            {
+              "label": "owner_update",
+              "description": "The sender is the store owner wanting to add, update, or manage store knowledge (products, policies, hours, FAQs)."
+            },
+            {
+              "label": "customer_query",
+              "description": "The sender is a customer asking questions about the store, products, prices, delivery, returns, or availability."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "agent_1710100010000",
+      "type": "flow-node",
+      "position": { "x": 80, "y": 550 },
+      "data": {
+        "node_type": "agent",
+        "config": {
+          "system_prompt": "You are the Store Expert knowledge gathering assistant for YourDesignStore.in — a custom merchandise & apparel company based in Bangalore that sells custom t-shirts, hoodies, caps, tote bags, jackets, mugs with various printing options (screen print, vinyl, embroidery, DTG).\n\nYou are speaking with the STORE OWNER. Your job is to gather and organize business knowledge.\n\n## Your tasks:\n1. Ask the owner what they want to add or update (products, pricing, policies, FAQs, hours, delivery info, etc.)\n2. Organize the information into clear categories\n3. Use the save_variable tool to store each piece of knowledge with descriptive keys like:\n - `kb_products_tshirts` for t-shirt details\n - `kb_policy_returns` for return policy\n - `kb_delivery_info` for delivery/shipping info\n - `kb_hours` for business hours\n - `kb_faq_[topic]` for FAQ entries\n - `kb_pricing_[category]` for pricing info\n4. Confirm what was saved and ask if there's anything else to add\n\n## Guidelines:\n- Be conversational but efficient\n- Ask one topic at a time\n- Summarize back what you understood before saving\n- If this is the first interaction, welcome the owner and ask what knowledge area they'd like to start with\n- Use save_variable for EACH piece of knowledge gathered",
+          "provider_model_id": "PROVIDER_MODEL_ID",
+          "max_iterations": 30,
+          "temperature": 0.3
+        }
+      }
+    },
+    {
+      "id": "agent_1710100020000",
+      "type": "flow-node",
+      "position": { "x": 520, "y": 550 },
+      "data": {
+        "node_type": "agent",
+        "config": {
+          "system_prompt": "You are the Store Expert for YourDesignStore.in — a custom merchandise & apparel company based in Bangalore, India.\n\nYou help CUSTOMERS with questions about the store, products, pricing, delivery, returns, and more.\n\n## About the store:\n- YourDesignStore.in specializes in custom/personalized merchandise\n- Products: T-shirts (multiple GSM options from 180-260 GSM, oversized, round neck, long sleeve, collared), hoodies, caps, tote bags, jackets, mugs\n- Printing options: Screen print, vinyl print, embroidery, DTG (direct-to-garment)\n- Based in Bangalore, India (Richmond Rd)\n- Also offers corporate gifting & bulk orders\n- Website: yourdesignstore.in\n\n## How to answer:\n1. First check if any stored variables (use get_variable) contain relevant knowledge. Try keys like:\n - kb_products_*, kb_pricing_*, kb_policy_*, kb_delivery_*, kb_hours, kb_faq_*\n2. If you find stored knowledge, use it as the primary source of truth\n3. If no stored knowledge exists for the query, use the general store info above\n4. Be friendly, helpful, and concise\n5. If you truly don't know something, say so honestly and suggest the customer visit yourdesignstore.in or contact the store directly\n6. For pricing queries without stored data, direct them to the website or suggest they ask for a custom quote\n\n## Important:\n- Never make up specific prices or availability unless you have it from stored knowledge\n- For bulk/corporate orders, encourage them to reach out directly\n- Always be warm and welcoming",
+          "provider_model_id": "PROVIDER_MODEL_ID",
+          "max_iterations": 20,
+          "temperature": 0.4
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "start",
+      "target": "decide_1710100000000",
+      "label": "next"
+    },
+    {
+      "source": "decide_1710100000000",
+      "target": "agent_1710100010000",
+      "label": "owner_update"
+    },
+    {
+      "source": "decide_1710100000000",
+      "target": "agent_1710100020000",
+      "label": "customer_query"
+    }
+  ]
+}

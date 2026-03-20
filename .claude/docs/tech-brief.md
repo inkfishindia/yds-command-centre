@@ -41,8 +41,8 @@ No React, no Next.js, no build tooling. Edit HTML, refresh browser.
 ```
 command-centre/
 ├── server.js                      # Express entry point
-├── package.json                   # Dependencies: express, @anthropic-ai/sdk, @notionhq/client, dotenv, cors
-├── .env                           # API keys (ANTHROPIC_API_KEY, NOTION_TOKEN, PORT)
+├── package.json                   # Dependencies: express, @anthropic-ai/sdk, @notionhq/client, googleapis, dotenv, cors
+├── .env                           # API keys (ANTHROPIC_API_KEY, NOTION_TOKEN, GOOGLE_SERVICE_ACCOUNT_KEY, spreadsheet IDs, PORT)
 ├── .env.example                   # Template for setup
 │
 ├── server/
@@ -51,24 +51,39 @@ command-centre/
 │   │   ├── chat.js                # POST /api/chat (SSE streaming), /approve, /clear, /pending
 │   │   ├── notion.js              # Dashboard, database browser, page viewer endpoints
 │   │   ├── documents.js           # Briefings, decisions, weekly reviews file browser
-│   │   └── skills.js              # GET /api/skills — lists available skill buttons
+│   │   ├── skills.js              # GET /api/skills — lists available skill buttons
+│   │   ├── sheets.js              # CRUD routes for 25 registered Google Sheets (GET/POST/PATCH/DELETE)
+│   │   ├── bmc.js                 # Business Model Canvas: GET / (all 11 sections), GET /:section
+│   │   ├── crm.js                 # CRM integrator: 8 endpoints (people, projects, tasks, campaigns, business-units)
+│   │   ├── marketing-ops.js       # Marketing dashboards (campaigns, content, sequences, sessions)
+│   │   ├── registry.js            # Project registry
+│   │   ├── tech-team.js           # Tech team module (sprint, bugs, specs, decisions, velocity, agents, strategy, github)
+│   │   ├── commitments.js         # POST /api/commitments (Notion write via approval gate)
+│   │   ├── decisions.js           # POST /api/decisions (Notion write via approval gate)
+│   │   └── notebooks.js           # Knowledge base (parsed notebook registry)
 │   ├── services/
 │   │   ├── agent.js               # Claude API wrapper, agentic tool loop, conversation state
-│   │   ├── notion.js              # Notion SDK wrapper, 7 databases, 5-min cache
+│   │   ├── notion.js              # Notion SDK wrapper, 11 databases, 5-min cache
+│   │   ├── sheets.js              # Google Sheets SDK wrapper, SHEET_REGISTRY (25 tabs), CRUD methods, 5-min cache
+│   │   ├── hydration.js           # Data hydration service: FK resolution across sheets (24 relationships)
+│   │   ├── github.js              # GitHub API wrapper (repo activity, PRs, issues, 5-min cache)
+│   │   ├── notebooks.js           # Notebook registry parser (markdown → structured JSON)
 │   │   ├── prompts.js             # Loads CLAUDE.md + colin.md + notion-hub.md as system prompt
 │   │   └── approval.js            # Pending approval queue (promise-based blocking)
 │   └── tools/
 │       ├── notion-tools.js        # 4 tool definitions: query_database, get_page, create_page, update_page
 │       ├── file-tools.js          # 3 tool definitions: read_file, write_file, list_files
+│       ├── marketing-tools.js     # 4 tool definitions: customer_psychology_generator, competitor_analysis, content_strategy_generator, campaign_ideator
+│       ├── store-tools.js         # 2 tool definitions: store_expert_query, store_expert_update (with KB path protection)
 │       └── tool-handler.js        # Central dispatcher + Notion property format converter
 │
 ├── public/
 │   ├── index.html                 # Single-page app shell (Alpine.js templates)
-│   ├── js/app.js                  # All frontend logic: chat, dashboard, Notion browser, docs
-│   └── css/styles.css             # Dark theme, responsive layout
+│   ├── js/app.js                  # All frontend logic: 10 views (chat, dashboard, team, queue, decisions, docs, notion, registry, knowledge, marketing ops, tech team, bmc, crm)
+│   └── css/styles.css             # Dark theme, responsive layout, mobile bottom nav
 ```
 
-~20 files total.
+~40 files total.
 
 ---
 
@@ -103,7 +118,7 @@ GET /api/health
 
 ---
 
-## The Five Views
+## The Views
 
 ### 1. Chat (default)
 Full conversation with Colin. Streaming responses via SSE. Markdown rendering for structured outputs (tables, briefs, reports).
@@ -129,11 +144,43 @@ Full read-only browser for the entire Notion workspace:
 - Breadcrumb navigation: Notion → Database → Page
 - "Open in Notion" link + "Ask Colin" button on every page
 
+### 6. Registry
+Project inventory with 11+ projects, sortable by priority, filterable by status/type. Keyboard nav (g+r). Each project shows name, type, status, team, technologies, progress, commitment/decision counts.
+
+### 7. Knowledge Base
+Parsed notebook registry (Categories + Notebooks) from markdown with search + category filtering. Keyboard nav (g+k). Shows notebook source, shared status, tags.
+
+### 8. Marketing Ops
+Campaign, content, sequence, and session dashboards with:
+- **Key Metrics callout:** Collapsible cards (Revenue, Repeat Rate, Customizer to Cart, Customers) with progress bars
+- **Campaigns:** Kanban by Stage (Briefing → Complete) with inline action buttons (update Stage/Status via PATCH with approval), loading state
+- **Sequences:** Toggle between Table view and Journey Map (5-column kanban by Journey Stage)
+- **Campaign Detail Panel:** Shows linked commitments with Overdue/Blocked indicators
+- Keyboard nav (g+m)
+
+### 9. Business Model Canvas
+Strategic business model overview across 11 sections:
+- **All sections parallel:** Segments, Business Units, Flywheels, Revenue Streams, Cost Structure, Channels, Platforms, Team, Hubs, Partners, Metrics
+- **Hydrated data:** All FK references resolved (e.g., owner IDs → names)
+- **Tab navigation:** Click section tabs to filter view
+- **5-col × 3-row grid layout:** Expandable blocks with detail panels
+- **Stats callout:** Totals for each section (total segments, total team members, etc.)
+- Keyboard nav (g+b)
+
+### 10. CRM
+Customer Relationship Management view aggregating execution data:
+- **6 section tabs:** Overview (pipeline), People, Projects, Tasks, Campaigns, Business Units
+- **Pipeline stats:** B2B vs Dropship funnels with SLA breach counts
+- **Data tables:** Searchable/filterable rows with hydrated FK resolution (assignee names, project names, etc.)
+- **Detail panel:** Click any row to view full properties
+- **Optional filters:** ?status=, ?owner=, ?assignee=, ?project= via query params
+- Keyboard nav (g+i)
+
 ---
 
 ## Notion Integration — Full Map
 
-### 7 Databases
+### 11 Databases
 
 | Database | What's In It | Command Centre Use |
 |---|---|---|
@@ -144,6 +191,10 @@ Full read-only browser for the entire Notion workspace:
 | **Decisions** | Decision log with rationale, alternatives, risks | Decision history, review prep |
 | **Platforms** | Systems and platform tracking | System inventory |
 | **Audiences** | Customer segments: B2C, B2B, Dropship, Sellers, Internal | Segment targeting |
+| **Campaigns** | Marketing campaigns with Stage (Briefing→Complete), Status, Launch Date, linked Commitments | Marketing Ops: kanban by Stage, inline actions (PATCH), linked commitments in detail panel |
+| **Content Calendar** | Content items with Status, publish dates, platform, type | Marketing Ops: kanban by Status, content planning view |
+| **Sequences** | Email/SMS sequences with Journey Stage, health metrics, subscriber count | Marketing Ops: table view or journey map (5-column kanban by Journey Stage) |
+| **Sessions Log** | Session tracking by date, attendees, focus areas | Marketing Ops: log view with date filtering |
 
 ### What Colin Can READ (no approval needed)
 - Query any database with filters, sorts, pagination
@@ -172,6 +223,63 @@ The Notion integration token must have access to each database. In Notion:
 3. Select the YDS integration
 
 If a database isn't shared with the integration, it won't appear in queries.
+
+---
+
+## Google Sheets Integration
+
+The Command Centre bridges Notion and Google Sheets, enabling Colin to access operational data from multiple sources:
+
+### 4 Spreadsheets, 25 Sheets
+
+| Spreadsheet | Tabs | Purpose |
+|---|---|---|
+| **Execution** (7) | PROJECTS, TASKS, PEOPLE, CAMPAIGNS, EXECUTIVE_DASHBOARD, TIME_TRACKING, LEAD_FLOWS | Day-to-day ops: projects, task tracking, team capacity, campaigns, lead pipeline |
+| **Strategy** (6) | BUSINESS_UNITS, FLYWHEEL, HUBS, CUSTOMER_SEGMENT, TOUCHPOINTS, APP_STORES | Strategic planning: market segments, revenue drivers, business unit ownership, distribution channels |
+| **App Logging** (2) | LOGIN, BRAIN_DUMP | Usage tracking: who logged in, quick brainstorm captures |
+| **Business Model Canvas** (11) | SEGMENTS, BUSINESS_UNITS, FLYWHEELS, REVENUE_STREAMS, COST_STRUCTURE, CHANNELS, PLATFORMS, TEAM, HUBS, PARTNERS, METRICS | Strategic model: classic 9-block + partnerships + metrics |
+
+### Data Hydration
+
+All sheet rows automatically resolve foreign key references. For example, when Colin queries the TASKS sheet:
+- `assignee_User_id` (raw ID) becomes `assignee_User_id_resolved` (full name from PEOPLE sheet)
+- `Project id` (raw ID) becomes `Project id_resolved` (project name from PROJECTS sheet)
+
+This is powered by the **Data Hydration Service** (`server/services/hydration.js`), which maintains a map of 24 FK relationships and lazy-loads target data on demand.
+
+### CRUD Routes
+
+All 25 sheets are accessible via RESTful routes:
+
+```
+GET  /api/sheets/:sheetKey              # Fetch all rows (with ?hydrate=true for FK resolution)
+POST /api/sheets/:sheetKey              # Append a row
+PATCH /api/sheets/:sheetKey/:rowIdx     # Update a row (rowIdx 1-based, >= 2)
+DELETE /api/sheets/:sheetKey/:rowIdx    # Delete a row
+```
+
+Examples:
+```
+GET /api/sheets/TASKS?hydrate=true      # All tasks with assignee names resolved
+POST /api/sheets/PROJECTS                # Create new project
+PATCH /api/sheets/CAMPAIGNS/3            # Update row 3 campaign status
+```
+
+### Environment Variables
+
+```
+GOOGLE_SERVICE_ACCOUNT_KEY              # Path to service account JSON (read/write scope)
+STRATEGY_SPREADSHEET_ID                 # Google Sheets ID for Strategy spreadsheet
+EXECUTION_SPREADSHEET_ID                # Google Sheets ID for Execution spreadsheet
+APP_LOGGING_SPREADSHEET_ID              # Google Sheets ID for App Logging spreadsheet
+BMC_SPREADSHEET_ID                      # Google Sheets ID for Business Model Canvas spreadsheet
+```
+
+### API Isolation
+
+- **Read-only client** (`getClient()`): For legacy pipeline queries (readonly scope)
+- **Read-write client** (`getReadWriteClient()`): For CRUD operations (full spreadsheets scope)
+- Graceful degradation: If sheets aren't configured, endpoints return `{available: false}` instead of errors
 
 ---
 
@@ -222,6 +330,45 @@ Each skill loads its prompt from `.claude/skills/{name}/prompt.md` (outside the 
 |---|---|---|
 | `/api/documents` | GET | All documents across all categories |
 | `/api/documents/:category/:filename` | GET | Read specific document |
+
+### Google Sheets
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/sheets/pipeline` | GET | CRM pipeline data (B2B + dropship stages, SLA breaches) |
+| `/api/sheets/:sheetKey` | GET | Fetch sheet rows (add `?hydrate=true` for FK resolution) |
+| `/api/sheets/:sheetKey` | POST | Append a row; body: JSON object with column values |
+| `/api/sheets/:sheetKey/:rowIdx` | PATCH | Update row (rowIdx 1-based, >= 2); body: column values |
+| `/api/sheets/:sheetKey/:rowIdx` | DELETE | Delete a row |
+
+### Business Model Canvas
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/bmc` | GET | All 11 BMC sections (segments, business_units, flywheels, revenue_streams, cost_structure, channels, platforms, team, hubs, partners, metrics) hydrated |
+| `/api/bmc/:section` | GET | Single BMC section (hydrated FK resolution) |
+
+### CRM
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/crm` | GET | Aggregated summary (pipeline + people) |
+| `/api/crm/people` | GET | Team data from PEOPLE sheet (hydrated: manager_id resolved) |
+| `/api/crm/projects` | GET | Projects from PROJECTS sheet (optional: `?status=`, `?owner=`) |
+| `/api/crm/tasks` | GET | Tasks from TASKS sheet (optional: `?status=`, `?assignee=`, `?project=`) |
+| `/api/crm/campaigns` | GET | Campaigns from Execution spreadsheet (optional: `?status=`) |
+| `/api/crm/business-units` | GET | Business units from Strategy spreadsheet (hydrated: owner, flywheel resolved) |
+| `/api/crm/tasks` | POST | Create new task; body: task fields |
+| `/api/crm/tasks/:rowIdx` | PATCH | Update task row (rowIdx 1-based, >= 2); body: task fields |
+
+### Marketing Ops
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/marketing-ops` | GET | Aggregated summary (campaigns + content + sequences + sessions + metrics) |
+| `/api/marketing-ops/campaigns` | GET | All campaigns (optional: `?stage=` filter) |
+| `/api/marketing-ops/content` | GET | Content calendar (optional: `?status=` filter) |
+| `/api/marketing-ops/sequences` | GET | Sequences (optional: `?journeyStage=` filter) |
+| `/api/marketing-ops/sessions` | GET | Sessions log (query: `?days=30`, range 1-365) |
+| `/api/marketing-ops/campaigns/:id` | PATCH | Update campaign Stage or Status; body: `{property, value}`; requires approval |
+| `/api/marketing-ops/campaigns/:id/commitments` | GET | Commitments linked to a campaign via Campaign relation |
+| `/api/marketing-ops/metrics` | GET | Key business metrics (revenue, repeatRate, customizerToCart, customers) |
 
 ### System
 | Endpoint | Method | Purpose |

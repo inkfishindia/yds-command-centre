@@ -22,7 +22,9 @@
       "Bash(git log*)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(python3 .claude/skills/*/scripts/*)"
+      "Bash(python3 .claude/skills/*/scripts/*)",
+      "Write(data/sessions/**)",
+      "Edit(data/sessions/**)"
     ],
     "deny": [
       "Bash(rm -rf *)",
@@ -37,6 +39,41 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '## Session Context'; cat data/sessions/handoff.md 2>/dev/null || echo 'No previous session state found.'; echo '---'; echo '## Recent Git Activity'; git log --oneline -5 2>/dev/null || echo 'Not a git repo'; echo '---'; echo '## Recent Dev Activity'; tail -7 data/sessions/activity-log.md 2>/dev/null || echo 'No activity log yet.'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Before stopping: 1) Update data/sessions/handoff.md with: what was built/fixed, key decisions, current state of server/frontend, what to do next. Keep under 80 lines. 2) Append one row to data/sessions/activity-log.md (format: | date | agent | action | details | pending |). 3) If any decisions were made, append to data/sessions/decisions.md.",
+            "model": "claude-haiku-4-5-20251001"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Context is about to be compacted. Save current working state to data/sessions/handoff.md NOW — include: current feature/bug, files being edited, test status, approval queue state. This is your lifeline for after compaction.",
+            "model": "claude-haiku-4-5-20251001"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Write",

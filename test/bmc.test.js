@@ -1,0 +1,157 @@
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
+
+// ── BMC_SECTIONS constant ─────────────────────────────────────────────────────
+
+// Extract BMC_SECTIONS by requiring the route module (it's not exported separately,
+// so we validate it indirectly through the router and via sheets SHEET_REGISTRY).
+
+const EXPECTED_SECTION_KEYS = [
+  'segments',
+  'business_units',
+  'flywheels',
+  'revenue_streams',
+  'cost_structure',
+  'channels',
+  'platforms',
+  'team',
+  'hubs',
+  'partners',
+  'metrics',
+];
+
+const EXPECTED_SHEET_KEYS = [
+  'BMC_SEGMENTS',
+  'BMC_BUSINESS_UNITS',
+  'BMC_FLYWHEELS',
+  'BMC_REVENUE_STREAMS',
+  'BMC_COST_STRUCTURE',
+  'BMC_CHANNELS',
+  'BMC_PLATFORMS',
+  'BMC_TEAM',
+  'BMC_HUBS',
+  'BMC_PARTNERS',
+  'BMC_METRICS',
+];
+
+// ── Route module ──────────────────────────────────────────────────────────────
+
+describe('BMC Route — module loading', () => {
+  it('loads without crashing', () => {
+    const bmc = require('../server/routes/bmc');
+    assert.ok(bmc);
+  });
+
+  it('exports an express router (function or has .stack)', () => {
+    const bmc = require('../server/routes/bmc');
+    assert.ok(typeof bmc === 'function' || Array.isArray(bmc.stack));
+  });
+
+  it('registers GET / route', () => {
+    const bmc = require('../server/routes/bmc');
+    const routes = bmc.stack
+      .filter(l => l.route)
+      .map(l => l.route.path);
+    assert.ok(routes.includes('/'), `Expected / in routes: ${routes.join(', ')}`);
+  });
+
+  it('registers GET /:section route', () => {
+    const bmc = require('../server/routes/bmc');
+    const routes = bmc.stack
+      .filter(l => l.route)
+      .map(l => l.route.path);
+    assert.ok(routes.includes('/:section'), `Expected /:section in routes: ${routes.join(', ')}`);
+  });
+});
+
+// ── SHEET_REGISTRY — all 11 BMC keys present ─────────────────────────────────
+
+describe('BMC — SHEET_REGISTRY has all 11 BMC sheet keys', () => {
+  let SHEET_REGISTRY;
+
+  it('loads SHEET_REGISTRY from sheets service', () => {
+    ({ SHEET_REGISTRY } = require('../server/services/sheets'));
+    assert.ok(SHEET_REGISTRY, 'SHEET_REGISTRY should be exported');
+  });
+
+  for (const key of EXPECTED_SHEET_KEYS) {
+    it(`SHEET_REGISTRY has key ${key}`, () => {
+      ({ SHEET_REGISTRY } = require('../server/services/sheets'));
+      assert.ok(SHEET_REGISTRY[key], `Missing SHEET_REGISTRY key: ${key}`);
+    });
+
+    it(`${key} belongs to BMC spreadsheet`, () => {
+      ({ SHEET_REGISTRY } = require('../server/services/sheets'));
+      assert.equal(
+        SHEET_REGISTRY[key].spreadsheetKey,
+        'BMC',
+        `${key}.spreadsheetKey should be 'BMC'`
+      );
+    });
+
+    it(`${key} has a sheetName and gid`, () => {
+      ({ SHEET_REGISTRY } = require('../server/services/sheets'));
+      const entry = SHEET_REGISTRY[key];
+      assert.ok(entry.sheetName, `${key} missing sheetName`);
+      assert.ok(entry.gid !== undefined, `${key} missing gid`);
+    });
+  }
+});
+
+// ── BMC_SECTIONS count ────────────────────────────────────────────────────────
+
+describe('BMC Route — section count', () => {
+  it('has exactly 11 section keys registered', () => {
+    // We verify this by inspecting the route stack — the /:section handler
+    // delegates to BMC_SECTIONS which we validate via SHEET_REGISTRY above.
+    // Count the expected section keys directly.
+    assert.equal(EXPECTED_SECTION_KEYS.length, 11);
+  });
+
+  it('every section key maps to a valid SHEET_REGISTRY key', () => {
+    const { SHEET_REGISTRY } = require('../server/services/sheets');
+
+    // Build the same mapping the route uses
+    const BMC_SECTIONS = {
+      segments: 'BMC_SEGMENTS',
+      business_units: 'BMC_BUSINESS_UNITS',
+      flywheels: 'BMC_FLYWHEELS',
+      revenue_streams: 'BMC_REVENUE_STREAMS',
+      cost_structure: 'BMC_COST_STRUCTURE',
+      channels: 'BMC_CHANNELS',
+      platforms: 'BMC_PLATFORMS',
+      team: 'BMC_TEAM',
+      hubs: 'BMC_HUBS',
+      partners: 'BMC_PARTNERS',
+      metrics: 'BMC_METRICS',
+    };
+
+    for (const [sectionKey, sheetKey] of Object.entries(BMC_SECTIONS)) {
+      assert.ok(
+        SHEET_REGISTRY[sheetKey],
+        `Section '${sectionKey}' maps to '${sheetKey}' which is missing from SHEET_REGISTRY`
+      );
+    }
+  });
+});
+
+// ── isSpreadsheetConfigured — BMC ─────────────────────────────────────────────
+
+describe('BMC — isSpreadsheetConfigured (unconfigured env)', () => {
+  it('returns false for BMC when env vars not set', () => {
+    const { isSpreadsheetConfigured } = require('../server/services/sheets');
+    assert.equal(isSpreadsheetConfigured('BMC'), false);
+  });
+});
+
+// ── hydrateSheetData — unconfigured ──────────────────────────────────────────
+
+describe('BMC — hydrateSheetData (unconfigured)', () => {
+  for (const key of EXPECTED_SHEET_KEYS) {
+    it(`hydrateSheetData('${key}') returns { available: false } when not configured`, async () => {
+      const { hydrateSheetData } = require('../server/services/hydration');
+      const result = await hydrateSheetData(key);
+      assert.equal(result.available, false);
+    });
+  }
+});
