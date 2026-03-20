@@ -12,6 +12,8 @@ function getClient() {
 // Simple in-memory cache with 5-minute TTL
 const cache = new Map();
 const CACHE_TTL = 5 * 60 * 1000;
+const DASHBOARD_CACHE_KEY = 'dashboard_summary_v1';
+const DASHBOARD_CACHE_TTL = 60 * 1000;
 
 function getCached(key) {
   const entry = cache.get(key);
@@ -26,8 +28,42 @@ function setCache(key, data) {
   cache.set(key, { data, time: Date.now() });
 }
 
+function setCachedWithTime(key, data, time = Date.now()) {
+  cache.set(key, { data, time });
+}
+
 // In-flight request deduplication — prevents duplicate Notion API calls for the same cache key
 const inFlight = new Map();
+
+// Rate-limited write queue — spaces out write operations to avoid Notion 429s
+const writeQueue = [];
+let writeProcessing = false;
+const WRITE_SPACING_MS = 350;
+
+async function enqueueWrite(writeFn) {
+  return new Promise((resolve, reject) => {
+    writeQueue.push({ fn: writeFn, resolve, reject });
+    processWriteQueue();
+  });
+}
+
+async function processWriteQueue() {
+  if (writeProcessing || writeQueue.length === 0) return;
+  writeProcessing = true;
+  while (writeQueue.length > 0) {
+    const { fn, resolve, reject } = writeQueue.shift();
+    try {
+      const result = await fn();
+      resolve(result);
+    } catch (err) {
+      reject(err);
+    }
+    if (writeQueue.length > 0) {
+      await new Promise(r => setTimeout(r, WRITE_SPACING_MS));
+    }
+  }
+  writeProcessing = false;
+}
 
 function deduplicatedFetch(cacheKey, fetchFn) {
   // Check cache first
@@ -97,6 +133,16 @@ const DB = {
   DECISIONS: '3c8a9b22ba924f20bfdcab4cc7a46478',
   PLATFORMS: '1fcf264fd2cd4308bcfd28997d171360',
   AUDIENCES: '63ec25cae3b0432093fa639d4c8b5809',
+  // Marketing Ops databases
+  CAMPAIGNS: 'cff40f3413a84c64b5bfedafeffb0b88',
+  CONTENT_CALENDAR: 'a3066b81c26c453daed24588c92ad7c5',
+  SEQUENCES: 'aaee75a9fc5141ba8f458ad1e72a4b9b',
+  SESSIONS_LOG: 'b1d04b582c4040918f6dd2ccc1c1b2f1',
+  // Tech Team databases
+  TECH_SPRINT_BOARD: 'e5ccd5d363304147a210207982b2c66b',
+  TECH_SPEC_LIBRARY: 'ad5b66e6e65c4e859b4ce5d83b49403b',
+  TECH_DECISION_LOG: '62ce820e06d2404598dab4ec8d064f9d',
+  TECH_SPRINT_ARCHIVE: 'ee87ff546d2a468499a9419475b9cb3c',
 };
 
 /**
@@ -231,19 +277,26 @@ async function getRecentDecisions(days = 30) {
     const notion = getClient();
     const since = new Date();
     since.setDate(since.getDate() - days);
-    const response = await withRetry(() => notion.databases.query({
-      database_id: DB.DECISIONS,
-      filter: {
-        property: 'Date',
-        date: { on_or_after: since.toISOString().split('T')[0] },
-      },
-      sorts: [{ property: 'Date', direction: 'descending' }],
-      page_size: 10,
-    }));
-    return response.results.map(page => ({
-      id: page.id,
-      ...simplify(page.properties),
-    }));
+    const decisions = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.DECISIONS,
+        filter: {
+          property: 'Date',
+          date: { on_or_after: since.toISOString().split('T')[0] },
+        },
+        sorts: [{ property: 'Date', direction: 'descending' }],
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      decisions.push(...response.results.map(page => ({
+        id: page.id,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+    return decisions;
   }).catch(err => {
     console.error('Failed to fetch decisions:', err.message);
     return [];
@@ -307,6 +360,7 @@ async function getProjects() {
       }));
       projects.push(...response.results.map(page => ({
         id: page.id,
+        last_edited_time: page.last_edited_time,
         ...simplify(page.properties),
       })));
       cursor = response.has_more ? response.next_cursor : null;
@@ -347,7 +401,7 @@ async function getAllCommitments(includeCancelled = false) {
         // Mark null Priority and Type as "Unset"
         if (!simplified.Priority) simplified.Priority = 'Unset';
         if (!simplified.Type) simplified.Type = 'Unset';
-        return { id: page.id, ...simplified };
+        return { id: page.id, last_edited_time: page.last_edited_time, ...simplified };
       }));
       cursor = response.has_more ? response.next_cursor : null;
     } while (cursor);
@@ -466,6 +520,11 @@ async function getCommitmentsForKanban() {
  * Get dashboard summary data with health distribution and counts
  */
 async function getDashboardSummary() {
+  const cachedDashboard = cache.get(DASHBOARD_CACHE_KEY);
+  if (cachedDashboard && Date.now() - cachedDashboard.time < DASHBOARD_CACHE_TTL) {
+    return cachedDashboard.data;
+  }
+
   const [focusAreas, overdue, decisions, people, projects, allCommitments, upcoming, audiencesResult, platformsResult, recentlyCompleted] = await Promise.all([
     getFocusAreas(),
     getOverdueCommitments(),
@@ -491,12 +550,22 @@ async function getDashboardSummary() {
 
   // Count projects per focus area
   const projectsByFA = {};
+  const activeProjectsByOwner = {};
   for (const project of projects) {
     // Try common relation property names
     const faIds = project['Focus Area'] || project['Focus Areas'] || project['Focus area'] || [];
     for (const faId of (Array.isArray(faIds) ? faIds : [])) {
       const nid = faId.replace(/-/g, '');
       projectsByFA[nid] = (projectsByFA[nid] || 0) + 1;
+    }
+
+    const ownerIds = project.Owner || [];
+    if (project.Status === 'Active') {
+      for (const ownerId of (Array.isArray(ownerIds) ? ownerIds : [])) {
+        const nid = ownerId.replace(/-/g, '');
+        if (!activeProjectsByOwner[nid]) activeProjectsByOwner[nid] = [];
+        activeProjectsByOwner[nid].push(project);
+      }
     }
   }
 
@@ -517,8 +586,25 @@ async function getDashboardSummary() {
   const faOverdue = {};   // nid → [commitment]  (active, due < today)
   const faBlocked = {};   // nid → count
   const faAllDates = {};  // nid → [ISO date strings]  (for lastActivity)
+  const commitmentsByPerson = {};
+  const activeCommitmentsByPerson = {};
 
   for (const c of allCommitments) {
+    const assignedIds = c['Assigned To'] || [];
+    const normalizedAssignedIds = Array.isArray(assignedIds)
+      ? assignedIds.map(id => id.replace(/-/g, ''))
+      : [];
+    const isActive = c.Status && !['Done', 'Cancelled'].includes(c.Status);
+
+    for (const personId of normalizedAssignedIds) {
+      if (!commitmentsByPerson[personId]) commitmentsByPerson[personId] = [];
+      commitmentsByPerson[personId].push(c);
+      if (isActive) {
+        if (!activeCommitmentsByPerson[personId]) activeCommitmentsByPerson[personId] = [];
+        activeCommitmentsByPerson[personId].push(c);
+      }
+    }
+
     const faIds = c['Focus Area'] || c['Focus Areas'] || c['Focus area'] || [];
     for (const faId of (Array.isArray(faIds) ? faIds : [])) {
       const nid = faId.replace(/-/g, '');
@@ -532,7 +618,6 @@ async function getDashboardSummary() {
       }
 
       // Overdue: active, due < today
-      const isActive = c.Status && !['Done', 'Cancelled'].includes(c.Status);
       if (isActive && dueStart && dueStart < todayStr) {
         if (!faOverdue[nid]) faOverdue[nid] = [];
         faOverdue[nid].push(c);
@@ -599,8 +684,12 @@ async function getDashboardSummary() {
 
   // Build people ID to Name lookup for resolving relations
   const peopleLookup = {};
+  const focusAreaLookup = {};
   for (const person of people) {
     peopleLookup[person.id.replace(/-/g, '')] = person.Name || 'Unknown';
+  }
+  for (const area of focusAreas) {
+    focusAreaLookup[area.id.replace(/-/g, '')] = area.Name || 'Unknown';
   }
 
   // Resolve relation IDs in overdue commitments
@@ -624,15 +713,8 @@ async function getDashboardSummary() {
   // Enrich people with workload data
   const enrichedPeople = people.map(person => {
     const pid = person.id.replace(/-/g, '');
-
-    // Count active commitments assigned to this person
-    const personCommitments = allCommitments.filter(c => {
-      const assignedIds = c['Assigned To'] || [];
-      return Array.isArray(assignedIds) && assignedIds.some(id => id.replace(/-/g, '') === pid);
-    });
-    const activeCommitments = personCommitments.filter(c =>
-      c.Status && !['Done', 'Cancelled'].includes(c.Status)
-    );
+    const personCommitments = commitmentsByPerson[pid] || [];
+    const activeCommitments = activeCommitmentsByPerson[pid] || [];
 
     // Count overdue commitments: due < today AND not Done/Cancelled
     const overdueCount = activeCommitments.filter(c => {
@@ -646,12 +728,7 @@ async function getDashboardSummary() {
     // Count blocked commitments: Status === 'Blocked'
     const blockedCount = activeCommitments.filter(c => c.Status === 'Blocked').length;
 
-    // Find projects owned by this person
-    const personProjects = projects.filter(p => {
-      const ownerIds = p.Owner || [];
-      return Array.isArray(ownerIds) && ownerIds.some(id => id.replace(/-/g, '') === pid);
-    });
-    const activeProjects = personProjects.filter(p => p.Status === 'Active');
+    const activeProjects = activeProjectsByOwner[pid] || [];
 
     // Find focus areas this person works on (from their commitments)
     const focusAreaIds = new Set();
@@ -665,8 +742,7 @@ async function getDashboardSummary() {
     // Resolve focus area IDs to names using the already-fetched focusAreas
     const focusAreaNames = [];
     for (const faId of focusAreaIds) {
-      const fa = focusAreas.find(a => a.id.replace(/-/g, '') === faId);
-      if (fa) focusAreaNames.push(fa.Name);
+      if (focusAreaLookup[faId]) focusAreaNames.push(focusAreaLookup[faId]);
     }
 
     return {
@@ -688,7 +764,7 @@ async function getDashboardSummary() {
     return !Array.isArray(assignedIds) || assignedIds.length === 0;
   }).length;
 
-  return {
+  const summary = {
     focusAreas: enrichedFocusAreas,
     overdue: enrichedOverdue,
     upcoming: enrichedUpcoming,
@@ -700,6 +776,9 @@ async function getDashboardSummary() {
     unassignedCount,
     timestamp: new Date().toISOString(),
   };
+
+  setCachedWithTime(DASHBOARD_CACHE_KEY, summary);
+  return summary;
 }
 
 /**
@@ -735,6 +814,22 @@ async function resolveRelations(properties) {
   return resolved;
 }
 
+async function resolveRelationIdsToNamedItems(ids) {
+  const uniqueIds = [...new Set((Array.isArray(ids) ? ids : []).filter(id => typeof id === 'string' && id.length >= 30))];
+  const entries = await Promise.all(
+    uniqueIds.map(async (id) => {
+      try {
+        const page = await getPageRaw(id);
+        const name = page?.properties?.Name || page?.properties?.Title || page?.properties?.name || 'Untitled';
+        return [id, { id, name }];
+      } catch {
+        return [id, { id, name: 'Untitled' }];
+      }
+    })
+  );
+  return Object.fromEntries(entries);
+}
+
 /**
  * List all known databases with metadata
  */
@@ -747,6 +842,14 @@ function listDatabases() {
     { id: DB.DECISIONS, name: 'Decisions', icon: 'D', description: 'Decision log with rationale' },
     { id: DB.PLATFORMS, name: 'Platforms', icon: 'S', description: 'System and platform tracking' },
     { id: DB.AUDIENCES, name: 'Audiences', icon: 'A', description: 'Customer segments and targeting' },
+    { id: DB.CAMPAIGNS, name: 'Campaigns', icon: 'M', description: 'Marketing campaigns with stage tracking' },
+    { id: DB.CONTENT_CALENDAR, name: 'Content Calendar', icon: 'W', description: 'Content pipeline from idea to published' },
+    { id: DB.SEQUENCES, name: 'Sequences', icon: 'Q', description: 'Email and messaging sequences' },
+    { id: DB.SESSIONS_LOG, name: 'Sessions Log', icon: 'L', description: 'Session records with decisions and commitments' },
+    { id: DB.TECH_SPRINT_BOARD, name: 'Sprint Board (Tech)', icon: '📋', description: 'Tech sprint items, bugs, and tasks' },
+    { id: DB.TECH_SPEC_LIBRARY, name: 'Spec Library', icon: '📄', description: 'Technical specification pipeline' },
+    { id: DB.TECH_DECISION_LOG, name: 'Tech Decision Log', icon: '⚖️', description: 'Technical decision records' },
+    { id: DB.TECH_SPRINT_ARCHIVE, name: 'Sprint Archive', icon: '📊', description: 'Sprint velocity and history' },
   ];
 }
 
@@ -854,39 +957,42 @@ async function getPageContent(pageId) {
  * Recursively fetch children for blocks that have them (toggles, columns, etc.)
  * Limited to 2 levels deep to avoid excessive API calls.
  */
+const EXPANDABLE_BLOCK_TYPES = new Set([
+  'toggle', 'column_list', 'column', 'bulleted_list_item',
+  'numbered_list_item', 'to_do', 'callout', 'quote', 'synced_block',
+]);
+
 async function fetchBlockChildren(blocks, depth = 0) {
   if (depth >= 2) return blocks; // Max recursion depth
 
   const notion = getClient();
-  const enriched = [];
 
-  for (const block of blocks) {
-    enriched.push(block);
+  // Fetch all expandable blocks' children in parallel
+  const expandableBlocks = blocks.filter(
+    b => b.has_children && EXPANDABLE_BLOCK_TYPES.has(b.type)
+  );
 
-    if (block.has_children && ['toggle', 'column_list', 'column', 'bulleted_list_item', 'numbered_list_item', 'to_do', 'callout', 'quote', 'synced_block'].includes(block.type)) {
-      try {
-        const children = [];
-        let cursor;
-        do {
-          const response = await withRetry(() => notion.blocks.children.list({
-            block_id: block.id,
-            page_size: 100,
-            start_cursor: cursor,
-          }));
-          children.push(...response.results);
-          cursor = response.has_more ? response.next_cursor : null;
-        } while (cursor);
+  await Promise.all(expandableBlocks.map(async (block) => {
+    try {
+      const children = [];
+      let cursor;
+      do {
+        const response = await withRetry(() => notion.blocks.children.list({
+          block_id: block.id,
+          page_size: 100,
+          start_cursor: cursor,
+        }));
+        children.push(...response.results);
+        cursor = response.has_more ? response.next_cursor : null;
+      } while (cursor);
 
-        // Recursively fetch grandchildren
-        const enrichedChildren = await fetchBlockChildren(children, depth + 1);
-        block._children = enrichedChildren;
-      } catch (err) {
-        console.warn(`Failed to fetch children for block ${block.id}:`, err.message);
-      }
+      block._children = await fetchBlockChildren(children, depth + 1);
+    } catch (err) {
+      console.warn(`Failed to fetch children for block ${block.id}:`, err.message);
     }
-  }
+  }));
 
-  return enriched;
+  return blocks;
 }
 
 /**
@@ -1084,6 +1190,223 @@ async function getRelatedPages(pageId) {
 }
 
 /**
+ * Selectively invalidate commitment-related cache entries after a write.
+ * Avoids a full cache.clear() which would bust unrelated caches (decisions, platforms, etc.)
+ */
+function invalidateCommitmentCaches() {
+  for (const key of cache.keys()) {
+    if (
+      key.startsWith('commitments_') ||
+      key.startsWith('all_commitments') ||
+      key.startsWith('kanban_commitments') ||
+      key.startsWith('recently_completed_') ||
+      key === 'projects' ||
+      key.startsWith('page_') ||
+      key.includes('dashboard')
+    ) {
+      cache.delete(key);
+    }
+  }
+}
+
+/**
+ * Create a new commitment page in the Commitments database.
+ */
+async function createCommitment({ name, assigneeId, dueDate, focusAreaId, priority, projectId, notes }) {
+  return enqueueWrite(async () => {
+    const notion = getClient();
+    const properties = {
+      Name: { title: [{ text: { content: name } }] },
+      Status: { select: { name: 'Not Started' } },
+      Priority: { select: { name: priority || 'Medium' } },
+      Source: { select: { name: 'Dashboard' } },
+      Type: { select: { name: 'Deliverable' } },
+    };
+
+    if (dueDate) {
+      properties['Due Date'] = { date: { start: dueDate } };
+    }
+
+    if (assigneeId) {
+      const cleanId = assigneeId.replace(/-/g, '');
+      const formattedId = [
+        cleanId.slice(0, 8), cleanId.slice(8, 12), cleanId.slice(12, 16),
+        cleanId.slice(16, 20), cleanId.slice(20),
+      ].join('-');
+      properties['Assigned To'] = { relation: [{ id: formattedId }] };
+    }
+
+    if (focusAreaId) {
+      const cleanId = focusAreaId.replace(/-/g, '');
+      const formattedId = [
+        cleanId.slice(0, 8), cleanId.slice(8, 12), cleanId.slice(12, 16),
+        cleanId.slice(16, 20), cleanId.slice(20),
+      ].join('-');
+      properties['Focus Area'] = { relation: [{ id: formattedId }] };
+    }
+
+    if (projectId) {
+      const cleanId = projectId.replace(/-/g, '');
+      const formattedId = [
+        cleanId.slice(0, 8), cleanId.slice(8, 12), cleanId.slice(12, 16),
+        cleanId.slice(16, 20), cleanId.slice(20),
+      ].join('-');
+      properties['Project'] = { relation: [{ id: formattedId }] };
+    }
+
+    if (notes) {
+      properties['Notes'] = { rich_text: [{ text: { content: notes } }] };
+    }
+
+    const result = await withRetry(() => notion.pages.create({
+      parent: { database_id: DB.COMMITMENTS },
+      properties,
+    }));
+
+    invalidateCommitmentCaches();
+    return { id: result.id, url: result.url };
+  });
+}
+
+/**
+ * Create a new decision page in the Decisions database.
+ */
+async function createDecision({ name, decision, rationale, context, focusAreaId, owner }) {
+  return enqueueWrite(async () => {
+    const notion = getClient();
+    const today = new Date().toISOString().split('T')[0];
+    const properties = {
+      Name: { title: [{ text: { content: name } }] },
+      Date: { date: { start: today } },
+      Owner: { rich_text: [{ text: { content: owner || 'Dan' } }] },
+      Decision: { rich_text: [{ text: { content: decision } }] },
+      Rationale: { rich_text: [{ text: { content: rationale || '' } }] },
+    };
+
+    if (context) {
+      properties['Context'] = { rich_text: [{ text: { content: context } }] };
+    }
+
+    if (focusAreaId) {
+      const cleanId = focusAreaId.replace(/-/g, '');
+      const formattedId = [
+        cleanId.slice(0, 8), cleanId.slice(8, 12), cleanId.slice(12, 16),
+        cleanId.slice(16, 20), cleanId.slice(20),
+      ].join('-');
+      properties['Focus Area'] = { relation: [{ id: formattedId }] };
+    }
+
+    const result = await withRetry(() => notion.pages.create({
+      parent: { database_id: DB.DECISIONS },
+      properties,
+    }));
+
+    // Invalidate decisions cache entries
+    for (const [key] of cache) {
+      if (key.startsWith('decisions_') || key.includes('dashboard')) {
+        cache.delete(key);
+      }
+    }
+
+    return { id: result.id, url: result.url };
+  });
+}
+
+/**
+ * Update the Status field of a commitment page.
+ */
+async function updateCommitmentStatus(pageId, status) {
+  return enqueueWrite(async () => {
+    const notion = getClient();
+    await withRetry(() => notion.pages.update({
+      page_id: pageId,
+      properties: { Status: { select: { name: status } } },
+    }));
+    invalidateCommitmentCaches();
+    return { id: pageId, status };
+  });
+}
+
+/**
+ * Update the Priority field of a commitment page.
+ */
+async function updateCommitmentPriority(pageId, priority) {
+  return enqueueWrite(async () => {
+    const notion = getClient();
+    await withRetry(() => notion.pages.update({
+      page_id: pageId,
+      properties: { Priority: { select: { name: priority } } },
+    }));
+    invalidateCommitmentCaches();
+    return { id: pageId, priority };
+  });
+}
+
+/**
+ * Update the Due Date field of a commitment page.
+ * @param {string} dueDate - ISO date string YYYY-MM-DD
+ */
+async function updateCommitmentDueDate(pageId, dueDate) {
+  return enqueueWrite(async () => {
+    const notion = getClient();
+    await withRetry(() => notion.pages.update({
+      page_id: pageId,
+      properties: { 'Due Date': { date: { start: dueDate } } },
+    }));
+    invalidateCommitmentCaches();
+    return { id: pageId, dueDate };
+  });
+}
+
+/**
+ * Update the Assigned To relation of a commitment page.
+ * Normalises the personId to standard UUID format before sending.
+ */
+async function updateCommitmentAssignee(pageId, personId) {
+  return enqueueWrite(async () => {
+    const notion = getClient();
+    const cleanId = personId.replace(/-/g, '');
+    const formattedId = [
+      cleanId.slice(0, 8), cleanId.slice(8, 12), cleanId.slice(12, 16),
+      cleanId.slice(16, 20), cleanId.slice(20),
+    ].join('-');
+    await withRetry(() => notion.pages.update({
+      page_id: pageId,
+      properties: { 'Assigned To': { relation: [{ id: formattedId }] } },
+    }));
+    invalidateCommitmentCaches();
+    return { id: pageId, assigneeId: personId };
+  });
+}
+
+/**
+ * Append a timestamped note to the Notes rich_text field of a commitment page.
+ * Preserves existing content and truncates to 1900 chars to stay within Notion limits.
+ */
+async function appendCommitmentNote(pageId, note) {
+  // Note: read-then-write is not atomic. Safe because write queue serializes and single user.
+  return enqueueWrite(async () => {
+    const notion = getClient();
+    const currentPage = await withRetry(() => notion.pages.retrieve({ page_id: pageId }));
+    const currentNotes = currentPage.properties.Notes?.rich_text
+      ?.map(t => t.plain_text).join('') || '';
+    const today = new Date().toISOString().split('T')[0];
+    const separator = currentNotes ? '\n' : '';
+    const newNotes = currentNotes + separator + `[${today} via Dashboard] ${note}`;
+    const truncated = newNotes.slice(-1900);
+
+    await withRetry(() => notion.pages.update({
+      page_id: pageId,
+      properties: {
+        Notes: { rich_text: [{ text: { content: truncated } }] },
+      },
+    }));
+    invalidateCommitmentCaches();
+    return { id: pageId, notes: truncated };
+  });
+}
+
+/**
  * Get key Notion pages
  */
 function getKeyPages() {
@@ -1099,11 +1422,720 @@ function clearCache() {
   cache.clear();
 }
 
+// ---------------------------------------------------------------------------
+// Priority weight map for topThree scoring
+// ---------------------------------------------------------------------------
+const PRIORITY_WEIGHTS = { Urgent: 4, High: 3, Medium: 2, Low: 1 };
+
+/**
+ * Compute a priority score for a commitment used by getMorningBrief topThree.
+ * Score = priority weight + overdue bonus (daysOverdue * 2) + due-today bonus (+5).
+ */
+function computeCommitmentScore(c, todayStr) {
+  const weight = PRIORITY_WEIGHTS[c.Priority] || 1;
+
+  const due = c['Due Date'];
+  const dueStart = due && typeof due === 'object' ? due.start : (due || null);
+
+  let overdueBonus = 0;
+  let dueTodayBonus = 0;
+  if (dueStart) {
+    if (dueStart < todayStr) {
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const days = Math.floor((new Date(todayStr) - new Date(dueStart)) / msPerDay);
+      overdueBonus = days * 2;
+    } else if (dueStart === todayStr) {
+      dueTodayBonus = 5;
+    }
+  }
+
+  return weight + overdueBonus + dueTodayBonus;
+}
+
+/**
+ * Derive a structured morning brief from getDashboardSummary().
+ * All data is computed from already-cached sub-calls — no extra Notion requests.
+ */
+function buildMorningBriefFromDashboard(dashboard) {
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // -------------------------------------------------------------------
+  // overdueCount and overdueItems (top 3 by daysOverdue DESC)
+  // -------------------------------------------------------------------
+  const overdueRaw = dashboard.overdue || [];
+  const overdueCount = overdueRaw.length;
+
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const withDays = overdueRaw.map(c => {
+    const due = c['Due Date'];
+    const dueStart = due && typeof due === 'object' ? due.start : (due || null);
+    const daysOverdue = dueStart
+      ? Math.max(0, Math.floor((new Date(todayStr) - new Date(dueStart)) / msPerDay))
+      : 0;
+    const severity = daysOverdue > 7 ? 'critical' : daysOverdue > 3 ? 'warning' : 'mild';
+    const owner = Array.isArray(c.assignedNames) && c.assignedNames.length > 0
+      ? c.assignedNames[0]
+      : 'Unassigned';
+    return { name: c.Name || 'Untitled', owner, daysOverdue, severity };
+  });
+  const overdueItems = withDays
+    .slice()
+    .sort((a, b) => b.daysOverdue - a.daysOverdue)
+    .slice(0, 3);
+
+  // -------------------------------------------------------------------
+  // todayItems — upcoming commitments due today or tomorrow
+  // -------------------------------------------------------------------
+  const tomorrowStr = new Date(new Date(todayStr).getTime() + msPerDay)
+    .toISOString().split('T')[0];
+
+  const todayItems = (dashboard.upcoming || []).filter(c => {
+    const due = c['Due Date'];
+    const dueStart = due && typeof due === 'object' ? due.start : (due || null);
+    return dueStart === todayStr || dueStart === tomorrowStr;
+  });
+
+  // -------------------------------------------------------------------
+  // topThree — highest-scoring open commitments
+  // -------------------------------------------------------------------
+  const allOpen = (dashboard.overdue || []).concat(dashboard.upcoming || []);
+  // Deduplicate by id
+  const seenIds = new Set();
+  const deduped = [];
+  for (const c of allOpen) {
+    if (c.id && !seenIds.has(c.id)) {
+      seenIds.add(c.id);
+      deduped.push(c);
+    } else if (!c.id) {
+      deduped.push(c);
+    }
+  }
+
+  const topThree = deduped
+    .filter(c => c.Status && !['Done', 'Cancelled'].includes(c.Status))
+    .map(c => ({ ...c, _score: computeCommitmentScore(c, todayStr) }))
+    .sort((a, b) => b._score - a._score)
+    .slice(0, 3)
+    .map(c => ({
+      name: c.Name || 'Untitled',
+      owner: Array.isArray(c.assignedNames) && c.assignedNames.length > 0
+        ? c.assignedNames[0]
+        : 'Unassigned',
+      dueDate: c['Due Date'],
+      priority: c.Priority,
+      status: c.Status,
+      id: c.id,
+    }));
+
+  // -------------------------------------------------------------------
+  // flags — overload, drift, decision
+  // -------------------------------------------------------------------
+  const flags = [];
+
+  // Overload: any person with activeCommitmentCount > 8 or overdueCount > 3
+  for (const person of (dashboard.people || [])) {
+    if (person.activeCommitmentCount > 8 || person.overdueCount > 3) {
+      flags.push({
+        type: 'overload',
+        message: `${person.Name || 'Unknown'} has ${person.activeCommitmentCount} active commitments and ${person.overdueCount} overdue`,
+      });
+    }
+  }
+
+  // Drift: focus areas with no activity in 14+ days
+  const fourteenDaysAgo = new Date(new Date(todayStr).getTime() - 14 * msPerDay)
+    .toISOString().split('T')[0];
+  for (const area of (dashboard.focusAreas || [])) {
+    if (!area.lastActivityDate || area.lastActivityDate < fourteenDaysAgo) {
+      flags.push({
+        type: 'drift',
+        message: `${area.Name || 'Unknown area'} has had no activity since ${area.lastActivityDate || 'never'}`,
+      });
+    }
+  }
+
+  // Decision: blocked items where Notes mention 'Dan' or 'decision'
+  const decisionPattern = /\bdan\b|decision/i;
+  const decisionBlocked = (dashboard.overdue || []).concat(dashboard.upcoming || []).filter(c => {
+    if (c.Status !== 'Blocked') return false;
+    const notes = c.Notes || '';
+    return decisionPattern.test(notes);
+  });
+  if (decisionBlocked.length > 0) {
+    flags.push({
+      type: 'decision',
+      message: `${decisionBlocked.length} blocked item${decisionBlocked.length > 1 ? 's' : ''} waiting on Dan or a decision`,
+    });
+  }
+
+  // -------------------------------------------------------------------
+  // waitingOn — blocked commitments grouped by blocker
+  // -------------------------------------------------------------------
+  const allCommitmentsForWaiting = (dashboard.overdue || []).concat(dashboard.upcoming || []);
+  const waitingOnMap = {};
+  for (const c of allCommitmentsForWaiting) {
+    if (c.Status !== 'Blocked') continue;
+    // Try to extract who is blocking from Notes field
+    const notes = (c.Notes || '').trim();
+    let blocker = 'Unknown';
+    const waitingMatch = notes.match(/waiting on ([A-Z][a-z]+)/i);
+    const blockedByMatch = notes.match(/blocked by ([A-Z][a-z]+)/i);
+    if (waitingMatch) blocker = waitingMatch[1];
+    else if (blockedByMatch) blocker = blockedByMatch[1];
+
+    waitingOnMap[c.id || Math.random().toString()] = { name: c.Name || 'Untitled', id: c.id, blocker };
+  }
+  const waitingOn = Object.values(waitingOnMap).map(item => ({
+    name: item.name,
+    blockerDetail: item.blocker || 'Unknown',
+    id: item.id,
+  }));
+
+  return {
+    overdueCount,
+    overdueItems,
+    todayItems,
+    topThree,
+    flags,
+    waitingOn,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+async function getMorningBrief() {
+  const dashboard = await getDashboardSummary();
+  return buildMorningBriefFromDashboard(dashboard);
+}
+
+/**
+ * Fetch all marketing campaigns with resolved relations.
+ */
+async function getCampaigns() {
+  return deduplicatedFetch('mktops_campaigns', async () => {
+    const notion = getClient();
+    const campaigns = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.CAMPAIGNS,
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      campaigns.push(...response.results.map(page => ({
+        id: page.id,
+        url: page.url,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    // Resolve Owner, Focus Area, and Audience relations to names
+    const resolved = await Promise.all(campaigns.map(async (campaign) => {
+      const ownerIds = Array.isArray(campaign.Owner) ? campaign.Owner : [];
+      const focusAreaIds = Array.isArray(campaign['Focus Area']) ? campaign['Focus Area'] : [];
+      const audienceIds = Array.isArray(campaign.Audience) ? campaign.Audience : [];
+
+      const allIds = [...new Set([...ownerIds, ...focusAreaIds, ...audienceIds])].slice(0, 30);
+      const pageMap = {};
+      await Promise.all(allIds.map(async (id) => {
+        try {
+          const page = await getPageRaw(id);
+          if (page) {
+            pageMap[id.replace(/-/g, '')] = page.properties.Name || page.properties.Title || page.properties.name || 'Untitled';
+          }
+        } catch { /* skip unresolvable */ }
+      }));
+
+      const ownerNames = ownerIds.map(id => pageMap[id.replace(/-/g, '')] || id.slice(0, 8));
+      const focusAreaNames = focusAreaIds.map(id => pageMap[id.replace(/-/g, '')] || id.slice(0, 8));
+      const audienceNames = audienceIds.map(id => pageMap[id.replace(/-/g, '')] || id.slice(0, 8));
+
+      return { ...campaign, ownerNames, focusAreaNames, audienceNames };
+    }));
+
+    return resolved;
+  }).catch(err => {
+    console.error('Failed to fetch campaigns:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Fetch content calendar with resolved Campaign relation.
+ */
+async function getContentCalendar() {
+  return deduplicatedFetch('mktops_content', async () => {
+    const notion = getClient();
+    const content = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.CONTENT_CALENDAR,
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      content.push(...response.results.map(page => ({
+        id: page.id,
+        url: page.url,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    // Resolve Campaign relation to campaignName
+    const resolved = await Promise.all(content.map(async (item) => {
+      const campaignIds = Array.isArray(item.Campaign) ? item.Campaign : [];
+      if (campaignIds.length === 0) return { ...item, campaignName: null };
+
+      try {
+        const page = await getPageRaw(campaignIds[0]);
+        const campaignName = page
+          ? (page.properties.Name || page.properties.Title || page.properties.name || 'Untitled')
+          : null;
+        return { ...item, campaignName };
+      } catch {
+        return { ...item, campaignName: null };
+      }
+    }));
+
+    return resolved;
+  }).catch(err => {
+    console.error('Failed to fetch content calendar:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Fetch email/messaging sequences.
+ * Open Rate, Click Rate, Unsub Rate come through simplify() as numbers.
+ */
+async function getSequences() {
+  return deduplicatedFetch('mktops_sequences', async () => {
+    const notion = getClient();
+    const sequences = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.SEQUENCES,
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      sequences.push(...response.results.map(page => ({
+        id: page.id,
+        url: page.url,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    return sequences;
+  }).catch(err => {
+    console.error('Failed to fetch sequences:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Fetch sessions log for the last N days with resolved Participants relation.
+ */
+async function getSessionsLog(days = 30) {
+  return deduplicatedFetch('mktops_sessions_' + days, async () => {
+    const notion = getClient();
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const sinceStr = since.toISOString().split('T')[0];
+
+    const sessions = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.SESSIONS_LOG,
+        filter: {
+          property: 'Date',
+          date: { on_or_after: sinceStr },
+        },
+        sorts: [{ property: 'Date', direction: 'descending' }],
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      sessions.push(...response.results.map(page => ({
+        id: page.id,
+        url: page.url,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    // Resolve Participants relation to participantNames
+    const resolved = await Promise.all(sessions.map(async (session) => {
+      const participantIds = Array.isArray(session.Participants) ? session.Participants : [];
+      if (participantIds.length === 0) return { ...session, participantNames: [] };
+
+      const names = await Promise.all(participantIds.slice(0, 10).map(async (id) => {
+        try {
+          const page = await getPageRaw(id);
+          return page
+            ? (page.properties.Name || page.properties.Title || page.properties.name || 'Untitled')
+            : id.slice(0, 8);
+        } catch {
+          return id.slice(0, 8);
+        }
+      }));
+
+      return { ...session, participantNames: names };
+    }));
+
+    return resolved;
+  }).catch(err => {
+    console.error('Failed to fetch sessions log:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Update a campaign's Stage or Status property.
+ */
+async function updateCampaignProperty(pageId, property, value) {
+  return enqueueWrite(async () => {
+    const notion = getClient();
+    const properties = {};
+
+    if (property === 'Stage') {
+      properties.Stage = { select: { name: value } };
+    } else if (property === 'Status') {
+      properties.Status = { select: { name: value } };
+    } else {
+      throw new Error('Unsupported campaign property: ' + property);
+    }
+
+    const result = await withRetry(() => notion.pages.update({
+      page_id: pageId,
+      properties,
+    }));
+
+    // Invalidate marketing ops caches
+    for (const [key] of cache) {
+      if (key.startsWith('mktops_')) cache.delete(key);
+    }
+
+    return { id: result.id, url: result.url };
+  });
+}
+
+/**
+ * Fetch commitments linked to a specific campaign via the Campaign relation.
+ */
+async function getCampaignCommitments(campaignId) {
+  const cacheKey = 'mktops_campaign_commitments_' + campaignId;
+  return deduplicatedFetch(cacheKey, async () => {
+    const allCommitments = await getAllCommitments();
+
+    const linked = allCommitments.filter(c => {
+      const campaignIds = Array.isArray(c.Campaign) ? c.Campaign : [];
+      return campaignIds.includes(campaignId);
+    });
+
+    // Enrich with overdue status
+    const now = new Date();
+    return linked.map(c => {
+      const dueDate = c['Due Date'];
+      const dueStr = dueDate && typeof dueDate === 'object' ? dueDate.start : dueDate;
+      const isOverdue = dueStr && new Date(dueStr) < now && c.Status !== 'Done' && c.Status !== 'Cancelled';
+      return { ...c, isOverdue, dueStr };
+    });
+  }).catch(err => {
+    console.error('Failed to get campaign commitments:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Aggregated Marketing Ops summary with stats.
+ */
+async function getMarketingOpsSummary() {
+  return deduplicatedFetch('mktops_summary', async () => {
+    const [campaigns, content, sequences, sessions] = await Promise.all([
+      getCampaigns(),
+      getContentCalendar(),
+      getSequences(),
+      getSessionsLog(7),
+    ]);
+
+    const activeCampaigns = campaigns.filter(c => c.Stage !== 'Complete').length;
+    const contentInPipeline = content.filter(c => c.Status !== 'Published').length;
+    const liveSequences = sequences.filter(s => s.Status === 'Live' || s.Status === 'Active').length;
+    const sessionsThisWeek = sessions.length;
+    const blockedCampaigns = campaigns.filter(c => c.Status === 'Blocked' || c.Status === 'Needs Dan');
+    const needsReviewContent = content.filter(c => c.Status === 'Brand Review');
+    const unhealthySequences = sequences.filter(s =>
+      (typeof s['Open Rate'] === 'number' && s['Open Rate'] < 15) ||
+      (typeof s['Unsub Rate'] === 'number' && s['Unsub Rate'] > 2)
+    );
+
+    return {
+      campaigns,
+      content,
+      sequences,
+      sessions,
+      stats: {
+        activeCampaigns,
+        contentInPipeline,
+        liveSequences,
+        sessionsThisWeek,
+        blockedCampaigns,
+        needsReviewContent,
+        unhealthySequences,
+      },
+    };
+  }).catch(err => {
+    console.error('Failed to fetch marketing ops summary:', err.message);
+    return { campaigns: [], content: [], sequences: [], sessions: [], stats: {} };
+  });
+}
+
+// ── Tech Team ─────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch all sprint board items, sorted by Priority ascending (P0 first).
+ */
+async function getSprintItems() {
+  return deduplicatedFetch('tech_sprint', async () => {
+    const notion = getClient();
+    const items = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.TECH_SPRINT_BOARD,
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      items.push(...response.results.map(page => ({
+        id: page.id,
+        url: page.url,
+        lastEdited: page.last_edited_time,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    // Sort by Priority ascending (P0 first)
+    const PRIORITY_ORDER = { 'P0 - Critical': 0, 'P1 - High': 1, 'P2 - Medium': 2, 'P3 - Low': 3 };
+    items.sort((a, b) => {
+      const pa = PRIORITY_ORDER[a.Priority] ?? 99;
+      const pb = PRIORITY_ORDER[b.Priority] ?? 99;
+      return pa - pb;
+    });
+
+    return items;
+  }).catch(err => {
+    console.error('Failed to fetch sprint items:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Fetch all spec library items, sorted by Status: Draft → In Review → Approved.
+ */
+async function getSpecLibrary() {
+  return deduplicatedFetch('tech_specs', async () => {
+    const notion = getClient();
+    const specs = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.TECH_SPEC_LIBRARY,
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      specs.push(...response.results.map(page => ({
+        id: page.id,
+        url: page.url,
+        lastEdited: page.last_edited_time,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    const STATUS_ORDER = { 'Draft': 0, 'In Review': 1, 'Approved': 2 };
+    specs.sort((a, b) => {
+      const sa = STATUS_ORDER[a.Status] ?? 99;
+      const sb = STATUS_ORDER[b.Status] ?? 99;
+      return sa - sb;
+    });
+
+    return specs;
+  }).catch(err => {
+    console.error('Failed to fetch spec library:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Fetch all tech decisions, sorted by Date descending (most recent first).
+ * Note: the title property in this DB is called "Decision" (not "Name").
+ */
+async function getTechDecisions() {
+  return deduplicatedFetch('tech_decisions', async () => {
+    const notion = getClient();
+    const decisions = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.TECH_DECISION_LOG,
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      decisions.push(...response.results.map(page => ({
+        id: page.id,
+        url: page.url,
+        lastEdited: page.last_edited_time,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    // Sort by Date descending (most recent first)
+    decisions.sort((a, b) => {
+      const da = a.Date && typeof a.Date === 'object' ? a.Date.start : a.Date;
+      const db2 = b.Date && typeof b.Date === 'object' ? b.Date.start : b.Date;
+      if (!da && !db2) return 0;
+      if (!da) return 1;
+      if (!db2) return -1;
+      return new Date(db2) - new Date(da);
+    });
+
+    return decisions;
+  }).catch(err => {
+    console.error('Failed to fetch tech decisions:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Fetch sprint archive, sorted by Sprint Number descending.
+ */
+async function getSprintArchive() {
+  return deduplicatedFetch('tech_archive', async () => {
+    const notion = getClient();
+    const archive = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.TECH_SPRINT_ARCHIVE,
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      archive.push(...response.results.map(page => ({
+        id: page.id,
+        url: page.url,
+        lastEdited: page.last_edited_time,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    // Sort by Sprint Number descending
+    archive.sort((a, b) => {
+      const na = typeof a['Sprint Number'] === 'number' ? a['Sprint Number'] : 0;
+      const nb = typeof b['Sprint Number'] === 'number' ? b['Sprint Number'] : 0;
+      return nb - na;
+    });
+
+    return archive;
+  }).catch(err => {
+    console.error('Failed to fetch sprint archive:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Aggregated Tech Team summary with stats.
+ */
+async function getTechTeamSummary() {
+  return deduplicatedFetch('tech_summary', async () => {
+    const [sprintItems, specs, techDecisions, sprintArchive] = await Promise.all([
+      getSprintItems(),
+      getSpecLibrary(),
+      getTechDecisions(),
+      getSprintArchive(),
+    ]);
+
+    const inProgress = sprintItems.filter(i => i.Status === 'In Progress').length;
+    const blocked = sprintItems.filter(i => i.Status === 'Blocked').length;
+    const openBugs = sprintItems.filter(i => i.Type === 'Bug' && i.Status !== 'Done' && i.Status !== 'Cancelled').length;
+    const specsInReview = specs.filter(s => s.Status === 'In Review').length;
+    const totalItems = sprintItems.length;
+    const doneItems = sprintItems.filter(i => i.Status === 'Done').length;
+    const waitingOnDan = sprintItems.filter(i => i['Waiting On'] === 'Dan' && i.Status !== 'Done');
+    const p0Bugs = sprintItems.filter(i => i.Type === 'Bug' && typeof i.Priority === 'string' && i.Priority.startsWith('P0')).length;
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentDecisions = techDecisions.filter(d => {
+      const dateStr = d.Date && typeof d.Date === 'object' ? d.Date.start : d.Date;
+      return dateStr && new Date(dateStr) >= sevenDaysAgo;
+    });
+
+    return {
+      sprintItems,
+      specs,
+      techDecisions,
+      sprintArchive,
+      stats: {
+        inProgress,
+        blocked,
+        openBugs,
+        specsInReview,
+        totalItems,
+        doneItems,
+        waitingOnDan,
+        p0Bugs,
+        recentDecisions,
+      },
+    };
+  }).catch(err => {
+    console.error('Failed to fetch tech team summary:', err.message);
+    return { sprintItems: [], specs: [], techDecisions: [], sprintArchive: [], stats: {} };
+  });
+}
+
+/**
+ * Update a sprint item's Status, Priority, or Waiting On property.
+ */
+async function updateSprintItemProperty(pageId, property, value) {
+  return enqueueWrite(async () => {
+    const notion = getClient();
+    const properties = {};
+
+    if (property === 'Status') {
+      properties.Status = { select: { name: value } };
+    } else if (property === 'Priority') {
+      properties.Priority = { select: { name: value } };
+    } else if (property === 'Waiting On') {
+      properties['Waiting On'] = { select: { name: value } };
+    } else {
+      throw new Error('Unsupported sprint item property: ' + property);
+    }
+
+    const result = await withRetry(() => notion.pages.update({
+      page_id: pageId,
+      properties,
+    }));
+
+    // Invalidate all tech caches
+    for (const [key] of cache) {
+      if (key.startsWith('tech_')) cache.delete(key);
+    }
+
+    return { id: result.id, url: result.url };
+  });
+}
+
 module.exports = {
   DB,
   getClient,
   simplify,
   resolveRelations,
+  resolveRelationIdsToNamedItems,
   getFocusAreas,
   getCommitments,
   getOverdueCommitments,
@@ -1114,6 +2146,8 @@ module.exports = {
   getAllCommitments,
   getCommitmentsForKanban,
   getDashboardSummary,
+  buildMorningBriefFromDashboard,
+  getMorningBrief,
   listDatabases,
   queryDatabase,
   getPage,
@@ -1121,4 +2155,25 @@ module.exports = {
   getRelatedPages,
   getKeyPages,
   clearCache,
+  invalidateCommitmentCaches,
+  createCommitment,
+  createDecision,
+  updateCommitmentStatus,
+  updateCommitmentPriority,
+  updateCommitmentDueDate,
+  updateCommitmentAssignee,
+  appendCommitmentNote,
+  getCampaigns,
+  getContentCalendar,
+  getSequences,
+  getSessionsLog,
+  getMarketingOpsSummary,
+  updateCampaignProperty,
+  getCampaignCommitments,
+  getSprintItems,
+  getSpecLibrary,
+  getTechDecisions,
+  getSprintArchive,
+  getTechTeamSummary,
+  updateSprintItemProperty,
 };

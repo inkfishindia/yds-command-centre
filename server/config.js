@@ -12,6 +12,10 @@ module.exports = {
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   NOTION_TOKEN: process.env.NOTION_TOKEN,
   MODEL: 'claude-opus-4-20250514',
+  GOOGLE_SERVICE_ACCOUNT_KEY: process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '',
+  GOOGLE_SHEETS_ID: process.env.GOOGLE_SHEETS_ID || '',
+  GITHUB_TOKEN: process.env.GITHUB_TOKEN || '',
+  STRATEGY_SHEETS_ID: process.env.STRATEGY_SHEETS_ID || '',
 
   // Colin's workspace paths
   COLIN_WORKSPACE,

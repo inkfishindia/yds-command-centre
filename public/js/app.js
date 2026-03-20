@@ -3,11 +3,10 @@
  * Uses Alpine.js for reactivity, marked.js for markdown rendering.
  */
 
-// Configure marked for safe rendering
-marked.setOptions({
-  breaks: true,
-  gfm: true,
-});
+import { configureMarkdown } from './modules/markdown.js';
+import { createDashboardModule } from './modules/dashboard.js';
+
+configureMarkdown();
 
 function app() {
   return {
@@ -37,15 +36,51 @@ function app() {
       { name: 'Emily', domain: 'Marketing campaigns', icon: 'E' },
     ],
 
-    // Dashboard
-    dashboard: null,
-    dashboardLoading: false,
-    upcomingCommitments: [],
-    expandedDecision: null,
-    expandedCommitmentRow: null,
-    showCompletedThisWeek: false,
-    lastRefresh: null,
-    refreshIntervalId: null,
+    ...createDashboardModule(),
+
+    // Registry
+    registry: null,
+    registryLoading: false,
+    registryFilter: '',
+    registryTypeFilter: '',
+    registryExpanded: null,
+
+    // Knowledge Base
+    notebooks: null,
+    notebooksLoading: false,
+    notebooksSearch: '',
+    notebooksCategory: '',
+    notebooksExpanded: null,
+
+    // Marketing Ops
+    mktops: null,
+    mktopsLoading: false,
+    mktopsSection: 'campaigns',
+    mktopsCampaignSearch: '',
+    mktopsStatusFilter: '',
+    mktopsJourneyFilter: '',
+    mktopsLastRefresh: null,
+    mktopsSequenceView: 'table',
+    mktopsActionLoading: null,
+    mktopsCampaignCommitments: null,
+    mktopsCampaignCommitmentsLoading: false,
+    mktopsMetrics: null,
+    mktopsMetricsExpanded: false,
+
+    // Tech Team
+    techTeam: null,
+    techTeamLoading: false,
+    techTeamSection: 'command',
+    techTeamLastRefresh: null,
+    techSystemFilter: '',
+    techPriorityFilter: '',
+    techTypeFilter: '',
+    techSprintSearch: '',
+    techActionLoading: null,
+    techExpandedItem: null,
+    techAgents: null,
+    techStrategy: null,
+    techGithub: null,
 
     // Projects
     projects: [],
@@ -64,6 +99,57 @@ function app() {
     commitmentsLoading: false,
     commitmentsView: 'kanban', // 'kanban' | 'list'
     commitmentFilters: { focusArea: '', person: '', priority: '', status: '' },
+
+    // Factory capacity
+    factoryZoneDetail: null,
+    factorySimOpen: false,
+    factorySimConfig: null,
+    factorySimPreset: 'current',
+    _factoryBaseCache: null,
+    factoryConfig: null,
+    factoryConfigLoading: false,
+    factoryEditingMachine: null,
+    factoryEditingZone: null,
+    factoryShowFormulas: false,
+    factoryMachineEdits: {},
+    factoryZoneEdits: {},
+    factoryOperatingEdits: {},
+    factoryEditingOperating: false,
+    factoryError: null,
+
+    // Write-back state
+    editDropdown: null,
+    undoToast: null,
+    quickNoteText: '',
+    quickNoteSaving: false,
+    writeErrors: {},
+    peopleList: [],
+
+    // Quick-create modals
+    showCreateCommitment: false,
+    showCreateDecision: false,
+    submittingCommitment: false,
+    submittingDecision: false,
+    newCommitment: { name: '', assigneeId: '', dueDate: '', focusAreaId: '', priority: 'Medium', notes: '' },
+    newDecision: { name: '', decision: '', rationale: '', context: '', focusAreaId: '', owner: 'Dan' },
+
+    // Inline action state (dashboard commitment rows)
+    showSnoozeFor: null,
+    showReassignFor: null,
+    actionFeedback: null,
+
+    // Action Queue
+    actionQueue: null,
+    actionQueueLoading: false,
+    queueTab: 'dan', // 'dan' | 'runner'
+
+    // Pipeline
+    pipeline: null,
+    pipelineLoading: false,
+
+    // Decisions standalone view
+    decisions: [],
+    decisionsLoading: false,
 
     // Decisions filters
     decisionDateRange: 'all', // 'week' | 'month' | '3months' | 'all'
@@ -100,6 +186,17 @@ function app() {
     cmdSearch: '',
     cmdSelectedIndex: 0,
 
+    // Keyboard chord navigation
+    _chordPending: null,
+    _chordTimeout: null,
+
+    // Visibility-based auto-refresh
+    _lastVisible: Date.now(),
+    _requestControllers: {},
+
+    // Bulk overdue selection
+    selectedOverdue: [],
+
     // Initialization
     async init() {
       // Check server health
@@ -120,25 +217,116 @@ function app() {
         console.error('Failed to load skills:', err);
       }
 
-      // Command palette keyboard shortcut
+      // Command palette keyboard shortcut + chord navigation
       document.addEventListener('keydown', (e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
           e.preventDefault();
           this.toggleCmdPalette();
         }
         if (e.key === 'Escape') {
-          if (this.cmdPaletteOpen) this.closeCmdPalette();
+          if (this._chordPending) {
+            clearTimeout(this._chordTimeout);
+            this._chordPending = null;
+          } else if (this.cmdPaletteOpen) this.closeCmdPalette();
+          else if (this.showCreateCommitment) { this.showCreateCommitment = false; }
+          else if (this.showCreateDecision) { this.showCreateDecision = false; }
+          else if (this.showSnoozeFor) { this.showSnoozeFor = null; }
+          else if (this.showReassignFor) { this.showReassignFor = null; }
           else if (this.detailPanel) this.closeDetailPanel();
+        }
+
+        // Chord and single-key shortcuts — skip when typing in inputs
+        const tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+        // Single-key: / opens command palette
+        if (e.key === '/' && !this._chordPending) {
+          e.preventDefault();
+          this.toggleCmdPalette();
+          return;
+        }
+
+        // Chord first key: g or n
+        if ((e.key === 'g' || e.key === 'n') && !this._chordPending) {
+          e.preventDefault();
+          this._chordPending = e.key;
+          this._chordTimeout = setTimeout(() => { this._chordPending = null; }, 500);
+          return;
+        }
+
+        // Chord second key
+        if (this._chordPending) {
+          clearTimeout(this._chordTimeout);
+          const chord = this._chordPending + e.key;
+          this._chordPending = null;
+          e.preventDefault();
+          switch (chord) {
+            case 'gh': this.view = 'dashboard'; this.loadDashboard(); break;
+            case 'gt': this.view = 'team'; this.loadTeam(); break;
+            case 'gq': this.view = 'actionQueue'; this.loadActionQueue(); break;
+            case 'gp': this.view = 'projects'; this.loadProjects(); break;
+            case 'gc': this.view = 'chat'; break;
+            case 'gd': this.view = 'docs'; this.loadDocuments(); break;
+            case 'gl': this.view = 'decisions'; this.loadDecisions(); break;
+            case 'gr': this.view = 'registry'; this.loadRegistry(); break;
+            case 'gk': this.view = 'knowledge'; this.loadNotebooks(); break;
+            case 'gm': this.view = 'marketingOps'; this.loadMarketingOps(); break;
+            case 'ge': this.view = 'techTeam'; this.loadTechTeam(); break;
+            case 'nc': this.showCreateCommitment = true; break;
+            case 'nd': this.showCreateDecision = true; break;
+          }
+        }
+      });
+
+      // Visibility-based auto-refresh
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          this._lastVisible = Date.now();
+        } else {
+          const away = Date.now() - this._lastVisible;
+          if (away > 60000 && this.view === 'dashboard') {
+            this.loadDashboard();
+          }
+        }
+      });
+
+      // Click outside closes edit dropdown
+      document.addEventListener('click', (e) => {
+        if (this.editDropdown && !e.target.closest('.edit-dropdown') && !e.target.closest('.editable-badge')) {
+          this.editDropdown = null;
         }
       });
 
       // Auto-load dashboard on start
+      if (window.innerWidth <= 768) {
+        this.commitmentsView = 'list';
+      }
       this.loadDashboard();
 
       // Auto-refresh dashboard every 5 minutes
       this.refreshIntervalId = setInterval(() => {
         this.loadDashboard();
       }, 300000);
+    },
+
+    beginRequest(key) {
+      if (this._requestControllers[key]) {
+        this._requestControllers[key].abort();
+      }
+      const controller = new AbortController();
+      this._requestControllers[key] = controller;
+      return controller.signal;
+    },
+
+    endRequest(key, signal) {
+      if (this._requestControllers[key] && this._requestControllers[key].signal === signal) {
+        delete this._requestControllers[key];
+      }
+    },
+
+    isAbortError(err) {
+      return err && err.name === 'AbortError';
     },
 
     // --- Chat ---
@@ -284,22 +472,22 @@ function app() {
       }
     },
 
-    // --- Dashboard ---
+    formatDueDate(c) {
+      if (!c.dueDate) return '—';
+      const label = this.formatDate(c.dueDate);
+      if (c.isOverdue && c.daysOverdue > 0) return `${label} (${c.daysOverdue}d overdue)`;
+      return label;
+    },
 
-    async loadDashboard() {
-      this.expandedDecision = null;
-      this.expandedCommitmentRow = null;
-      this.dashboardLoading = true;
-      try {
-        const res = await fetch('/api/notion/dashboard');
-        this.dashboard = await res.json();
-        this.upcomingCommitments = this.dashboard.upcoming || [];
-        this.lastRefresh = new Date();
-      } catch (err) {
-        console.error('Dashboard error:', err);
-      } finally {
-        this.dashboardLoading = false;
-      }
+    getLoadBarClass(count) {
+      if (count >= 8) return 'red';
+      if (count >= 5) return 'amber';
+      return 'green';
+    },
+
+    getHealthDotClass(person) {
+      const cls = this.getPersonHealthClass(person);
+      return cls.replace('health-', '');
     },
 
     toggleCommitmentRow(key) {
@@ -399,17 +587,347 @@ function app() {
       return 'Due ' + month + ' ' + day;
     },
 
+    // --- Registry ---
+
+    async loadRegistry() {
+      const signal = this.beginRequest('registry');
+      this.registryLoading = true;
+      try {
+        const res = await fetch('/api/registry', { signal });
+        if (res.ok) this.registry = await res.json();
+      } catch (err) {
+        if (this.isAbortError(err)) return;
+        console.error('Registry load error:', err);
+      } finally {
+        this.endRequest('registry', signal);
+        this.registryLoading = false;
+      }
+    },
+
+    getFilteredRegistry() {
+      if (!this.registry) return [];
+      let projects = this.registry.projects;
+      if (this.registryFilter) projects = projects.filter(p => p.status === this.registryFilter);
+      if (this.registryTypeFilter) projects = projects.filter(p => p.type === this.registryTypeFilter);
+      return projects;
+    },
+
+    getRegistryStatusClass(status) {
+      const map = { 'active': 'reg-active', 'in-progress': 'reg-building', 'back-burner': 'reg-paused', 'not-started': 'reg-planned' };
+      return map[status] || '';
+    },
+
+    getRegistryTypeLabel(type) {
+      const map = { 'agent-system': 'AI Team', 'app': 'App', 'backend': 'Backend', 'knowledge-base': 'Knowledge', 'integration': 'Integration' };
+      return map[type] || type;
+    },
+
+    getRegistryTypeClass(type) {
+      const map = { 'agent-system': 'reg-type-agent', 'app': 'reg-type-app', 'backend': 'reg-type-backend', 'knowledge-base': 'reg-type-knowledge', 'integration': 'reg-type-integration' };
+      return map[type] || '';
+    },
+
+    // --- Knowledge Base ---
+
+    async loadNotebooks() {
+      const signal = this.beginRequest('notebooks');
+      this.notebooksLoading = true;
+      try {
+        const res = await fetch('/api/notebooks', { signal });
+        if (res.ok) this.notebooks = await res.json();
+      } catch (err) {
+        if (this.isAbortError(err)) return;
+        console.error('Notebooks load error:', err);
+      } finally {
+        this.endRequest('notebooks', signal);
+        this.notebooksLoading = false;
+      }
+    },
+
+    getFilteredNotebooks() {
+      if (!this.notebooks || !this.notebooks.available) return [];
+      let categories = this.notebooks.categories;
+
+      if (this.notebooksCategory) {
+        categories = categories.filter(c => c.name === this.notebooksCategory);
+      }
+
+      if (this.notebooksSearch.trim()) {
+        const q = this.notebooksSearch.toLowerCase().trim();
+        categories = categories.map(c => ({
+          ...c,
+          notebooks: c.notebooks.filter(n =>
+            n.name.toLowerCase().includes(q) ||
+            n.description.toLowerCase().includes(q)
+          )
+        })).filter(c => c.notebooks.length > 0);
+      }
+
+      return categories;
+    },
+
+    getTotalFilteredNotebooks() {
+      return this.getFilteredNotebooks().reduce((sum, c) => sum + c.notebooks.length, 0);
+    },
+
+    // --- Marketing Ops ---
+
+    async loadMarketingOps() {
+      const signal = this.beginRequest('mktops');
+      this.mktopsLoading = true;
+      try {
+        const [data, metricsRes] = await Promise.all([
+          fetch('/api/marketing-ops', { signal }).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch('/api/marketing-ops/metrics', { signal }).then(r => r.ok ? r.json() : null).catch(() => null)
+        ]);
+        if (!data) return;
+        this.mktops = data;
+        this.mktopsMetrics = metricsRes ? Object.values(metricsRes).map(m => ({ ...m })) : null;
+        this.mktopsLastRefresh = new Date();
+      } catch (e) {
+        if (this.isAbortError(e)) return;
+        console.error('Marketing ops error:', e);
+      } finally {
+        this.mktopsLoading = false;
+        this.endRequest('mktops', signal);
+      }
+    },
+
+    getCampaignsByStage(stage) {
+      if (!this.mktops?.campaigns) return [];
+      return this.mktops.campaigns.filter(c => {
+        if (c.Stage !== stage) return false;
+        if (this.mktopsStatusFilter && c.Status !== this.mktopsStatusFilter) return false;
+        if (this.mktopsCampaignSearch) {
+          const q = this.mktopsCampaignSearch.toLowerCase();
+          const name = (c.Name || '').toLowerCase();
+          const owners = (c.ownerNames || []).join(' ').toLowerCase();
+          if (!name.includes(q) && !owners.includes(q)) return false;
+        }
+        return true;
+      });
+    },
+
+    getContentByStatus(status) {
+      if (!this.mktops?.content) return [];
+      return this.mktops.content.filter(c => c.Status === status);
+    },
+
+    getSequenceHealth(seq) {
+      if ((seq['Unsub Rate'] || 0) > 2) return 'critical';
+      if ((seq['Open Rate'] || 100) < 15) return 'warning';
+      return 'healthy';
+    },
+
+    getFilteredSequences() {
+      if (!this.mktops?.sequences) return [];
+      if (!this.mktopsJourneyFilter) return this.mktops.sequences;
+      return this.mktops.sequences.filter(s => s['Journey Stage'] === this.mktopsJourneyFilter);
+    },
+
+    getMktopsRefreshLabel() {
+      if (!this.mktopsLastRefresh) return '';
+      const seconds = Math.floor((Date.now() - this.mktopsLastRefresh.getTime()) / 1000);
+      if (seconds < 10) return 'Just now';
+      if (seconds < 60) return seconds + 's ago';
+      const minutes = Math.floor(seconds / 60);
+      return minutes + 'm ago';
+    },
+
+    formatMktDate(dateVal) {
+      if (!dateVal) return '';
+      const d = typeof dateVal === 'string' ? dateVal : dateVal.start;
+      if (!d) return '';
+      return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    },
+
+    getSequencesByJourneyStage(stage) {
+      if (!this.mktops?.sequences) return [];
+      return this.getFilteredSequences().filter(s => (s['Journey Stage'] || 'Awareness') === stage);
+    },
+
+    async campaignAction(id, property, value) {
+      this.mktopsActionLoading = id;
+      try {
+        const res = await fetch(`/api/marketing-ops/campaigns/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ property, value })
+        });
+        if (!res.ok) throw new Error('Action failed');
+        await this.loadMarketingOps();
+      } catch (e) {
+        console.error('Campaign action failed:', e);
+      } finally {
+        this.mktopsActionLoading = null;
+      }
+    },
+
+    getCampaignActions(c) {
+      const actions = [];
+      const stage = c.Stage || '';
+      if (stage === 'Briefing') actions.push({ label: 'Start', property: 'Stage', value: 'In Progress' });
+      if (stage === 'In Progress') actions.push({ label: 'To Review', property: 'Stage', value: 'Review' });
+      if (stage === 'Review') actions.push({ label: 'Go Live', property: 'Stage', value: 'Live' });
+      if (stage === 'Live') actions.push({ label: 'Complete', property: 'Stage', value: 'Complete' });
+      if (c.Status !== 'Blocked') actions.push({ label: 'Block', property: 'Status', value: 'Blocked' });
+      return actions;
+    },
+
+    async loadCampaignCommitments(id) {
+      const signal = this.beginRequest('campaignCommitments');
+      this.mktopsCampaignCommitmentsLoading = true;
+      this.mktopsCampaignCommitments = null;
+      try {
+        const res = await fetch(`/api/marketing-ops/campaigns/${id}/commitments`, { signal });
+        if (res.ok) this.mktopsCampaignCommitments = await res.json();
+      } catch (e) {
+        if (this.isAbortError(e)) return;
+        console.error('Failed to load campaign commitments:', e);
+      } finally {
+        this.mktopsCampaignCommitmentsLoading = false;
+        this.endRequest('campaignCommitments', signal);
+      }
+    },
+
+    // --- Tech Team ---
+
+    async loadTechTeam() {
+      const signal = this.beginRequest('techTeam');
+      this.techTeamLoading = true;
+      try {
+        const [data, agentsRes, strategyRes, githubRes] = await Promise.all([
+          fetch('/api/tech-team', { signal }).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch('/api/tech-team/agents', { signal }).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch('/api/tech-team/strategy', { signal }).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch('/api/tech-team/github', { signal }).then(r => r.ok ? r.json() : null).catch(() => null),
+        ]);
+        if (!data) return;
+        this.techTeam = data;
+        this.techAgents = agentsRes;
+        this.techStrategy = strategyRes;
+        this.techGithub = githubRes;
+        this.techTeamLastRefresh = new Date();
+      } catch (e) {
+        if (this.isAbortError(e)) return;
+        console.error('Tech team error:', e);
+      } finally {
+        this.techTeamLoading = false;
+        this.endRequest('techTeam', signal);
+      }
+    },
+
+    getSprintItemsByStatus(status) {
+      if (!this.techTeam?.sprintItems) return [];
+      return this.techTeam.sprintItems.filter(i => {
+        if (i.Status !== status) return false;
+        if (this.techSystemFilter && i.System !== this.techSystemFilter) return false;
+        if (this.techPriorityFilter && i.Priority !== this.techPriorityFilter) return false;
+        if (this.techTypeFilter && i.Type !== this.techTypeFilter) return false;
+        if (this.techSprintSearch) {
+          const q = this.techSprintSearch.toLowerCase();
+          const name = (i.Name || '').toLowerCase();
+          const bugId = (i['Bug ID'] || '').toLowerCase();
+          if (!name.includes(q) && !bugId.includes(q)) return false;
+        }
+        return true;
+      });
+    },
+
+    getTechBugs() {
+      if (!this.techTeam?.sprintItems) return [];
+      return this.techTeam.sprintItems.filter(i => i.Type === 'Bug' && i.Status !== 'Cancelled');
+    },
+
+    getTechBugStats() {
+      const bugs = this.getTechBugs().filter(b => b.Status !== 'Done');
+      const stats = { total: bugs.length, byPriority: {}, bySystem: {} };
+      bugs.forEach(b => {
+        const p = b.Priority || 'Unset';
+        const s = b.System || 'Unset';
+        stats.byPriority[p] = (stats.byPriority[p] || 0) + 1;
+        stats.bySystem[s] = (stats.bySystem[s] || 0) + 1;
+      });
+      return stats;
+    },
+
+    getSpecsByStatus(status) {
+      if (!this.techTeam?.specs) return [];
+      return this.techTeam.specs.filter(s => s.Status === status);
+    },
+
+    getRoadmapByHorizon(horizon) {
+      if (!this.techTeam?.sprintItems) return [];
+      return this.techTeam.sprintItems.filter(i => i.Horizon === horizon && i.Status !== 'Done' && i.Status !== 'Cancelled');
+    },
+
+    getVelocityData() {
+      if (!this.techTeam?.sprintArchive) return [];
+      return this.techTeam.sprintArchive.filter(s => s['Items Planned']).map(s => ({
+        name: s['Sprint Name'] || `Sprint ${s['Sprint Number']}`,
+        planned: s['Items Planned'] || 0,
+        completed: s['Items Completed'] || 0,
+        hoursPlanned: s['Total Hours Planned'] || 0,
+        hoursCompleted: s['Total Hours Completed'] || 0,
+        pct: s['Items Planned'] ? Math.round((s['Items Completed'] / s['Items Planned']) * 100) : 0,
+      }));
+    },
+
+    getTechRefreshLabel() {
+      if (!this.techTeamLastRefresh) return '';
+      const mins = Math.floor((Date.now() - this.techTeamLastRefresh) / 60000);
+      if (mins < 1) return 'Just now';
+      return `${mins}m ago`;
+    },
+
+    async techSprintAction(id, property, value) {
+      this.techActionLoading = id;
+      try {
+        const res = await fetch(`/api/tech-team/sprint/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ property, value })
+        });
+        if (res.ok) await this.loadTechTeam();
+      } catch (e) {
+        console.error('Tech sprint action error:', e);
+      } finally {
+        this.techActionLoading = null;
+      }
+    },
+
+    getTechSystems() {
+      if (!this.techTeam?.sprintItems) return [];
+      return [...new Set(this.techTeam.sprintItems.map(i => i.System).filter(Boolean))].sort();
+    },
+
+    getTechPriorityClass(priority) {
+      if (!priority) return '';
+      if (priority.startsWith('P0')) return 'tech-priority-critical';
+      if (priority.startsWith('P1')) return 'tech-priority-high';
+      if (priority.startsWith('P2')) return 'tech-priority-medium';
+      return 'tech-priority-low';
+    },
+
+    getTechTypeClass(type) {
+      if (!type) return '';
+      return 'tech-type-' + type.toLowerCase();
+    },
+
     // --- Projects ---
 
     async loadProjects() {
+      const signal = this.beginRequest('projects');
       this.projectsLoading = true;
       try {
-        const res = await fetch('/api/notion/projects');
+        const res = await fetch('/api/notion/projects', { signal });
         const data = await res.json();
         this.projects = data.projects || [];
       } catch (err) {
+        if (this.isAbortError(err)) return;
         console.error('Projects load error:', err);
       } finally {
+        this.endRequest('projects', signal);
         this.projectsLoading = false;
       }
     },
@@ -512,14 +1030,17 @@ function app() {
     // --- Commitments Kanban ---
 
     async loadCommitments() {
+      const signal = this.beginRequest('commitments');
       this.commitmentsLoading = true;
       try {
-        const res = await fetch('/api/notion/commitments/all');
+        const res = await fetch('/api/notion/commitments/all', { signal });
         const data = await res.json();
         this.commitments = data.commitments || [];
       } catch (err) {
+        if (this.isAbortError(err)) return;
         console.error('Commitments load error:', err);
       } finally {
+        this.endRequest('commitments', signal);
         this.commitmentsLoading = false;
       }
     },
@@ -571,9 +1092,432 @@ function app() {
       };
     },
 
+    // === Commitment Write-Back ===
+
+    async updateCommitmentField(commitmentId, field, newValue, apiPath) {
+      const commitment = this.commitments.find(c => c.id === commitmentId);
+      if (!commitment) return;
+
+      const oldValue = commitment[field];
+      commitment[field] = newValue;
+      this.editDropdown = null;
+
+      // Undo toast for status/priority only
+      if (field === 'Status' || field === 'Priority') {
+        this.showUndoToast(commitmentId, field, oldValue, newValue);
+      }
+
+      delete this.writeErrors[commitmentId + field];
+
+      try {
+        const body = {};
+        body[apiPath === 'status' ? 'status' : 'priority'] = newValue;
+        const res = await fetch(`/api/commitments/${commitmentId}/${apiPath}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          let msg = 'Update failed';
+          try { const err = await res.json(); msg = err.error || msg; } catch {}
+          throw new Error(msg);
+        }
+      } catch (err) {
+        commitment[field] = oldValue;
+        this.writeErrors[commitmentId + field] = err.message;
+        setTimeout(() => { delete this.writeErrors[commitmentId + field]; }, 4000);
+        this.dismissUndoToast();
+      }
+    },
+
+    updateStatus(commitmentId, newStatus) {
+      this.updateCommitmentField(commitmentId, 'Status', newStatus, 'status');
+    },
+
+    updatePriority(commitmentId, newPriority) {
+      this.updateCommitmentField(commitmentId, 'Priority', newPriority, 'priority');
+    },
+
+    async updateDueDate(commitmentId, newDate) {
+      const commitment = this.commitments.find(c => c.id === commitmentId);
+      if (!commitment) return;
+
+      const oldValue = commitment['Due Date'];
+      commitment['Due Date'] = { start: newDate, end: null };
+      this.editDropdown = null;
+      delete this.writeErrors[commitmentId + 'dueDate'];
+
+      try {
+        const res = await fetch(`/api/commitments/${commitmentId}/due-date`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dueDate: newDate }),
+        });
+        if (!res.ok) {
+          let msg = 'Update failed';
+          try { const err = await res.json(); msg = err.error || msg; } catch {}
+          throw new Error(msg);
+        }
+      } catch (err) {
+        commitment['Due Date'] = oldValue;
+        this.writeErrors[commitmentId + 'dueDate'] = err.message;
+        setTimeout(() => { delete this.writeErrors[commitmentId + 'dueDate']; }, 4000);
+      }
+    },
+
+    async updateAssignee(commitmentId, personId, personName) {
+      const commitment = this.commitments.find(c => c.id === commitmentId);
+      if (!commitment) return;
+
+      const oldAssignedTo = [...(commitment['Assigned To'] || [])];
+      const oldAssignedNames = [...(commitment.assignedNames || [])];
+
+      commitment['Assigned To'] = [personId];
+      commitment.assignedNames = [personName];
+      this.editDropdown = null;
+      delete this.writeErrors[commitmentId + 'assignee'];
+
+      try {
+        const res = await fetch(`/api/commitments/${commitmentId}/assignee`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ personId: personId.replace(/-/g, '') }),
+        });
+        if (!res.ok) {
+          let msg = 'Update failed';
+          try { const err = await res.json(); msg = err.error || msg; } catch {}
+          throw new Error(msg);
+        }
+      } catch (err) {
+        commitment['Assigned To'] = oldAssignedTo;
+        commitment.assignedNames = oldAssignedNames;
+        this.writeErrors[commitmentId + 'assignee'] = err.message;
+        setTimeout(() => { delete this.writeErrors[commitmentId + 'assignee']; }, 4000);
+      }
+    },
+
+    async submitQuickNote(commitmentId) {
+      const note = this.quickNoteText.trim();
+      if (!note || this.quickNoteSaving) return;
+
+      this.quickNoteSaving = true;
+      delete this.writeErrors[commitmentId + 'notes'];
+
+      try {
+        const res = await fetch(`/api/commitments/${commitmentId}/notes`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note }),
+        });
+        if (!res.ok) {
+          let msg = 'Failed to save note';
+          try { const err = await res.json(); msg = err.error || msg; } catch {}
+          throw new Error(msg);
+        }
+        const result = await res.json();
+        const commitment = this.commitments.find(c => c.id === commitmentId);
+        if (commitment) commitment.Notes = result.notes;
+        // Also update the detail panel if open
+        if (this.detailPanel && this.detailPanel.id === commitmentId && this.detailPanel.properties) {
+          this.detailPanel.properties.Notes = result.notes;
+        }
+        this.quickNoteText = '';
+      } catch (err) {
+        this.writeErrors[commitmentId + 'notes'] = err.message;
+        setTimeout(() => { delete this.writeErrors[commitmentId + 'notes']; }, 4000);
+      } finally {
+        this.quickNoteSaving = false;
+      }
+    },
+
+    // --- Dashboard Quick Actions ---
+
+    async quickMarkDone(item) {
+      try {
+        const res = await fetch(`/api/commitments/${item.id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'Done' }),
+        });
+        if (res.ok) {
+          this.actionFeedback = { type: 'success', message: `"${item.Name || 'Commitment'}" marked done` };
+          setTimeout(() => { this.actionFeedback = null; }, 3000);
+          this.loadDashboard();
+        } else {
+          this.actionFeedback = { type: 'error', message: 'Failed to update status' };
+          setTimeout(() => { this.actionFeedback = null; }, 3000);
+        }
+      } catch {
+        this.actionFeedback = { type: 'error', message: 'Failed to update' };
+        setTimeout(() => { this.actionFeedback = null; }, 3000);
+      }
+    },
+
+    async quickSnooze(itemId, newDate) {
+      try {
+        const res = await fetch(`/api/commitments/${itemId}/due-date`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dueDate: newDate }),
+        });
+        if (res.ok) {
+          this.showSnoozeFor = null;
+          this.actionFeedback = { type: 'success', message: 'Due date updated' };
+          setTimeout(() => { this.actionFeedback = null; }, 3000);
+          this.loadDashboard();
+        } else {
+          this.actionFeedback = { type: 'error', message: 'Failed to snooze' };
+          setTimeout(() => { this.actionFeedback = null; }, 3000);
+        }
+      } catch {
+        this.actionFeedback = { type: 'error', message: 'Failed to snooze' };
+        setTimeout(() => { this.actionFeedback = null; }, 3000);
+      }
+    },
+
+    async quickReassign(itemId, personId, personName) {
+      try {
+        const res = await fetch(`/api/commitments/${itemId}/assignee`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ personId }),
+        });
+        if (res.ok) {
+          this.showReassignFor = null;
+          this.actionFeedback = { type: 'success', message: `Reassigned to ${personName}` };
+          setTimeout(() => { this.actionFeedback = null; }, 3000);
+          this.loadDashboard();
+        } else {
+          this.actionFeedback = { type: 'error', message: 'Failed to reassign' };
+          setTimeout(() => { this.actionFeedback = null; }, 3000);
+        }
+      } catch {
+        this.actionFeedback = { type: 'error', message: 'Failed to reassign' };
+        setTimeout(() => { this.actionFeedback = null; }, 3000);
+      }
+    },
+
+    getSnoozeDate(preset) {
+      const d = new Date();
+      if (preset === 'tomorrow') d.setDate(d.getDate() + 1);
+      else if (preset === '+3') d.setDate(d.getDate() + 3);
+      else if (preset === '+7') d.setDate(d.getDate() + 7);
+      return d.toISOString().split('T')[0];
+    },
+
+    // --- Bulk Overdue Actions ---
+
+    toggleOverdueSelect(id) {
+      const idx = this.selectedOverdue.indexOf(id);
+      if (idx === -1) this.selectedOverdue.push(id);
+      else this.selectedOverdue.splice(idx, 1);
+    },
+
+    isOverdueSelected(id) {
+      return this.selectedOverdue.includes(id);
+    },
+
+    selectAllOverdue() {
+      if (!this.dashboard || !this.dashboard.overdue) return;
+      if (this.selectedOverdue.length === this.dashboard.overdue.length) {
+        this.selectedOverdue = [];
+      } else {
+        this.selectedOverdue = this.dashboard.overdue.map(c => c.id);
+      }
+    },
+
+    async bulkMarkDone() {
+      if (this.selectedOverdue.length === 0) return;
+      const count = this.selectedOverdue.length;
+      for (const id of this.selectedOverdue) {
+        try {
+          await fetch(`/api/commitments/${id}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'Done' }),
+          });
+        } catch { /* continue */ }
+      }
+      this.selectedOverdue = [];
+      this.actionFeedback = { type: 'success', message: `${count} items marked done` };
+      setTimeout(() => { this.actionFeedback = null; }, 3000);
+      this.loadDashboard();
+    },
+
+    async bulkSnooze(days) {
+      if (this.selectedOverdue.length === 0) return;
+      const count = this.selectedOverdue.length;
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      const newDate = d.toISOString().split('T')[0];
+      for (const id of this.selectedOverdue) {
+        try {
+          await fetch(`/api/commitments/${id}/due-date`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dueDate: newDate }),
+          });
+        } catch { /* continue */ }
+      }
+      this.selectedOverdue = [];
+      this.actionFeedback = { type: 'success', message: `${count} items snoozed +${days}d` };
+      setTimeout(() => { this.actionFeedback = null; }, 3000);
+      this.loadDashboard();
+    },
+
+    // --- Create Modals ---
+
+    async submitCommitment() {
+      this.submittingCommitment = true;
+      try {
+        const res = await fetch('/api/commitments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.newCommitment),
+        });
+        if (res.ok) {
+          this.showCreateCommitment = false;
+          this.newCommitment = { name: '', assigneeId: '', dueDate: '', focusAreaId: '', priority: 'Medium', notes: '' };
+          this.actionFeedback = { type: 'success', message: 'Commitment created' };
+          setTimeout(() => { this.actionFeedback = null; }, 3000);
+          this.loadDashboard();
+        } else {
+          let msg = 'Failed to create';
+          try { const err = await res.json(); msg = err.error || msg; } catch {}
+          this.actionFeedback = { type: 'error', message: msg };
+          setTimeout(() => { this.actionFeedback = null; }, 3000);
+        }
+      } catch {
+        this.actionFeedback = { type: 'error', message: 'Failed to create commitment' };
+        setTimeout(() => { this.actionFeedback = null; }, 3000);
+      } finally {
+        this.submittingCommitment = false;
+      }
+    },
+
+    async submitDecision() {
+      this.submittingDecision = true;
+      try {
+        const res = await fetch('/api/decisions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.newDecision),
+        });
+        if (res.ok) {
+          this.showCreateDecision = false;
+          this.newDecision = { name: '', decision: '', rationale: '', context: '', focusAreaId: '', owner: 'Dan' };
+          this.actionFeedback = { type: 'success', message: 'Decision recorded' };
+          setTimeout(() => { this.actionFeedback = null; }, 3000);
+          this.loadDashboard();
+        } else {
+          let msg = 'Failed to create';
+          try { const err = await res.json(); msg = err.error || msg; } catch {}
+          this.actionFeedback = { type: 'error', message: msg };
+          setTimeout(() => { this.actionFeedback = null; }, 3000);
+        }
+      } catch {
+        this.actionFeedback = { type: 'error', message: 'Failed to create decision' };
+        setTimeout(() => { this.actionFeedback = null; }, 3000);
+      } finally {
+        this.submittingDecision = false;
+      }
+    },
+
+    // --- Dropdown Management ---
+
+    openEditDropdown(commitmentId, field, event) {
+      event.stopPropagation();
+      const rect = event.target.getBoundingClientRect();
+      const options = field === 'Status'
+        ? ['Not Started', 'In Progress', 'Blocked', 'Done', 'Cancelled']
+        : field === 'Priority'
+        ? ['Urgent', 'High', 'Medium', 'Low']
+        : [];
+      this.editDropdown = {
+        commitmentId,
+        field,
+        options,
+        position: { top: rect.bottom + 4, left: rect.left },
+      };
+    },
+
+    openDatePicker(commitmentId, event) {
+      event.stopPropagation();
+      const rect = event.target.getBoundingClientRect();
+      const today = new Date();
+      const fmt = d => d.toISOString().split('T')[0];
+      const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+      const nextFriday = new Date(today); nextFriday.setDate(today.getDate() + ((5 - today.getDay() + 7) % 7 || 7));
+      const nextWeek = new Date(today); nextWeek.setDate(today.getDate() + 7);
+      const nextMonth = new Date(today); nextMonth.setMonth(today.getMonth() + 1);
+
+      this.editDropdown = {
+        commitmentId,
+        field: 'dueDate',
+        shortcuts: [
+          { label: 'Today', value: fmt(today) },
+          { label: 'Tomorrow', value: fmt(tomorrow) },
+          { label: 'Next Friday', value: fmt(nextFriday) },
+          { label: 'Next week', value: fmt(nextWeek) },
+          { label: 'Next month', value: fmt(nextMonth) },
+        ],
+        position: { top: rect.bottom + 4, left: rect.left },
+      };
+    },
+
+    async openPersonPicker(commitmentId, event) {
+      event.stopPropagation();
+      const rect = event.target.getBoundingClientRect();
+
+      if (this.peopleList.length === 0) {
+        try {
+          const res = await fetch('/api/notion/people');
+          const data = await res.json();
+          this.peopleList = data.people || [];
+        } catch (err) {
+          console.error('Failed to load people:', err);
+          return;
+        }
+      }
+
+      this.editDropdown = {
+        commitmentId,
+        field: 'assignee',
+        people: this.peopleList,
+        position: { top: rect.bottom + 4, left: rect.left },
+      };
+    },
+
+    closeEditDropdown() {
+      this.editDropdown = null;
+    },
+
+    // --- Undo Toast ---
+
+    showUndoToast(commitmentId, field, oldValue, newValue) {
+      if (this.undoToast?.timeoutId) clearTimeout(this.undoToast.timeoutId);
+      const timeoutId = setTimeout(() => { this.undoToast = null; }, 5000);
+      this.undoToast = { commitmentId, field, oldValue, newValue, timeoutId };
+    },
+
+    undoLastChange() {
+      if (!this.undoToast) return;
+      const { commitmentId, field, oldValue } = this.undoToast;
+      clearTimeout(this.undoToast.timeoutId);
+      this.undoToast = null;
+      if (field === 'Status') this.updateCommitmentField(commitmentId, 'Status', oldValue, 'status');
+      else if (field === 'Priority') this.updateCommitmentField(commitmentId, 'Priority', oldValue, 'priority');
+    },
+
+    dismissUndoToast() {
+      if (this.undoToast?.timeoutId) clearTimeout(this.undoToast.timeoutId);
+      this.undoToast = null;
+    },
+
     // --- Team ---
 
     async loadTeam() {
+      const signal = this.beginRequest('team');
       this.expandedTeamMember = null;
       this.teamLoading = true;
       try {
@@ -581,13 +1525,15 @@ function app() {
         if (this.dashboard && this.dashboard.people && this.dashboard.people.length) {
           this.teamData = this.dashboard.people;
         } else {
-          const res = await fetch('/api/notion/people');
+          const res = await fetch('/api/notion/people', { signal });
           const data = await res.json();
           this.teamData = data.people;
         }
       } catch (err) {
+        if (this.isAbortError(err)) return;
         console.error('Team error:', err);
       } finally {
+        this.endRequest('team', signal);
         this.teamLoading = false;
       }
     },
@@ -601,23 +1547,30 @@ function app() {
     // --- Documents ---
 
     async loadDocuments() {
+      const signal = this.beginRequest('documents');
       this.docsLoading = true;
       try {
-        const res = await fetch('/api/documents');
+        const res = await fetch('/api/documents', { signal });
         this.documents = await res.json();
       } catch (err) {
+        if (this.isAbortError(err)) return;
         console.error('Documents error:', err);
       } finally {
+        this.endRequest('documents', signal);
         this.docsLoading = false;
       }
     },
 
     async openDocument(category, filename) {
+      const signal = this.beginRequest('activeDocument');
       try {
-        const res = await fetch(`/api/documents/${category}/${encodeURIComponent(filename)}`);
+        const res = await fetch(`/api/documents/${category}/${encodeURIComponent(filename)}`, { signal });
         this.activeDoc = await res.json();
       } catch (err) {
+        if (this.isAbortError(err)) return;
         console.error('Document open error:', err);
+      } finally {
+        this.endRequest('activeDocument', signal);
       }
     },
 
@@ -631,27 +1584,31 @@ function app() {
     // --- Notion Browser ---
 
     async loadNotion() {
+      const signal = this.beginRequest('notionHome');
       this.notionLoading = true;
       this.notionActiveDb = null;
       this.notionActivePage = null;
       this.notionPageContent = '';
       try {
         const [dbRes, kpRes] = await Promise.all([
-          fetch('/api/notion/databases'),
-          fetch('/api/notion/key-pages'),
+          fetch('/api/notion/databases', { signal }),
+          fetch('/api/notion/key-pages', { signal }),
         ]);
         const dbData = await dbRes.json();
         const kpData = await kpRes.json();
         this.notionDatabases = dbData.databases;
         this.notionKeyPages = kpData.pages;
       } catch (err) {
+        if (this.isAbortError(err)) return;
         console.error('Notion load error:', err);
       } finally {
+        this.endRequest('notionHome', signal);
         this.notionLoading = false;
       }
     },
 
     async openNotionDb(db) {
+      const signal = this.beginRequest('notionDb');
       this.notionLoading = true;
       this.notionActiveDb = db;
       this.notionActivePage = null;
@@ -660,14 +1617,16 @@ function app() {
       this.notionSearchQuery = '';
       this.notionFilterStatus = '';
       try {
-        const res = await fetch(`/api/notion/databases/${db.id}`);
+        const res = await fetch(`/api/notion/databases/${db.id}`, { signal });
         const data = await res.json();
         this.notionEntries = data.results;
         this.notionHasMore = data.hasMore;
         this.notionNextCursor = data.nextCursor;
       } catch (err) {
+        if (this.isAbortError(err)) return;
         console.error('Database query error:', err);
       } finally {
+        this.endRequest('notionDb', signal);
         this.notionLoading = false;
       }
     },
@@ -707,21 +1666,26 @@ function app() {
 
     async loadMoreEntries() {
       if (!this.notionHasMore || !this.notionNextCursor || !this.notionActiveDb) return;
+      const signal = this.beginRequest('notionMoreEntries');
       this.notionLoading = true;
       try {
-        const res = await fetch(`/api/notion/databases/${this.notionActiveDb.id}?cursor=${this.notionNextCursor}`);
+        const res = await fetch(`/api/notion/databases/${this.notionActiveDb.id}?cursor=${this.notionNextCursor}`, { signal });
         const data = await res.json();
         this.notionEntries = [...this.notionEntries, ...data.results];
         this.notionHasMore = data.hasMore;
         this.notionNextCursor = data.nextCursor;
       } catch (err) {
+        if (this.isAbortError(err)) return;
         console.error('Load more error:', err);
       } finally {
+        this.endRequest('notionMoreEntries', signal);
         this.notionLoading = false;
       }
     },
 
     async openNotionPage(pageId, pageName) {
+      const pageSignal = this.beginRequest('notionPage');
+      const relatedSignal = this.beginRequest('notionRelated');
       this.notionLoading = true;
       this.notionActivePage = { id: pageId, name: pageName || 'Loading...' };
       this.notionPageContent = '';
@@ -729,8 +1693,8 @@ function app() {
       this.notionRelatedLoading = true;
       try {
         const [pageRes, contentRes] = await Promise.all([
-          fetch(`/api/notion/pages/${pageId}`),
-          fetch(`/api/notion/pages/${pageId}/content`),
+          fetch(`/api/notion/pages/${pageId}`, { signal: pageSignal }),
+          fetch(`/api/notion/pages/${pageId}/content`, { signal: pageSignal }),
         ]);
         const page = await pageRes.json();
         const content = await contentRes.json();
@@ -745,21 +1709,32 @@ function app() {
         this.notionPageContent = content.markdown || '*No content*';
 
         // Fetch related pages in background
-        fetch(`/api/notion/pages/${pageId}/related`)
+        fetch(`/api/notion/pages/${pageId}/related`, { signal: relatedSignal })
           .then(r => r.json())
           .then(data => { this.notionRelated = data.related || {}; })
-          .catch(() => { this.notionRelated = {}; })
-          .finally(() => { this.notionRelatedLoading = false; });
+          .catch((err) => {
+            if (!this.isAbortError(err)) this.notionRelated = {};
+          })
+          .finally(() => {
+            this.endRequest('notionRelated', relatedSignal);
+            this.notionRelatedLoading = false;
+          });
       } catch (err) {
+        if (this.isAbortError(err)) return;
         console.error('Page load error:', err);
         this.notionPageContent = '*Failed to load page content*';
         this.notionRelatedLoading = false;
       } finally {
+        this.endRequest('notionPage', pageSignal);
         this.notionLoading = false;
       }
     },
 
     notionBack() {
+      if (this._requestControllers.notionPage) this._requestControllers.notionPage.abort();
+      if (this._requestControllers.notionRelated) this._requestControllers.notionRelated.abort();
+      if (this._requestControllers.notionDb) this._requestControllers.notionDb.abort();
+      if (this._requestControllers.notionMoreEntries) this._requestControllers.notionMoreEntries.abort();
       if (this.notionActivePage) {
         this.notionActivePage = null;
         this.notionPageContent = '';
@@ -847,11 +1822,12 @@ function app() {
     // --- Detail Panel ---
 
     async openDetailPanel(pageId, pageName) {
+      const signal = this.beginRequest('detailPanel');
       this.detailPanel = { id: pageId, name: pageName || 'Loading...', loading: true, properties: null, content: null, url: null };
       try {
         const [pageRes, contentRes] = await Promise.all([
-          fetch(`/api/notion/pages/${pageId}`),
-          fetch(`/api/notion/pages/${pageId}/content`),
+          fetch(`/api/notion/pages/${pageId}`, { signal }),
+          fetch(`/api/notion/pages/${pageId}/content`, { signal }),
         ]);
         const page = await pageRes.json();
         const content = await contentRes.json();
@@ -864,15 +1840,19 @@ function app() {
           loading: false,
         };
       } catch (err) {
+        if (this.isAbortError(err)) return;
         console.error('Detail panel error:', err);
         if (this.detailPanel) {
           this.detailPanel.loading = false;
           this.detailPanel.content = '*Failed to load*';
         }
+      } finally {
+        this.endRequest('detailPanel', signal);
       }
     },
 
     closeDetailPanel() {
+      if (this._requestControllers.detailPanel) this._requestControllers.detailPanel.abort();
       this.detailPanel = null;
     },
 
@@ -912,6 +1892,11 @@ function app() {
         { group: 'Navigation', label: 'Commitments', action: 'commitments' },
         { group: 'Navigation', label: 'Team', action: 'team' },
         { group: 'Navigation', label: 'Documents', action: 'docs' },
+        { group: 'Navigation', label: 'Decision Log', action: 'decisions' },
+        { group: 'Navigation', label: 'Project Registry', action: 'registry' },
+        { group: 'Navigation', label: 'Knowledge Base', action: 'knowledge' },
+        { group: 'Navigation', label: 'Marketing Ops', action: 'marketingOps' },
+        { group: 'Navigation', label: 'Tech Team', action: 'techTeam' },
         { group: 'Navigation', label: 'Notion', action: 'notion' },
       ];
 
@@ -938,6 +1923,49 @@ function app() {
 
       const all = [...tabs, ...databases, ...keyPages, ...skillItems];
 
+      // Add people from loaded team data
+      if (this.teamData.length > 0) {
+        this.teamData.forEach(p => {
+          all.push({ group: 'People', label: p.Name || p.name || 'Unknown', personRef: p });
+        });
+      }
+
+      // Add focus areas from dashboard
+      if (this.dashboard && this.dashboard.focusAreas) {
+        this.dashboard.focusAreas.forEach(fa => {
+          all.push({ group: 'Focus Areas', label: fa.Name || fa.name || 'Unknown', focusAreaRef: fa });
+        });
+      }
+
+      // Add overdue commitments from dashboard
+      if (this.dashboard && this.dashboard.overdue) {
+        this.dashboard.overdue.forEach(c => {
+          const name = c.Name || c.name || 'Untitled';
+          all.push({ group: 'Overdue', label: name, commitmentRef: c });
+        });
+      }
+
+      // Add campaigns from marketing ops
+      if (this.mktops && this.mktops.campaigns) {
+        this.mktops.campaigns.forEach(c => {
+          all.push({ group: 'Campaigns', label: c.Name || 'Untitled', campaignRef: c });
+        });
+      }
+
+      // Add content from marketing ops
+      if (this.mktops && this.mktops.content) {
+        this.mktops.content.forEach(c => {
+          all.push({ group: 'Content', label: c.Name || 'Untitled', contentRef: c });
+        });
+      }
+
+      // Add sprint items from tech team
+      if (this.techTeam?.sprintItems) {
+        this.techTeam.sprintItems.slice(0, 50).forEach(item => {
+          all.push({ group: 'Sprint Items', label: `${item['Bug ID'] ? item['Bug ID'] + ' ' : ''}${item.Name || 'Untitled'}`, techItemRef: item });
+        });
+      }
+
       if (!q) return all;
       return all.filter(item => item.label.toLowerCase().includes(q));
     },
@@ -960,6 +1988,11 @@ function app() {
         else if (item.action === 'commitments') this.loadCommitments();
         else if (item.action === 'team') this.loadTeam();
         else if (item.action === 'docs') this.loadDocuments();
+        else if (item.action === 'decisions') this.loadDecisions();
+        else if (item.action === 'registry') this.loadRegistry();
+        else if (item.action === 'knowledge') this.loadNotebooks();
+        else if (item.action === 'marketingOps') this.loadMarketingOps();
+        else if (item.action === 'techTeam') this.loadTechTeam();
         else if (item.action === 'notion') this.loadNotion();
       } else if (item.dbRef) {
         this.view = 'notion';
@@ -970,12 +2003,37 @@ function app() {
       } else if (item.skillRef) {
         this.view = 'chat';
         this.triggerSkill(item.skillRef);
+      } else if (item.personRef) {
+        this.openPersonView(item.personRef);
+      } else if (item.focusAreaRef) {
+        this.openFocusAreaView(item.focusAreaRef);
+      } else if (item.commitmentRef) {
+        this.openDetailPanel(item.commitmentRef.id, item.commitmentRef.Name || item.commitmentRef.name);
+      } else if (item.campaignRef) {
+        this.view = 'marketingOps';
+        if (!this.mktops) this.loadMarketingOps();
+        this.mktopsSection = 'campaigns';
+        this.openDetailPanel(item.campaignRef.id, item.campaignRef.Name);
+      } else if (item.contentRef) {
+        this.view = 'marketingOps';
+        if (!this.mktops) this.loadMarketingOps();
+        this.mktopsSection = 'content';
+        this.openDetailPanel(item.contentRef.id, item.contentRef.Name);
+      } else if (item.techItemRef) {
+        this.view = 'techTeam';
+        this.loadTechTeam();
+        this.techTeamSection = 'sprint';
       }
 
       this.closeCmdPalette();
     },
 
     // --- Team Workload ---
+
+    getOverloadedCount() {
+      if (!this.teamData || this.teamData.length === 0) return 0;
+      return this.teamData.filter(p => (p.overdueCount || 0) >= 3 || (p.activeCommitmentCount || 0) >= 8).length;
+    },
 
     getMaxWorkload() {
       if (!this.teamData || this.teamData.length === 0) return 1;
@@ -1031,11 +2089,57 @@ function app() {
       };
     },
 
+    // --- Decisions Standalone View ---
+
+    async loadDecisions() {
+      const signal = this.beginRequest('decisions');
+      this.view = 'decisions';
+      this.decisionsLoading = true;
+      try {
+        const res = await fetch('/api/notion/decisions?days=365', { signal });
+        if (res.ok) {
+          const data = await res.json();
+          this.decisions = data.decisions || [];
+        }
+      } catch (err) {
+        if (this.isAbortError(err)) return;
+        console.error('Decisions load error:', err);
+      } finally {
+        this.endRequest('decisions', signal);
+        this.decisionsLoading = false;
+      }
+    },
+
+    // --- Project Staleness ---
+
+    isProjectStale(project) {
+      const projectEdit = project.last_edited_time;
+      const commitmentEdit = project.lastCommitmentActivity;
+      const latestEdit = [projectEdit, commitmentEdit].filter(Boolean).sort().reverse()[0];
+      if (!latestEdit) return true;
+      const daysSince = Math.floor((Date.now() - new Date(latestEdit).getTime()) / (1000 * 60 * 60 * 24));
+      return daysSince >= 7;
+    },
+
+    getProjectStaleDays(project) {
+      const projectEdit = project.last_edited_time;
+      const commitmentEdit = project.lastCommitmentActivity;
+      const latestEdit = [projectEdit, commitmentEdit].filter(Boolean).sort().reverse()[0];
+      if (!latestEdit) return '?';
+      return Math.floor((Date.now() - new Date(latestEdit).getTime()) / (1000 * 60 * 60 * 24));
+    },
+
     // --- Decision Filters ---
 
     getFilteredDecisions() {
-      if (!this.dashboard || !this.dashboard.recentDecisions) return [];
-      let results = this.dashboard.recentDecisions;
+      let results;
+      if (this.view === 'decisions' && this.decisions.length > 0) {
+        results = this.decisions;
+      } else if (this.dashboard && this.dashboard.recentDecisions) {
+        results = this.dashboard.recentDecisions;
+      } else {
+        return [];
+      }
 
       // Date range filter
       if (this.decisionDateRange !== 'all') {
@@ -1094,9 +2198,17 @@ function app() {
     },
 
     getDecisionFilterOptions() {
-      if (!this.dashboard || !this.dashboard.recentDecisions) return { focusAreas: [], owners: [] };
-      const decisions = this.dashboard.recentDecisions;
-      const focusAreas = this.dashboard.focusAreas || [];
+      let decisions;
+      let focusAreas;
+      if (this.view === 'decisions' && this.decisions.length > 0) {
+        decisions = this.decisions;
+        focusAreas = (this.dashboard && this.dashboard.focusAreas) || [];
+      } else if (this.dashboard && this.dashboard.recentDecisions) {
+        decisions = this.dashboard.recentDecisions;
+        focusAreas = this.dashboard.focusAreas || [];
+      } else {
+        return { focusAreas: [], owners: [] };
+      }
 
       // Collect unique focus area IDs used across all decisions
       const usedFaIds = new Set();
@@ -1224,5 +2336,642 @@ function app() {
         if (el) el.scrollTop = el.scrollHeight;
       });
     },
+
+    // ── Factory View ──────────────────────────────────────────────────────────
+
+    getFactoryData() {
+      if (this.factoryConfig) {
+        const cfg = this.factoryConfig;
+        return {
+          machines: cfg.machines || [],
+          zones: cfg.zones || [],
+          orderMix: cfg.order_mix || {},
+          assumptions: cfg.operating || {},
+        };
+      }
+      // Fallback hardcoded data
+      const machines = [
+        { id: "DTG-B1", name: "Brother DTG #1", type: "DTG", zone: "DTG", brand: "Brother", theoretical_pcs_per_hour: 7.5, cycle_time_minutes: 8, cycle_time_light: 5, cycle_time_dark: 10, mandatory_maintenance_min: 50, avg_changeover_min: 25, depends_on: ["CURER-01"], is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "DTG-B2", name: "Brother DTG #2", type: "DTG", zone: "DTG", brand: "Brother", theoretical_pcs_per_hour: 7.5, cycle_time_minutes: 8, cycle_time_light: 5, cycle_time_dark: 10, mandatory_maintenance_min: 50, avg_changeover_min: 25, depends_on: ["CURER-01"], is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "DTG-B3", name: "Brother DTG #3", type: "DTG", zone: "DTG", brand: "Brother", theoretical_pcs_per_hour: 7.5, cycle_time_minutes: 8, cycle_time_light: 5, cycle_time_dark: 10, mandatory_maintenance_min: 50, avg_changeover_min: 25, depends_on: ["CURER-01"], is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "DTG-E1", name: "Epson DTG #1", type: "DTG", zone: "DTG", brand: "Epson", theoretical_pcs_per_hour: 7.5, cycle_time_minutes: 8, cycle_time_light: 5, cycle_time_dark: 10, mandatory_maintenance_min: 55, avg_changeover_min: 25, depends_on: ["CURER-01"], is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "DTG-E2", name: "Epson DTG #2", type: "DTG", zone: "DTG", brand: "Epson", theoretical_pcs_per_hour: 7.5, cycle_time_minutes: 8, cycle_time_light: 5, cycle_time_dark: 10, mandatory_maintenance_min: 55, avg_changeover_min: 25, depends_on: ["CURER-01"], is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "CURER-01", name: "MAX Curer", type: "CURER", zone: "DTG", brand: "MAX", theoretical_pcs_per_hour: 20, cycle_time_minutes: 3, mandatory_maintenance_min: 0, avg_changeover_min: 0, is_shared: false, is_sub_bottleneck: true, status: "ACTIVE" },
+        { id: "PRETREAT-01", name: "Pretreatment Machine", type: "PRETREAT", zone: "DTG", brand: "Unknown", theoretical_pcs_per_hour: 30, cycle_time_minutes: 2, mandatory_maintenance_min: 10, avg_changeover_min: 0, is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "DTF-01", name: "Custom DTF Printer", type: "DTF", zone: "DTF", brand: "Custom", theoretical_pcs_per_hour: 10, cycle_time_minutes: 6, mandatory_maintenance_min: 30, avg_changeover_min: 20, is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "SUB-E1", name: "Epson Sublimation Printer", type: "SUBLIMATION", zone: "SUB", brand: "Epson", theoretical_pcs_per_hour: 8, cycle_time_minutes: 8, mandatory_maintenance_min: 15, avg_changeover_min: 15, is_shared: false, is_sub_bottleneck: true, status: "ACTIVE" },
+        { id: "SUB-MUG12", name: "12-Mug Vacuum Press", type: "HEAT_PRESS", zone: "SUB", brand: "Unknown", theoretical_pcs_per_hour: 72, cycle_time_minutes: 10, mandatory_maintenance_min: 5, avg_changeover_min: 5, is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "VNL-01", name: "Roland Print-and-Cut", type: "VINYL", zone: "VNL", brand: "Roland", theoretical_pcs_per_hour: 6, cycle_time_minutes: 10, mandatory_maintenance_min: 10, avg_changeover_min: 15, is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "EMB-T1", name: "Tajima Embroidery #1", type: "EMBROIDERY", zone: "EMB", brand: "Tajima", theoretical_pcs_per_hour: 4, cycle_time_minutes: 15, mandatory_maintenance_min: 15, avg_changeover_min: 20, is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "EMB-T2", name: "Tajima Embroidery #2", type: "EMBROIDERY", zone: "EMB", brand: "Tajima", theoretical_pcs_per_hour: 4, cycle_time_minutes: 15, mandatory_maintenance_min: 15, avg_changeover_min: 20, is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "SCR-01", name: "Single-Head Screen Press", type: "SCREEN_PRINT", zone: "SCR", brand: "Unknown", theoretical_pcs_per_hour: 20, cycle_time_minutes: 3, mandatory_maintenance_min: 0, avg_changeover_min: 60, is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "SCR-06", name: "6-Head Screen Press", type: "SCREEN_PRINT", zone: "SCR", brand: "Unknown", theoretical_pcs_per_hour: 50, cycle_time_minutes: 1.2, mandatory_maintenance_min: 0, avg_changeover_min: 45, is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "SCR-08", name: "8-Head Screen Press", type: "SCREEN_PRINT", zone: "SCR", brand: "Unknown", theoretical_pcs_per_hour: 75, cycle_time_minutes: 0.8, mandatory_maintenance_min: 0, avg_changeover_min: 45, is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "SCR-12", name: "12-Head Screen Press", type: "SCREEN_PRINT", zone: "SCR", brand: "Unknown", theoretical_pcs_per_hour: 100, cycle_time_minutes: 0.6, mandatory_maintenance_min: 0, avg_changeover_min: 60, is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "LASER-01", name: "Laser Engraver", type: "LASER", zone: "LASER", brand: "Unknown", theoretical_pcs_per_hour: 12, cycle_time_minutes: 5, mandatory_maintenance_min: 10, avg_changeover_min: 10, is_shared: false, is_sub_bottleneck: false, status: "ACTIVE" },
+        { id: "FUSE-01", name: "Flat Fusing Press #1", type: "HEAT_PRESS", zone: "FUSING", brand: "Unknown", is_shared: true, shared_with: ["DTG", "DTF", "SUB"], theoretical_pcs_per_hour: 15, cycle_time_minutes: 4, mandatory_maintenance_min: 0, avg_changeover_min: 0, status: "ACTIVE" },
+        { id: "FUSE-02", name: "Flat Fusing Press #2", type: "HEAT_PRESS", zone: "FUSING", brand: "Unknown", is_shared: true, shared_with: ["DTG", "DTF", "SUB"], theoretical_pcs_per_hour: 15, cycle_time_minutes: 4, mandatory_maintenance_min: 0, avg_changeover_min: 0, status: "ACTIVE" },
+        { id: "FUSE-03", name: "Flat Fusing Press #3", type: "HEAT_PRESS", zone: "FUSING", brand: "Unknown", is_shared: true, shared_with: ["DTG", "DTF", "SUB"], theoretical_pcs_per_hour: 15, cycle_time_minutes: 4, mandatory_maintenance_min: 0, avg_changeover_min: 0, status: "ACTIVE" },
+        { id: "FUSE-04", name: "Flat Fusing Press #4", type: "HEAT_PRESS", zone: "FUSING", brand: "Unknown", is_shared: true, shared_with: ["DTG", "DTF", "SUB"], theoretical_pcs_per_hour: 15, cycle_time_minutes: 4, mandatory_maintenance_min: 0, avg_changeover_min: 0, status: "ACTIVE" },
+      ];
+
+      const zones = [
+        { id: "DTG",     name: "DTG Bay",         method: "Direct-to-Garment",            operators: 2 },
+        { id: "DTF",     name: "DTF Bay",          method: "Direct-to-Film",               operators: 1 },
+        { id: "SUB",     name: "Sublimation Bay",  method: "Sublimation",                  operators: 1 },
+        { id: "VNL",     name: "Vinyl Bay",        method: "Vinyl Print & Cut",            operators: 1 },
+        { id: "EMB",     name: "Embroidery Bay",   method: "Embroidery",                   operators: 1 },
+        { id: "SCR",     name: "Screen Print Bay", method: "Screen Printing",              operators: 2 },
+        { id: "LASER",   name: "Laser Bay",        method: "Laser Engraving",              operators: 1 },
+        { id: "QC_PACK", name: "QC + Packing",     method: "Quality Control & Packing",    operators: 2 },
+      ];
+
+      const orderMix = { DTG: 0.55, DTF: 0.15, SUB: 0.10, EMB: 0.10, VNL: 0.05, SCR: 0.05 };
+
+      const assumptions = {
+        shift_hours: 8,
+        orders_per_day: 40,
+        avg_pieces_per_order: 3.5,
+        efficiency_factor: 0.70,
+        qc_combined_minutes_per_piece: 7,
+        qc_efficiency: 0.74,
+        qc_separated: false,
+      };
+
+      return { machines, zones, orderMix, assumptions };
+    },
+
+    calculateFactoryCapacity(simConfig = null) {
+      const { machines: rawMachines, zones: rawZones, orderMix: rawOrderMix, assumptions } = this.getFactoryData();
+
+      // ── Apply sim overrides ────────────────────────────────────────────────
+      const cfg = simConfig || {
+        orders_per_day: assumptions.orders_per_day,
+        avg_pieces_per_order: assumptions.avg_pieces_per_order,
+        method_split: { ...rawOrderMix },
+        efficiency: assumptions.efficiency_factor,
+        qc_operators: rawZones.find(z => z.id === 'QC_PACK').operators,
+        qc_separated: assumptions.qc_separated,
+        machine_overrides: {},
+        curer_stagger: false,
+        dtf_parallel: false,
+        gang_cutting: false,
+        shifts: 1,
+        second_shift_efficiency: 0.85,
+      };
+
+      // Build working machine list (apply enable/disable overrides)
+      const machines = rawMachines.map(m => {
+        const enabled = cfg.machine_overrides[m.id] !== false;
+        let tph = m.theoretical_pcs_per_hour;
+        // Apply process improvement multipliers
+        if (m.id === 'CURER-01' && cfg.curer_stagger) tph *= 1.3;
+        if (m.id === 'DTF-01'   && cfg.dtf_parallel)  tph *= 1.4;
+        if (m.id === 'VNL-01'   && cfg.gang_cutting)  tph *= 2.0;
+        return { ...m, theoretical_pcs_per_hour: tph, _enabled: enabled };
+      });
+
+      // Build working zones (apply QC operator override)
+      const zones = rawZones.map(z => {
+        if (z.id === 'QC_PACK') return { ...z, operators: cfg.qc_operators };
+        return z;
+      });
+
+      // Order mix: normalise so values are fractions (0–1)
+      const orderMix = cfg.method_split;
+
+      const shift_hours = assumptions.shift_hours;
+      const orders_per_day = cfg.orders_per_day;
+      const avg_pieces_per_order = cfg.avg_pieces_per_order;
+      const efficiency_factor = cfg.efficiency;
+      const shift_minutes = shift_hours * 60;
+      const total_daily_pieces = orders_per_day * avg_pieces_per_order;
+
+      // ── Machine-level realistic capacity ────────────────────────────────────
+      const supportMachineTypes = new Set(["CURER", "PRETREAT"]);
+      const machineCapacity = {};
+      machines.forEach(m => {
+        if (!m._enabled) { machineCapacity[m.id] = 0; return; }
+        const available = shift_minutes - m.mandatory_maintenance_min - m.avg_changeover_min;
+        const eff = supportMachineTypes.has(m.type) ? 1.0 : efficiency_factor;
+        const realistic = m.theoretical_pcs_per_hour * (available / 60) * eff;
+        machineCapacity[m.id] = Math.max(0, realistic);
+      });
+
+      // ── Zone-level calculations ──────────────────────────────────────────────
+      const supportTypes = new Set(["CURER", "PRETREAT", "HEAT_PRESS"]);
+
+      const zoneResults = zones.map(zone => {
+        if (zone.id === "QC_PACK") {
+          // QC+Pack is people-based — uses validated 0.74 efficiency (not the machine efficiency slider)
+          const qc_efficiency = 0.74;
+          let capacity;
+          if (cfg.qc_separated) {
+            // Separated mode: split operators across QC and packing in parallel
+            // Each station handles 3.5 min/piece (vs 7 min combined)
+            const qc_staff   = Math.ceil(zone.operators / 2);
+            const pack_staff  = Math.floor(zone.operators / 2);
+            const qc_cap   = qc_staff   * (shift_minutes / 3.5);
+            const pack_cap  = pack_staff  * (shift_minutes / 3.5);
+            capacity = Math.min(qc_cap, pack_cap) * qc_efficiency;
+          } else {
+            // Combined: each operator handles both QC + packing (7 min/piece total)
+            const qc_combined_minutes_per_piece = 7;
+            capacity = zone.operators * (shift_minutes / qc_combined_minutes_per_piece) * qc_efficiency;
+          }
+          const demand = total_daily_pieces;
+          const safeCapacity = Math.max(1, Math.round(capacity));
+          const load = demand / safeCapacity;
+          return {
+            ...zone,
+            capacity: safeCapacity,
+            demand: Math.round(demand),
+            load,
+            status: this._factoryLoadStatus(load),
+            machines: [],
+            sub_bottleneck: null,
+            is_people_based: true,
+          };
+        }
+
+        const zoneMachines = machines.filter(m => m.zone === zone.id);
+        const productionMachines = zoneMachines.filter(m => !supportTypes.has(m.type));
+        const subBottleneck = zoneMachines.find(m => m.is_sub_bottleneck);
+
+        const rawSum = productionMachines.reduce((sum, m) => sum + machineCapacity[m.id], 0);
+
+        let effectiveCapacity = rawSum;
+        let cappedBy = null;
+
+        if (subBottleneck) {
+          const cap = machineCapacity[subBottleneck.id];
+          if (cap < rawSum) {
+            effectiveCapacity = cap;
+            cappedBy = subBottleneck.id;
+          }
+        }
+
+        const mix = orderMix[zone.id] || 0;
+        const demand = total_daily_pieces * mix;
+        const safeCapacity = Math.max(1, Math.round(effectiveCapacity));
+        const load = demand > 0 ? demand / safeCapacity : 0;
+
+        return {
+          ...zone,
+          capacity: safeCapacity,
+          demand: Math.round(demand),
+          load,
+          status: this._factoryLoadStatus(load),
+          machines: zoneMachines.map(m => ({
+            ...m,
+            realistic_daily: Math.round(machineCapacity[m.id]),
+            _enabled: m._enabled,
+          })),
+          sub_bottleneck: cappedBy,
+          is_people_based: false,
+        };
+      });
+
+      // ── Shift multiplier ─────────────────────────────────────────────────────
+      if (cfg.shifts === 2) {
+        const mult = 1 + cfg.second_shift_efficiency;
+        zoneResults.forEach(z => {
+          z.capacity = Math.round(z.capacity * mult);
+        });
+      }
+
+      // ── Binding constraint ───────────────────────────────────────────────────
+      // Recalculate load after potential shift adjustment
+      zoneResults.forEach(z => {
+        z.load = z.demand > 0 ? z.demand / z.capacity : 0;
+        z.status = this._factoryLoadStatus(z.load);
+      });
+      const bindingZone = zoneResults.reduce((max, z) => z.load > max.load ? z : max, zoneResults[0]);
+
+      // ── Shared resource (Fusing Bay) contention ──────────────────────────────
+      const fusingMachines = machines.filter(m => m.zone === "FUSING");
+      const fusingTotalCapacity = fusingMachines.reduce((sum, m) => {
+        if (!m._enabled) return sum;
+        const avail = shift_minutes - m.mandatory_maintenance_min - m.avg_changeover_min;
+        return sum + m.theoretical_pcs_per_hour * (avail / 60);
+      }, 0);
+
+      const dtgDemand  = total_daily_pieces * (orderMix.DTG || 0);
+      const dtfDemand  = total_daily_pieces * (orderMix.DTF || 0);
+      const subDemand  = total_daily_pieces * (orderMix.SUB || 0);
+      const fusingDemand = (dtgDemand * 0.5 * 1) + (dtfDemand * 2) + (subDemand * 1);
+      const safeFusing = Math.max(1, fusingTotalCapacity);
+      const fusingContention = fusingDemand / safeFusing;
+
+      const curerCapacity = machineCapacity["CURER-01"] || 1;
+      const curerUtilisation = dtgDemand / curerCapacity;
+
+      const pretreatCapacity = machineCapacity["PRETREAT-01"] || 1;
+      const pretreatUtilisation = (dtgDemand * 0.5) / pretreatCapacity;
+
+      const sharedResources = [
+        {
+          id: "FUSING",
+          name: "Fusing Bay (4 Presses)",
+          capacity: Math.round(fusingTotalCapacity),
+          demand: Math.round(fusingDemand),
+          contention: fusingContention,
+          status: this._factoryLoadStatus(fusingContention),
+          note: "Shared by DTG (dark), DTF (×2), SUB",
+        },
+        {
+          id: "CURER-01",
+          name: "MAX Curer",
+          capacity: Math.round(curerCapacity),
+          demand: Math.round(dtgDemand),
+          contention: curerUtilisation,
+          status: this._factoryLoadStatus(curerUtilisation),
+          note: "Caps entire DTG zone output",
+        },
+        {
+          id: "PRETREAT-01",
+          name: "Pretreat Machine",
+          capacity: Math.round(pretreatCapacity),
+          demand: Math.round(dtgDemand * 0.5),
+          contention: pretreatUtilisation,
+          status: this._factoryLoadStatus(pretreatUtilisation),
+          note: "Used for DTG dark garments only (~50%)",
+        },
+      ];
+
+      // ── Constraint cascade ───────────────────────────────────────────────────
+      const constraintCascade = zoneResults
+        .filter(z => z.demand > 0)
+        .slice()
+        .sort((a, b) => b.load - a.load)
+        .map(z => ({
+          ...z,
+          fix: this._constraintFix(z.id, z.load),
+        }));
+
+      // Use actual assumptions values for display (but override with sim values when active)
+      const displayAssumptions = {
+        ...assumptions,
+        orders_per_day: cfg.orders_per_day,
+        avg_pieces_per_order: cfg.avg_pieces_per_order,
+        efficiency_factor: cfg.efficiency,
+      };
+
+      return {
+        zones: zoneResults,
+        bindingZone,
+        factoryThroughput: Math.min(bindingZone.capacity, total_daily_pieces),
+        totalPossible: total_daily_pieces,
+        sharedResources,
+        constraintCascade,
+        assumptions: displayAssumptions,
+        total_daily_pieces,
+      };
+    },
+
+    // ── Simulation helpers ─────────────────────────────────────────────────────
+
+    initFactorySimConfig() {
+      const { zones, assumptions } = this.getFactoryData();
+      this.factorySimConfig = {
+        orders_per_day: assumptions.orders_per_day,
+        avg_pieces_per_order: assumptions.avg_pieces_per_order,
+        method_split: { DTG: 55, DTF: 15, SUB: 10, EMB: 10, VNL: 5, SCR: 5 },
+        efficiency: 70,
+        qc_operators: zones.find(z => z.id === 'QC_PACK').operators,
+        qc_separated: false,
+        machine_overrides: {},
+        curer_stagger: false,
+        dtf_parallel: false,
+        gang_cutting: false,
+        shifts: 1,
+        second_shift_efficiency: 85,
+      };
+      this.factorySimPreset = 'current';
+    },
+
+    applyFactoryPreset(preset) {
+      const base = {
+        orders_per_day: 40, avg_pieces_per_order: 3.5,
+        method_split: { DTG: 55, DTF: 15, SUB: 10, EMB: 10, VNL: 5, SCR: 5 },
+        efficiency: 70, qc_operators: 2, qc_separated: false, machine_overrides: {},
+        curer_stagger: false, dtf_parallel: false, gang_cutting: false, shifts: 1, second_shift_efficiency: 85,
+      };
+      const presets = {
+        'current':          { ...base },
+        'qc_fixed':         { ...base, qc_operators: 4, qc_separated: true },
+        'phase3':           { ...base, orders_per_day: 70, qc_operators: 4, qc_separated: true, curer_stagger: true },
+        'growth':           { ...base, orders_per_day: 120, efficiency: 75, qc_operators: 6, qc_separated: true, curer_stagger: true, dtf_parallel: true, gang_cutting: true },
+        '20cr':             { ...base, orders_per_day: 200, efficiency: 75, qc_operators: 8, qc_separated: true, curer_stagger: true, dtf_parallel: true, gang_cutting: true },
+        'machine_down_dtg': { ...base, machine_overrides: { 'DTG-B1': false } },
+        'machine_down_dtf': { ...base, machine_overrides: { 'DTF-01': false } },
+        'qc_absent':        { ...base, qc_operators: 1 },
+        'monsoon':          { ...base, efficiency: 60 },
+        'second_shift':     { ...base, shifts: 2, second_shift_efficiency: 85 },
+      };
+      if (presets[preset]) {
+        this.factorySimConfig = { ...presets[preset] };
+        this.factorySimPreset = preset;
+      }
+    },
+
+    getSimulatedCapacity() {
+      if (!this.factorySimConfig) return this.calculateFactoryCapacity();
+      const cfg = this.factorySimConfig;
+      return this.calculateFactoryCapacity({
+        orders_per_day: cfg.orders_per_day,
+        avg_pieces_per_order: cfg.avg_pieces_per_order,
+        method_split: Object.fromEntries(
+          Object.entries(cfg.method_split).map(([k, v]) => [k, v / 100])
+        ),
+        efficiency: cfg.efficiency / 100,
+        qc_operators: cfg.qc_operators,
+        qc_separated: cfg.qc_separated,
+        machine_overrides: cfg.machine_overrides,
+        curer_stagger: cfg.curer_stagger,
+        dtf_parallel: cfg.dtf_parallel,
+        gang_cutting: cfg.gang_cutting,
+        shifts: cfg.shifts,
+        second_shift_efficiency: cfg.second_shift_efficiency / 100,
+      });
+    },
+
+    simMethodSplitTotal() {
+      if (!this.factorySimConfig) return 100;
+      const m = this.factorySimConfig.method_split;
+      return (m.DTG || 0) + (m.DTF || 0) + (m.SUB || 0) + (m.EMB || 0) + (m.VNL || 0) + (m.SCR || 0);
+    },
+
+    toggleFactorySim() {
+      if (!this.factorySimOpen) {
+        if (!this.factorySimConfig) this.initFactorySimConfig();
+        this.factorySimOpen = true;
+      } else {
+        this.factorySimOpen = false;
+      }
+    },
+
+    closeFactorySim() {
+      this.factorySimOpen = false;
+    },
+
+    // View helpers (called from HTML — no nested x-data needed)
+    getFactoryCap() {
+      return this.getSimulatedCapacity();
+    },
+    getFactoryBaseCap() {
+      if (!this._factoryBaseCache) this._factoryBaseCache = this.calculateFactoryCapacity();
+      return this._factoryBaseCache;
+    },
+    factoryBarWidth(load) {
+      return Math.min(load * 100, 100).toFixed(1) + '%';
+    },
+    factoryBarLabel(load) {
+      return Math.round(load * 100) + '%';
+    },
+
+    _factoryLoadStatus(load) {
+      if (load >= 1.0)  return "OVER";
+      if (load >= 0.85) return "AT_RISK";
+      if (load >= 0.70) return "APPROACHING";
+      return "OK";
+    },
+
+    _constraintFix(zoneId, load) {
+      const fixes = {
+        QC_PACK: "Add 2 staff, separate QC and packing stations — unlocks full 140 pcs/day throughput",
+        DTG:     "Implement stagger-loading protocol on MAX Curer (+30% throughput)",
+        EMB:     "Add a third Tajima head or run split shifts — EMB is 56% loaded",
+        DTF:     "DTF is within safe range; monitor if mix shifts above 20%",
+        SUB:     "Sublimation is within safe range; printer is the limit, not the press",
+        VNL:     "Vinyl is lightly loaded; no action needed",
+        SCR:     "Screen Print has significant headroom; capacity far exceeds demand",
+        LASER:   "Laser is not in current order mix; track when laser orders begin",
+      };
+      return fixes[zoneId] || "Monitor load ratio";
+    },
+
+    factoryLoadBarWidth(load) {
+      return Math.min(load * 100, 100).toFixed(1) + '%';
+    },
+
+    factoryLoadLabel(load) {
+      return Math.round(load * 100) + '%';
+    },
+
+    toggleFactoryZone(zoneId) {
+      this.factoryZoneDetail = this.factoryZoneDetail === zoneId ? null : zoneId;
+    },
+
+    // ── Factory config API ──────────────────────────────────────────────────
+
+    async loadFactoryConfig() {
+      if (this.factoryConfigLoading) return;
+      this.factoryConfigLoading = true;
+      try {
+        const res = await fetch('/api/factory/config');
+        if (!res.ok) throw new Error('Failed to load factory config');
+        this.factoryConfig = await res.json();
+        this._factoryBaseCache = null;
+      } catch (e) {
+        console.warn('Factory config load failed, using hardcoded data:', e.message);
+      } finally {
+        this.factoryConfigLoading = false;
+      }
+    },
+
+    async saveFactoryMachine(machineId, updates) {
+      try {
+        const res = await fetch(`/api/factory/machines/${machineId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        });
+        if (!res.ok) throw new Error('Save failed');
+        this.factoryConfig = await res.json();
+        this._factoryBaseCache = null;
+        this.factoryEditingMachine = null;
+      } catch (e) {
+        console.error('saveFactoryMachine error:', e);
+        this.factoryError = 'Failed to save — check console';
+        setTimeout(() => this.factoryError = null, 3000);
+      }
+    },
+
+    async saveFactoryZone(zoneId, updates) {
+      try {
+        const res = await fetch(`/api/factory/zones/${zoneId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        });
+        if (!res.ok) throw new Error('Save failed');
+        this.factoryConfig = await res.json();
+        this._factoryBaseCache = null;
+        this.factoryEditingZone = null;
+      } catch (e) {
+        console.error('saveFactoryZone error:', e);
+        this.factoryError = 'Failed to save — check console';
+        setTimeout(() => this.factoryError = null, 3000);
+      }
+    },
+
+    async saveFactoryOperating(updates) {
+      try {
+        const res = await fetch('/api/factory/operating', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        });
+        if (!res.ok) throw new Error('Save failed');
+        this.factoryConfig = await res.json();
+        this._factoryBaseCache = null;
+        this.factoryEditingOperating = false;
+      } catch (e) {
+        console.error('saveFactoryOperating error:', e);
+        this.factoryError = 'Failed to save — check console';
+        setTimeout(() => this.factoryError = null, 3000);
+      }
+    },
+
+    async addFactoryMachine(machine) {
+      try {
+        const res = await fetch('/api/factory/machines', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(machine),
+        });
+        if (!res.ok) throw new Error('Add failed');
+        this.factoryConfig = await res.json();
+        this._factoryBaseCache = null;
+      } catch (e) {
+        console.error('addFactoryMachine error:', e);
+      }
+    },
+
+    async deleteFactoryMachine(machineId) {
+      try {
+        const res = await fetch(`/api/factory/machines/${machineId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Delete failed');
+        this.factoryConfig = await res.json();
+        this._factoryBaseCache = null;
+      } catch (e) {
+        console.error('deleteFactoryMachine error:', e);
+      }
+    },
+
+    startEditMachine(machine) {
+      this.factoryEditingMachine = machine.id;
+      this.factoryMachineEdits = {
+        name: machine.name,
+        theoretical_pcs_per_hour: machine.theoretical_pcs_per_hour,
+        available_minutes: machine.available_minutes || null,
+        efficiency_factor: machine.efficiency_factor || null,
+        notes: machine.notes || '',
+        formula: machine.formula || '',
+        rules: JSON.parse(JSON.stringify(machine.rules || [])),
+      };
+    },
+
+    cancelEditMachine() {
+      this.factoryEditingMachine = null;
+      this.factoryMachineEdits = {};
+    },
+
+    commitEditMachine(machineId) {
+      const updates = {};
+      const e = this.factoryMachineEdits;
+      if (e.name !== undefined) updates.name = e.name;
+      if (e.theoretical_pcs_per_hour !== undefined) updates.theoretical_pcs_per_hour = parseFloat(e.theoretical_pcs_per_hour);
+      if (e.available_minutes !== null && e.available_minutes !== undefined) updates.available_minutes = parseFloat(e.available_minutes);
+      if (e.efficiency_factor !== null && e.efficiency_factor !== undefined) updates.efficiency_factor = parseFloat(e.efficiency_factor);
+      if (e.notes !== undefined) updates.notes = e.notes;
+      if (e.formula !== undefined) updates.formula = e.formula;
+      if (e.rules !== undefined) updates.rules = e.rules;
+      if (this.factoryConfig) {
+        this.saveFactoryMachine(machineId, updates);
+      } else {
+        // Optimistic update on hardcoded data is not possible; just cancel
+        this.factoryEditingMachine = null;
+      }
+    },
+
+    addMachineRule() {
+      if (!this.factoryMachineEdits.rules) this.factoryMachineEdits.rules = [];
+      this.factoryMachineEdits.rules.push({ type: 'caps_zone', target: '', description: '' });
+    },
+
+    removeMachineRule(index) {
+      this.factoryMachineEdits.rules.splice(index, 1);
+    },
+
+    startEditZone(zone) {
+      this.factoryEditingZone = zone.id;
+      this.factoryZoneEdits = {
+        operators: zone.operators,
+        notes: zone.notes || '',
+        formula: zone.formula || '',
+        rules: JSON.parse(JSON.stringify(zone.rules || [])),
+      };
+    },
+
+    cancelEditZone() {
+      this.factoryEditingZone = null;
+      this.factoryZoneEdits = {};
+    },
+
+    commitEditZone(zoneId) {
+      const updates = {};
+      const e = this.factoryZoneEdits;
+      if (e.operators !== undefined) updates.operators = parseInt(e.operators);
+      if (e.notes !== undefined) updates.notes = e.notes;
+      if (e.formula !== undefined) updates.formula = e.formula;
+      if (e.rules !== undefined) updates.rules = e.rules;
+      if (this.factoryConfig) {
+        this.saveFactoryZone(zoneId, updates);
+      } else {
+        this.factoryEditingZone = null;
+      }
+    },
+
+    addZoneRule() {
+      if (!this.factoryZoneEdits.rules) this.factoryZoneEdits.rules = [];
+      this.factoryZoneEdits.rules.push({ type: 'sub_bottleneck', bottleneck_machine: '', description: '' });
+    },
+
+    removeZoneRule(index) {
+      this.factoryZoneEdits.rules.splice(index, 1);
+    },
+
+    startEditOperating() {
+      const { assumptions } = this.getFactoryData();
+      this.factoryOperatingEdits = {
+        shift_hours: assumptions.shift_hours,
+        orders_per_day: assumptions.orders_per_day,
+        avg_pieces_per_order: assumptions.avg_pieces_per_order,
+      };
+      this.factoryEditingOperating = true;
+    },
+
+    cancelEditOperating() {
+      this.factoryEditingOperating = false;
+      this.factoryOperatingEdits = {};
+    },
+
+    commitEditOperating() {
+      const e = this.factoryOperatingEdits;
+      const updates = {
+        shift_hours: parseFloat(e.shift_hours),
+        orders_per_day: parseInt(e.orders_per_day),
+        avg_pieces_per_order: parseFloat(e.avg_pieces_per_order),
+      };
+      if (this.factoryConfig) {
+        this.saveFactoryOperating(updates);
+      } else {
+        this.factoryEditingOperating = false;
+      }
+    },
   };
 }
+
+window.app = app;
