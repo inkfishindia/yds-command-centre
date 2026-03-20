@@ -4,7 +4,9 @@ const notionService = require('../services/notion');
 const githubService = require('../services/github');
 const sheetsService = require('../services/sheets');
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
+const fsSync = require('fs');
+const config = require('../config');
 
 // GET /api/tech-team — Tech team summary (command center data)
 router.get('/', async (req, res) => {
@@ -97,10 +99,10 @@ router.get('/agents', async (req, res) => {
     const skillsDir = path.join(__dirname, '../../.claude/skills');
 
     const agents = [];
-    if (fs.existsSync(agentsDir)) {
-      const files = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'));
+    if (fsSync.existsSync(agentsDir)) {
+      const files = (await fs.readdir(agentsDir)).filter(f => f.endsWith('.md'));
       for (const file of files) {
-        const content = fs.readFileSync(path.join(agentsDir, file), 'utf8');
+        const content = await fs.readFile(path.join(agentsDir, file), 'utf8');
         const nameMatch = content.match(/^#\s+(.+)/m);
         const modelMatch = content.match(/model[:\s]+(\S+)/im) || content.match(/uses?\s+(sonnet|opus|haiku)/im);
         const descMatch = content.match(/(?:description|purpose)[:\s]+(.+)/im);
@@ -115,8 +117,8 @@ router.get('/agents', async (req, res) => {
     }
 
     const skills = [];
-    if (fs.existsSync(skillsDir)) {
-      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+    if (fsSync.existsSync(skillsDir)) {
+      const entries = await fs.readdir(skillsDir, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory()) {
           const indexPath = path.join(skillsDir, entry.name, 'index.md');
@@ -124,8 +126,8 @@ router.get('/agents', async (req, res) => {
           const readmePath = path.join(skillsDir, entry.name, 'README.md');
           let desc = '';
           for (const p of [indexPath, promptPath, readmePath]) {
-            if (fs.existsSync(p)) {
-              const content = fs.readFileSync(p, 'utf8');
+            if (fsSync.existsSync(p)) {
+              const content = await fs.readFile(p, 'utf8');
               const descLine = content.match(/(?:description|purpose)[:\s]+(.+)/im);
               if (descLine) desc = descLine[1].trim();
               break;
@@ -157,7 +159,7 @@ router.get('/strategy', async (req, res) => {
 // GET /api/tech-team/github — GitHub repo activity
 router.get('/github', async (req, res) => {
   try {
-    const data = await githubService.getRepoActivity('inkfishindia', 'YD-CRM');
+    const data = await githubService.getRepoActivity(config.GITHUB_REPO_OWNER, config.GITHUB_REPO_NAME);
     res.json(data);
   } catch (err) {
     console.error('GitHub error:', err);

@@ -3100,6 +3100,11 @@
             </div>
           </div>
 
+          <div class="empty-state" x-show="mktops && mktops.stats.activeCampaigns === 0 && mktops.stats.contentInPipeline === 0 && !mktopsLoading" style="margin: 1.5rem 0">
+            <p><strong>Notion databases not connected.</strong></p>
+            <p>Share the Campaigns, Content Calendar, Sequences, and Sessions Log databases with your Notion integration to see data here.</p>
+          </div>
+
           <!-- Section tabs -->
           <div class="mktops-tabs">
             <button class="filter-pill" :class="mktopsSection === 'campaigns' && 'filter-pill-active'" @click="mktopsSection = 'campaigns'">Campaigns</button>
@@ -3362,6 +3367,11 @@
         <div class="kpi-card" :class="techTeam?.stats?.blocked > 0 && 'kpi-alert'"><div class="kpi-value" x-text="techTeam?.stats?.blocked || 0"></div><div class="kpi-label">Blocked</div></div>
         <div class="kpi-card" :class="techTeam?.stats?.openBugs > 0 && 'kpi-alert'"><div class="kpi-value" x-text="techTeam?.stats?.openBugs || 0"></div><div class="kpi-label">Open Bugs</div></div>
         <div class="kpi-card"><div class="kpi-value" x-text="techTeam?.stats?.specsInReview || 0"></div><div class="kpi-label">Specs in Review</div></div>
+      </div>
+
+      <div class="empty-state" x-show="techTeam && techTeam.stats.totalItems === 0 && !techTeamLoading" style="margin: 1.5rem 0">
+        <p><strong>Notion databases not connected.</strong></p>
+        <p>Share the Tech Sprint Board, Spec Library, Decision Log, and Sprint Archive databases with your Notion integration to see data here.</p>
       </div>
 
       <!-- Tab bar -->

@@ -15,6 +15,8 @@ module.exports = {
   GOOGLE_SERVICE_ACCOUNT_KEY: process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '',
   GOOGLE_SHEETS_ID: process.env.GOOGLE_SHEETS_ID || '',
   GITHUB_TOKEN: process.env.GITHUB_TOKEN || '',
+  GITHUB_REPO_OWNER: process.env.GITHUB_REPO_OWNER || 'inkfishindia',
+  GITHUB_REPO_NAME: process.env.GITHUB_REPO_NAME || 'YD-CRM',
   STRATEGY_SHEETS_ID: process.env.STRATEGY_SHEETS_ID || '',
 
   // Colin's workspace paths
