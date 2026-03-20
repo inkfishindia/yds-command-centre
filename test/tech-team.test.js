@@ -81,7 +81,7 @@ describe('Tech Team', () => {
       const dbs = notion.listDatabases();
       const sprintBoard = dbs.find(d => d.name === 'Sprint Board (Tech)');
       assert.ok(sprintBoard, 'Sprint Board (Tech) not found');
-      assert.strictEqual(sprintBoard.id, 'e5ccd5d363304147a210207982b2c66b');
+      assert.strictEqual(sprintBoard.id, '2c459dc96d804bce913547e02b78776c');
     });
   });
 

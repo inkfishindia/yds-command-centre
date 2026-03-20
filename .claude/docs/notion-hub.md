@@ -15,14 +15,14 @@
 | Decisions | 3c8a9b22ba924f20bfdcab4cc7a46478 | 158108d0-623d-4dda-8e5c-2f6ade2597be | Decision logging |
 | Platforms | 1fcf264fd2cd4308bcfd28997d171360 | 0e7a29d5-e583-44fd-a7bf-78c12af0b670 | System tracking |
 | Audiences | 63ec25cae3b0432093fa639d4c8b5809 | 97e9f674-484e-4117-ba18-4357e12879a1 | Segment targeting |
-| Campaigns | cff40f3413a84c64b5bfedafeffb0b88 | cff40f34-13a8-4c64-b5bf-edafeffb0b88 | Marketing campaign tracking |
-| Content Calendar | a3066b81c26c453daed24588c92ad7c5 | a3066b81-c26c-453d-aed2-4588c92ad7c5 | Content scheduling & status |
-| Sequences | aaee75a9fc5141ba8f458ad1e72a4b9b | aaee75a9-fc51-41ba-8f45-8ad1e72a4b9b | Email/automation sequences |
-| Sessions Log | b1d04b582c4040918f6dd2ccc1c1b2f1 | b1d04b58-2c40-4091-8f6d-d2ccc1c1b2f1 | Session tracking & analytics |
-| Sprint Board (Tech) | e5ccd5d3633044f0a210207982b2c66b | e5ccd5d3-6330-4147-a210-207982b2c66b | Tech sprint items, bugs, tasks |
-| Spec Library | ad5b66e6e65c4e859b4ce5d83b49403b | ad5b66e6-e65c-4e85-9b4c-e5d83b49403b | Technical specification pipeline |
-| Tech Decision Log | 62ce820e06d24045998dab4ec8d064f9d | 62ce820e-06d2-4045-98da-b4ec8d064f9d | Technical decision records |
-| Sprint Archive | ee87ff546d2a468499a9419475b9cb3c | ee87ff54-6d2a-4684-99a9-419475b9cb3c | Sprint velocity history |
+| Campaigns | 9f5f3da620e64bf0bceef7f9a3465925 | 9f5f3da6-20e6-4bf0-bcee-f7f9a3465925 | Marketing campaign tracking |
+| Content Calendar | 227f3365feab476e88791f2a4d0a72b9 | 227f3365-feab-476e-8879-1f2a4d0a72b9 | Content scheduling & status |
+| Sequences | e580d12cac8c43bd890176fc0985518e | e580d12c-ac8c-43bd-8901-76fc0985518e | Email/automation sequences |
+| Sessions Log | dffaf6eb216444858981203915991c22 | dffaf6eb-2164-4485-8981-203915991c22 | Session tracking & analytics |
+| Sprint Board (Tech) | 2c459dc96d804bce913547e02b78776c | 2c459dc9-6d80-4bce-9135-47e02b78776c | Tech sprint items, bugs, tasks |
+| Spec Library | 5be6d7cf5607407cbca010b422bceb7e | 5be6d7cf-5607-407c-bca0-10b422bceb7e | Technical specification pipeline |
+| Tech Decision Log | 1f9193d41ac3409484d2d0ae1442c95b | 1f9193d4-1ac3-4094-84d2-d0ae1442c95b | Technical decision records |
+| Sprint Archive | 9ba8330aa3c044d195b27eb450e278f2 | 9ba8330a-a3c0-44d1-95b2-7eb450e278f2 | Sprint velocity history |
 
 **Future Databases** (IDs TBD — Nirmal to create)
 - Agent Registry — AI agent configuration and capabilities
