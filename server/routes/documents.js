@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const fs = require('fs');
+const fs = require('fs/promises');
 const path = require('path');
 const config = require('../config');
 
@@ -9,36 +9,45 @@ const DOCUMENT_DIRS = {
   decisions: config.DECISIONS_DIR,
   'weekly-reviews': config.WEEKLY_REVIEWS_DIR,
 };
+const LIST_CACHE_TTL = 15 * 1000;
+const CONTENT_CACHE_TTL = 15 * 1000;
+const listCache = new Map();
+const contentCache = new Map();
 
 /**
  * GET /api/documents
  * List all documents across all directories.
  */
-router.get('/', (req, res) => {
-  const all = {};
-  for (const [name, dir] of Object.entries(DOCUMENT_DIRS)) {
-    all[name] = listDir(dir);
+router.get('/', async (req, res) => {
+  try {
+    const all = {};
+    for (const [name, dir] of Object.entries(DOCUMENT_DIRS)) {
+      all[name] = await listDir(dir);
+    }
+    res.json(all);
+  } catch (err) {
+    console.error('Documents list error:', err);
+    res.status(500).json({ error: 'Failed to list documents' });
   }
-  res.json(all);
 });
 
 /**
  * GET /api/documents/:category
  * List documents in a specific category (briefings, decisions, weekly-reviews).
  */
-router.get('/:category', (req, res) => {
+router.get('/:category', async (req, res) => {
   const dir = DOCUMENT_DIRS[req.params.category];
   if (!dir) {
     return res.status(404).json({ error: 'Unknown document category' });
   }
-  res.json({ files: listDir(dir) });
+  res.json({ files: await listDir(dir) });
 });
 
 /**
  * GET /api/documents/:category/:filename
  * Read a specific document.
  */
-router.get('/:category/:filename', (req, res) => {
+router.get('/:category/:filename', async (req, res) => {
   const dir = DOCUMENT_DIRS[req.params.category];
   if (!dir) {
     return res.status(404).json({ error: 'Unknown document category' });
@@ -52,27 +61,50 @@ router.get('/:category/:filename', (req, res) => {
   }
 
   try {
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const content = await readDocument(filePath);
     res.json({ filename, content, category: req.params.category });
   } catch (err) {
     res.status(404).json({ error: 'File not found' });
   }
 });
 
-function listDir(dir) {
+async function listDir(dir) {
+  const cached = listCache.get(dir);
+  if (cached && Date.now() - cached.time < LIST_CACHE_TTL) {
+    return cached.data;
+  }
+
   try {
-    if (!fs.existsSync(dir)) return [];
-    return fs
-      .readdirSync(dir, { withFileTypes: true })
-      .filter(e => e.isFile() && e.name.endsWith('.md'))
-      .map(e => ({
-        name: e.name,
-        modified: fs.statSync(path.join(dir, e.name)).mtime.toISOString(),
-      }))
-      .sort((a, b) => b.name.localeCompare(a.name));
+    await fs.access(dir);
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const files = await Promise.all(
+      entries
+        .filter(e => e.isFile() && e.name.endsWith('.md'))
+        .map(async (entry) => {
+          const stat = await fs.stat(path.join(dir, entry.name));
+          return {
+            name: entry.name,
+            modified: stat.mtime.toISOString(),
+          };
+        })
+    );
+    files.sort((a, b) => b.name.localeCompare(a.name));
+    listCache.set(dir, { data: files, time: Date.now() });
+    return files;
   } catch {
     return [];
   }
+}
+
+async function readDocument(filePath) {
+  const cached = contentCache.get(filePath);
+  if (cached && Date.now() - cached.time < CONTENT_CACHE_TTL) {
+    return cached.data;
+  }
+
+  const content = await fs.readFile(filePath, 'utf-8');
+  contentCache.set(filePath, { data: content, time: Date.now() });
+  return content;
 }
 
 module.exports = router;

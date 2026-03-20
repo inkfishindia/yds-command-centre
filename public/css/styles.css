@@ -486,7 +486,12 @@ body {
 }
 
 .skill-btn:hover { background: var(--bg-hover); border-color: var(--border-light); }
-.skill-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.skill-btn:disabled,
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 
 .skill-icon {
   width: 24px;
@@ -7082,6 +7087,11 @@ tr:hover .table-link { color: var(--accent); }
   .tech-stats { flex-direction: column; }
   .tech-velocity-numbers { min-width: 60px; font-size: 11px; }
   .tech-bar-label { min-width: 70px; font-size: 11px; }
+  .tech-command-grid { grid-template-columns: 1fr; }
+  .tech-widget { min-width: 0; }
+  .tech-filters { display: flex; flex-direction: column; gap: 0.5rem; }
+  .tech-filters select,
+  .tech-filters input { width: 100%; }
 }
 
 /* === Phone-First Surfaces === */

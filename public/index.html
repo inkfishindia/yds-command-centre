@@ -3482,9 +3482,9 @@
           <div class="tech-widget">
             <h3>Quick Actions</h3>
             <div style="display:flex;flex-direction:column;gap:0.5rem">
-              <button class="action-btn" disabled>New Sprint Item</button>
-              <button class="action-btn" disabled>File Bug Report</button>
-              <button class="action-btn" disabled>Request Review</button>
+              <button class="action-btn" disabled title="Coming soon">New Sprint Item</button>
+              <button class="action-btn" disabled title="Coming soon">File Bug Report</button>
+              <button class="action-btn" disabled title="Coming soon">Request Review</button>
             </div>
           </div>
         </div>
@@ -3522,7 +3522,7 @@
                 <span class="kanban-count" x-text="getSprintItemsByStatus(status).length"></span>
               </div>
               <template x-for="item in getSprintItemsByStatus(status)" :key="item.id">
-                <div class="kanban-card" :class="item.Status === 'Blocked' && 'tech-card-blocked'">
+                <div class="kanban-card" :class="item.Status === 'Blocked' && 'tech-card-blocked'" :data-priority="item.Priority?.toLowerCase().replace(/ - /g, '-')">
                   <div class="kanban-card-top">
                     <span class="tech-type-badge" :class="getTechTypeClass(item.Type)" x-text="item.Type"></span>
                     <span class="tech-priority-pill" :class="getTechPriorityClass(item.Priority)" x-text="item.Priority?.split(' - ')[0]"></span>
