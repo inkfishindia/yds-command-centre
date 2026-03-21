@@ -1,18 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const notionService = require('../services/notion');
-const githubService = require('../services/github');
-const sheetsService = require('../services/sheets');
-const path = require('path');
-const fs = require('fs').promises;
-const fsSync = require('fs');
-const config = require('../config');
+const techTeamService = require('../services/tech-team-service');
 
 // GET /api/tech-team — Tech team summary (command center data)
 router.get('/', async (req, res) => {
   try {
-    const data = await notionService.getTechTeamSummary();
-    res.json(data);
+    res.json(await techTeamService.getSummary());
   } catch (err) {
     console.error('Tech team summary error:', err);
     res.status(500).json({ error: 'Failed to load tech team data' });
@@ -22,12 +15,12 @@ router.get('/', async (req, res) => {
 // GET /api/tech-team/sprint — Sprint board items with optional filters
 router.get('/sprint', async (req, res) => {
   try {
-    let items = await notionService.getSprintItems();
-    if (req.query.status) items = items.filter(i => i.Status === req.query.status);
-    if (req.query.system) items = items.filter(i => i.System === req.query.system);
-    if (req.query.priority) items = items.filter(i => i.Priority === req.query.priority);
-    if (req.query.type) items = items.filter(i => i.Type === req.query.type);
-    res.json({ items });
+    res.json(await techTeamService.getSprintItems({
+      status: req.query.status,
+      system: req.query.system,
+      priority: req.query.priority,
+      type: req.query.type,
+    }));
   } catch (err) {
     console.error('Sprint items error:', err);
     res.status(500).json({ error: 'Failed to load sprint items' });
@@ -37,21 +30,7 @@ router.get('/sprint', async (req, res) => {
 // GET /api/tech-team/bugs — Sprint items filtered to Type=Bug
 router.get('/bugs', async (req, res) => {
   try {
-    const items = await notionService.getSprintItems();
-    const bugs = items.filter(i => i.Type === 'Bug' && i.Status !== 'Cancelled');
-    const stats = {
-      total: bugs.length,
-      open: bugs.filter(b => b.Status !== 'Done').length,
-      byPriority: {},
-      bySystem: {},
-    };
-    bugs.filter(b => b.Status !== 'Done').forEach(b => {
-      const p = b.Priority || 'Unset';
-      const s = b.System || 'Unset';
-      stats.byPriority[p] = (stats.byPriority[p] || 0) + 1;
-      stats.bySystem[s] = (stats.bySystem[s] || 0) + 1;
-    });
-    res.json({ bugs, stats });
+    res.json(await techTeamService.getBugs());
   } catch (err) {
     console.error('Bugs error:', err);
     res.status(500).json({ error: 'Failed to load bugs' });
@@ -61,9 +40,7 @@ router.get('/bugs', async (req, res) => {
 // GET /api/tech-team/specs — Spec pipeline
 router.get('/specs', async (req, res) => {
   try {
-    let specs = await notionService.getSpecLibrary();
-    if (req.query.status) specs = specs.filter(s => s.Status === req.query.status);
-    res.json({ specs });
+    res.json(await techTeamService.getSpecs({ status: req.query.status }));
   } catch (err) {
     console.error('Specs error:', err);
     res.status(500).json({ error: 'Failed to load specs' });
@@ -73,8 +50,7 @@ router.get('/specs', async (req, res) => {
 // GET /api/tech-team/decisions — Tech decision log
 router.get('/decisions', async (req, res) => {
   try {
-    const decisions = await notionService.getTechDecisions();
-    res.json({ decisions });
+    res.json(await techTeamService.getDecisions());
   } catch (err) {
     console.error('Tech decisions error:', err);
     res.status(500).json({ error: 'Failed to load tech decisions' });
@@ -84,8 +60,7 @@ router.get('/decisions', async (req, res) => {
 // GET /api/tech-team/velocity — Sprint archive for velocity charts
 router.get('/velocity', async (req, res) => {
   try {
-    const archive = await notionService.getSprintArchive();
-    res.json({ sprints: archive });
+    res.json(await techTeamService.getVelocity());
   } catch (err) {
     console.error('Velocity error:', err);
     res.status(500).json({ error: 'Failed to load velocity data' });
@@ -95,50 +70,7 @@ router.get('/velocity', async (req, res) => {
 // GET /api/tech-team/agents — Agent registry + skill catalog from file system
 router.get('/agents', async (req, res) => {
   try {
-    const agentsDir = path.join(__dirname, '../../.claude/agents');
-    const skillsDir = path.join(__dirname, '../../.claude/skills');
-
-    const agents = [];
-    if (fsSync.existsSync(agentsDir)) {
-      const files = (await fs.readdir(agentsDir)).filter(f => f.endsWith('.md'));
-      for (const file of files) {
-        const content = await fs.readFile(path.join(agentsDir, file), 'utf8');
-        const nameMatch = content.match(/^#\s+(.+)/m);
-        const modelMatch = content.match(/model[:\s]+(\S+)/im) || content.match(/uses?\s+(sonnet|opus|haiku)/im);
-        const descMatch = content.match(/(?:description|purpose)[:\s]+(.+)/im);
-        agents.push({
-          id: file.replace('.md', ''),
-          name: nameMatch ? nameMatch[1].trim() : file.replace('.md', ''),
-          model: modelMatch ? modelMatch[1].trim() : 'Unknown',
-          description: descMatch ? descMatch[1].trim() : '',
-          file: file,
-        });
-      }
-    }
-
-    const skills = [];
-    if (fsSync.existsSync(skillsDir)) {
-      const entries = await fs.readdir(skillsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory()) {
-          const indexPath = path.join(skillsDir, entry.name, 'index.md');
-          const promptPath = path.join(skillsDir, entry.name, 'prompt.md');
-          const readmePath = path.join(skillsDir, entry.name, 'README.md');
-          let desc = '';
-          for (const p of [indexPath, promptPath, readmePath]) {
-            if (fsSync.existsSync(p)) {
-              const content = await fs.readFile(p, 'utf8');
-              const descLine = content.match(/(?:description|purpose)[:\s]+(.+)/im);
-              if (descLine) desc = descLine[1].trim();
-              break;
-            }
-          }
-          skills.push({ id: entry.name, name: entry.name, description: desc });
-        }
-      }
-    }
-
-    res.json({ agents, skills });
+    res.json(await techTeamService.getAgentsCatalog());
   } catch (err) {
     console.error('Agents error:', err);
     res.status(500).json({ error: 'Failed to load agent data' });
@@ -148,8 +80,7 @@ router.get('/agents', async (req, res) => {
 // GET /api/tech-team/strategy — Strategy cascade from Google Sheets
 router.get('/strategy', async (req, res) => {
   try {
-    const data = await sheetsService.getStrategyCascade();
-    res.json(data);
+    res.json(await techTeamService.getStrategy());
   } catch (err) {
     console.error('Strategy error:', err);
     res.status(500).json({ error: 'Failed to load strategy data' });
@@ -159,8 +90,7 @@ router.get('/strategy', async (req, res) => {
 // GET /api/tech-team/github — GitHub repo activity
 router.get('/github', async (req, res) => {
   try {
-    const data = await githubService.getRepoActivity(config.GITHUB_REPO_OWNER, config.GITHUB_REPO_NAME);
-    res.json(data);
+    res.json(await techTeamService.getGithubActivity());
   } catch (err) {
     console.error('GitHub error:', err);
     res.status(500).json({ error: 'Failed to load GitHub data' });
@@ -195,7 +125,7 @@ router.patch('/sprint/:id', async (req, res) => {
       return res.status(400).json({ error: `Invalid value for ${property}. Allowed: ${allowedValues[property].join(', ')}` });
     }
 
-    const result = await notionService.updateSprintItemProperty(pageId, property, value);
+    const result = await techTeamService.updateSprintItemProperty(pageId, property, value);
     res.json(result);
   } catch (err) {
     console.error('Sprint item update error:', err);

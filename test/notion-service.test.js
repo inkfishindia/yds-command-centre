@@ -68,6 +68,88 @@ describe('Notion Service — Pure Functions', () => {
   });
 });
 
+describe('Notion Service — stale-while-revalidate cache', () => {
+  // We reach into the module's cache Map via clearCache + the internal
+  // setCachedWithTime export so we can plant entries at controlled ages.
+  const ns = require('../server/services/notion');
+
+  // Helper: plant a cache entry with an explicit timestamp
+  function plantEntry(key, data, ageMs) {
+    // clearCache wipes everything; we only need one entry at a time in these tests
+    ns.clearCache();
+    // setCachedWithTime is exported and accepts (key, data, time)
+    ns.setCachedWithTime(key, data, Date.now() - ageMs);
+  }
+
+  const FRESH_AGE   = 2 * 60 * 1000;   //  2 min — within TTL
+  const STALE_AGE   = 7 * 60 * 1000;   //  7 min — past TTL, within hard expiry
+  const EXPIRED_AGE = 20 * 60 * 1000;  // 20 min — past hard expiry
+
+  it('returns fresh data without calling fetchFn', async () => {
+    plantEntry('swr-key', 'fresh-value', FRESH_AGE);
+    let called = false;
+    const result = await ns.deduplicatedFetch('swr-key', () => {
+      called = true;
+      return Promise.resolve('new-value');
+    });
+    assert.equal(result, 'fresh-value');
+    assert.equal(called, false, 'fetchFn should not be called for fresh cache');
+  });
+
+  it('returns stale data immediately when entry is past TTL but within hard expiry', async () => {
+    plantEntry('swr-stale', 'stale-value', STALE_AGE);
+    const result = await ns.deduplicatedFetch('swr-stale', () => Promise.resolve('new-value'));
+    assert.equal(result, 'stale-value', 'Should return stale data without waiting for refresh');
+  });
+
+  it('triggers a background refresh for stale entries', async () => {
+    plantEntry('swr-bg', 'stale-value', STALE_AGE);
+    let refreshCalled = false;
+    let resolveRefresh;
+    const refreshPromise = new Promise(resolve => { resolveRefresh = resolve; });
+
+    await ns.deduplicatedFetch('swr-bg', () => {
+      refreshCalled = true;
+      return refreshPromise;
+    });
+
+    assert.equal(refreshCalled, true, 'Background fetchFn should be invoked for stale entry');
+    // Let the background refresh complete so it does not leak into other tests
+    resolveRefresh('refreshed-value');
+    await new Promise(r => setImmediate(r)); // drain microtasks
+  });
+
+  it('does not stampede — only one background refresh in-flight per key', async () => {
+    plantEntry('swr-nodup', 'stale-value', STALE_AGE);
+    let callCount = 0;
+    const fetchFn = () => {
+      callCount++;
+      return new Promise(resolve => setImmediate(() => resolve('done')));
+    };
+    await ns.deduplicatedFetch('swr-nodup', fetchFn);
+    await ns.deduplicatedFetch('swr-nodup', fetchFn); // second call while bg is in-flight
+    assert.equal(callCount, 1, 'fetchFn must only be called once despite multiple stale reads');
+    await new Promise(r => setTimeout(r, 20)); // let background settle
+  });
+
+  it('does a blocking fetch when entry is hard-expired', async () => {
+    plantEntry('swr-exp', 'expired-value', EXPIRED_AGE);
+    let called = false;
+    const result = await ns.deduplicatedFetch('swr-exp', () => {
+      called = true;
+      return Promise.resolve('fresh-from-api');
+    });
+    assert.equal(called, true, 'fetchFn must be called when entry is hard-expired');
+    assert.equal(result, 'fresh-from-api');
+  });
+
+  it('does a blocking fetch on cold start (no entry)', async () => {
+    ns.clearCache();
+    const result = await ns.deduplicatedFetch('swr-cold', () => Promise.resolve('cold-result'));
+    assert.equal(result, 'cold-result');
+  });
+});
+
 describe('Notion simplify()', () => {
   let simplify;
 

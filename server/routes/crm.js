@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const sheetsService = require('../services/sheets');
-const hydrationService = require('../services/hydration');
+const crmService = require('../services/crm-service');
 
 /**
  * GET /api/crm
@@ -11,16 +11,7 @@ const hydrationService = require('../services/hydration');
  */
 router.get('/', async (req, res) => {
   try {
-    const [pipeline, people] = await Promise.all([
-      sheetsService.getPipelineData(),
-      sheetsService.fetchSheet('PEOPLE').catch(() => ({ available: false })),
-    ]);
-
-    res.json({
-      pipeline,
-      people: people.available !== false ? (people.rows || []) : [],
-      timestamp: new Date().toISOString(),
-    });
+    res.json(await crmService.getOverview());
   } catch (err) {
     console.error('CRM summary error:', err);
     res.status(500).json({ error: 'Failed to load CRM data' });
@@ -33,8 +24,7 @@ router.get('/', async (req, res) => {
  */
 router.get('/people', async (req, res) => {
   try {
-    const data = await hydrationService.hydrateSheetData('PEOPLE');
-    res.json(data);
+    res.json(await crmService.getPeople());
   } catch (err) {
     console.error('CRM people error:', err.message);
     res.status(500).json({ error: 'Failed to load people data' });
@@ -47,18 +37,10 @@ router.get('/people', async (req, res) => {
  */
 router.get('/projects', async (req, res) => {
   try {
-    const data = await hydrationService.hydrateSheetData('PROJECTS');
-    if (data.available === false) return res.json(data);
-
-    let rows = data.rows || [];
-    if (req.query.status) {
-      rows = rows.filter(r => (r.Status || r.status || '').toLowerCase() === req.query.status.toLowerCase());
-    }
-    if (req.query.owner) {
-      rows = rows.filter(r => (r.owner_User_id_resolved || '').toLowerCase().includes(req.query.owner.toLowerCase()));
-    }
-
-    res.json({ available: true, headers: data.headers, rows });
+    res.json(await crmService.getProjects({
+      status: req.query.status,
+      owner: req.query.owner,
+    }));
   } catch (err) {
     console.error('CRM projects error:', err.message);
     res.status(500).json({ error: 'Failed to load projects data' });
@@ -71,21 +53,11 @@ router.get('/projects', async (req, res) => {
  */
 router.get('/tasks', async (req, res) => {
   try {
-    const data = await hydrationService.hydrateSheetData('TASKS');
-    if (data.available === false) return res.json(data);
-
-    let rows = data.rows || [];
-    if (req.query.status) {
-      rows = rows.filter(r => (r.status || '').toLowerCase() === req.query.status.toLowerCase());
-    }
-    if (req.query.assignee) {
-      rows = rows.filter(r => (r.assignee_User_id_resolved || '').toLowerCase().includes(req.query.assignee.toLowerCase()));
-    }
-    if (req.query.project) {
-      rows = rows.filter(r => (r['Project id_resolved'] || '').toLowerCase().includes(req.query.project.toLowerCase()));
-    }
-
-    res.json({ available: true, headers: data.headers, rows });
+    res.json(await crmService.getTasks({
+      status: req.query.status,
+      assignee: req.query.assignee,
+      project: req.query.project,
+    }));
   } catch (err) {
     console.error('CRM tasks error:', err.message);
     res.status(500).json({ error: 'Failed to load tasks data' });
@@ -98,15 +70,7 @@ router.get('/tasks', async (req, res) => {
  */
 router.get('/campaigns', async (req, res) => {
   try {
-    const data = await sheetsService.fetchSheet('CAMPAIGNS');
-    if (data.available === false) return res.json(data);
-
-    let rows = data.rows || [];
-    if (req.query.status) {
-      rows = rows.filter(r => (r.status || '').toLowerCase() === req.query.status.toLowerCase());
-    }
-
-    res.json({ available: true, headers: data.headers, rows });
+    res.json(await crmService.getCampaigns({ status: req.query.status }));
   } catch (err) {
     console.error('CRM campaigns error:', err.message);
     res.status(500).json({ error: 'Failed to load campaigns data' });
@@ -119,8 +83,7 @@ router.get('/campaigns', async (req, res) => {
  */
 router.get('/business-units', async (req, res) => {
   try {
-    const data = await hydrationService.hydrateSheetData('BUSINESS_UNITS');
-    res.json(data);
+    res.json(await crmService.getBusinessUnits());
   } catch (err) {
     console.error('CRM business-units error:', err.message);
     res.status(500).json({ error: 'Failed to load business units' });

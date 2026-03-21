@@ -9,18 +9,35 @@ function getClient() {
   return notionClient;
 }
 
-// Simple in-memory cache with 5-minute TTL
+// Stale-while-revalidate cache
+// Fresh window  (0 – CACHE_TTL):       return immediately, no background fetch
+// Stale window  (CACHE_TTL – CACHE_HARD_EXPIRY): return stale data immediately + trigger background refresh
+// Expired       (> CACHE_HARD_EXPIRY): treat as cold start — blocking fetch
 const cache = new Map();
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 5 * 60 * 1000;          // 5 min — stale threshold
+const CACHE_HARD_EXPIRY = 15 * 60 * 1000; // 15 min — absolute expiry
 const DASHBOARD_CACHE_KEY = 'dashboard_summary_v1';
 const DASHBOARD_CACHE_TTL = 60 * 1000;
 
+/**
+ * Returns the raw cache entry so callers can inspect age themselves.
+ * Returns null if no entry exists at all.
+ */
+function getCacheEntry(key) {
+  return cache.get(key) || null;
+}
+
+/**
+ * Returns cached data if it is still within the fresh window (< CACHE_TTL).
+ * Returns null if absent, stale, or hard-expired.
+ * Side-effect: deletes hard-expired entries.
+ */
 function getCached(key) {
   const entry = cache.get(key);
-  if (entry && Date.now() - entry.time < CACHE_TTL) {
-    return entry.data;
-  }
-  cache.delete(key);
+  if (!entry) return null;
+  const age = Date.now() - entry.time;
+  if (age < CACHE_TTL) return entry.data;
+  if (age >= CACHE_HARD_EXPIRY) cache.delete(key);
   return null;
 }
 
@@ -65,15 +82,54 @@ async function processWriteQueue() {
   writeProcessing = false;
 }
 
+/**
+ * Stale-while-revalidate fetch with in-flight deduplication.
+ *
+ * - Fresh hit  (age < CACHE_TTL):           returns cached data, no network call
+ * - Stale hit  (CACHE_TTL <= age < HARD):   returns stale data immediately;
+ *                                            fires a background refresh if none in-flight
+ * - Cold start (no entry or age >= HARD):   blocking fetch, result is cached
+ */
 function deduplicatedFetch(cacheKey, fetchFn) {
-  // Check cache first
-  const cached = getCached(cacheKey);
-  if (cached) return Promise.resolve(cached);
+  const entry = getCacheEntry(cacheKey);
 
-  // Check if there's already an in-flight request for this key
+  if (entry) {
+    const age = Date.now() - entry.time;
+
+    // Fresh — return immediately
+    if (age < CACHE_TTL) return Promise.resolve(entry.data);
+
+    // Stale but within hard expiry — return stale, kick off background refresh
+    if (age < CACHE_HARD_EXPIRY) {
+      if (!inFlight.has(cacheKey)) {
+        const fetchStartedAt = Date.now();
+        const bg = fetchFn()
+          .then(result => {
+            // Only overwrite cache if no fresher write has landed since we started
+            const current = cache.get(cacheKey);
+            if (!current || current.time <= fetchStartedAt) {
+              setCache(cacheKey, result);
+            }
+            return result;
+          })
+          .catch(err => {
+            console.warn(`[notion-cache] Background refresh failed for "${cacheKey}":`, err.message || err);
+          })
+          .finally(() => {
+            inFlight.delete(cacheKey);
+          });
+        inFlight.set(cacheKey, bg);
+      }
+      return Promise.resolve(entry.data);
+    }
+
+    // Hard-expired — fall through to blocking fetch (entry deleted in getCached)
+    cache.delete(cacheKey);
+  }
+
+  // Cold start or hard-expired — join existing in-flight or start a new blocking fetch
   if (inFlight.has(cacheKey)) return inFlight.get(cacheKey);
 
-  // Start the fetch and store the promise
   const promise = fetchFn()
     .then(result => {
       setCache(cacheKey, result);
@@ -2176,4 +2232,7 @@ module.exports = {
   getSprintArchive,
   getTechTeamSummary,
   updateSprintItemProperty,
+  // Cache internals — exported for testing only
+  setCachedWithTime,
+  deduplicatedFetch,
 };

@@ -1,14 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const notionService = require('../services/notion');
-const fs = require('fs').promises;
-const path = require('path');
+const marketingOpsService = require('../services/marketing-ops-service');
 
 // GET /api/marketing-ops — aggregated summary
 router.get('/', async (req, res) => {
   try {
-    const data = await notionService.getMarketingOpsSummary();
-    res.json(data);
+    res.json(await marketingOpsService.getSummary());
   } catch (err) {
     console.error('Marketing ops summary error:', err);
     res.status(500).json({ error: 'Failed to load marketing ops data' });
@@ -18,11 +15,7 @@ router.get('/', async (req, res) => {
 // GET /api/marketing-ops/campaigns
 router.get('/campaigns', async (req, res) => {
   try {
-    let campaigns = await notionService.getCampaigns();
-    if (req.query.stage) {
-      campaigns = campaigns.filter(c => c.Stage === req.query.stage);
-    }
-    res.json({ campaigns });
+    res.json(await marketingOpsService.getCampaigns({ stage: req.query.stage }));
   } catch (err) {
     console.error('Campaigns error:', err);
     res.status(500).json({ error: 'Failed to load campaigns' });
@@ -32,11 +25,7 @@ router.get('/campaigns', async (req, res) => {
 // GET /api/marketing-ops/content
 router.get('/content', async (req, res) => {
   try {
-    let content = await notionService.getContentCalendar();
-    if (req.query.status) {
-      content = content.filter(c => c.Status === req.query.status);
-    }
-    res.json({ content });
+    res.json(await marketingOpsService.getContent({ status: req.query.status }));
   } catch (err) {
     console.error('Content calendar error:', err);
     res.status(500).json({ error: 'Failed to load content calendar' });
@@ -46,11 +35,7 @@ router.get('/content', async (req, res) => {
 // GET /api/marketing-ops/sequences
 router.get('/sequences', async (req, res) => {
   try {
-    let sequences = await notionService.getSequences();
-    if (req.query.journeyStage) {
-      sequences = sequences.filter(s => s['Journey Stage'] === req.query.journeyStage);
-    }
-    res.json({ sequences });
+    res.json(await marketingOpsService.getSequences({ journeyStage: req.query.journeyStage }));
   } catch (err) {
     console.error('Sequences error:', err);
     res.status(500).json({ error: 'Failed to load sequences' });
@@ -61,8 +46,7 @@ router.get('/sequences', async (req, res) => {
 router.get('/sessions', async (req, res) => {
   try {
     const days = Math.min(Math.max(parseInt(req.query.days) || 30, 1), 365);
-    const sessions = await notionService.getSessionsLog(days);
-    res.json({ sessions });
+    res.json(await marketingOpsService.getSessions(days));
   } catch (err) {
     console.error('Sessions log error:', err);
     res.status(500).json({ error: 'Failed to load sessions' });
@@ -96,7 +80,7 @@ router.patch('/campaigns/:id', async (req, res) => {
   }
 
   try {
-    const result = await notionService.updateCampaignProperty(pageId, property, value);
+    const result = await marketingOpsService.updateCampaignProperty(pageId, property, value);
     res.json(result);
   } catch (err) {
     console.error('Campaign update error:', err);
@@ -111,8 +95,7 @@ router.get('/campaigns/:id/commitments', async (req, res) => {
     return res.status(400).json({ error: 'Invalid page ID format' });
   }
   try {
-    const commitments = await notionService.getCampaignCommitments(pageId);
-    res.json({ commitments });
+    res.json(await marketingOpsService.getCampaignCommitments(pageId));
   } catch (err) {
     console.error('Campaign commitments error:', err);
     res.status(500).json({ error: 'Failed to load campaign commitments' });
@@ -122,9 +105,7 @@ router.get('/campaigns/:id/commitments', async (req, res) => {
 // GET /api/marketing-ops/metrics — key business metrics
 router.get('/metrics', async (req, res) => {
   try {
-    const metricsPath = path.join(__dirname, '..', 'data', 'metrics.json');
-    const raw = await fs.readFile(metricsPath, 'utf-8');
-    res.json(JSON.parse(raw));
+    res.json(await marketingOpsService.getMetrics());
   } catch (err) {
     console.error('Metrics error:', err);
     res.status(500).json({ error: 'Failed to load metrics' });

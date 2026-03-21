@@ -162,9 +162,11 @@ Campaign, content, sequence, and session dashboards with:
 Strategic business model overview across 11 sections:
 - **All sections parallel:** Segments, Business Units, Flywheels, Revenue Streams, Cost Structure, Channels, Platforms, Team, Hubs, Partners, Metrics
 - **Hydrated data:** All FK references resolved (e.g., owner IDs → names)
-- **Tab navigation:** Click section tabs to filter view
-- **5-col × 3-row grid layout:** Expandable blocks with detail panels
-- **Stats callout:** Totals for each section (total segments, total team members, etc.)
+- **Hybrid executive canvas:** summary hero + spotlight cards above the classic canvas structure
+- **Section cards:** top items with preview text and status pills rather than raw flat rows
+- **Value proposition emphasis:** center block visually elevated as the strategic core
+- **Scroll-responsive layout:** page-level scroll preferred over nested card scroll; stacks cleanly on small screens
+- **Detail panel:** `Canvas Detail` drawer is positioned as the next step toward inline editing
 - Keyboard nav (g+b)
 
 ### 10. CRM
@@ -269,11 +271,21 @@ PATCH /api/sheets/CAMPAIGNS/3            # Update row 3 campaign status
 
 ```
 GOOGLE_SERVICE_ACCOUNT_KEY              # Path to service account JSON (read/write scope)
+GOOGLE_SHEETS_ID                        # Legacy CRM pipeline spreadsheet ID (LEAD_FLOWS source)
 STRATEGY_SPREADSHEET_ID                 # Google Sheets ID for Strategy spreadsheet
 EXECUTION_SPREADSHEET_ID                # Google Sheets ID for Execution spreadsheet
 APP_LOGGING_SPREADSHEET_ID              # Google Sheets ID for App Logging spreadsheet
 BMC_SPREADSHEET_ID                      # Google Sheets ID for Business Model Canvas spreadsheet
 ```
+
+Current local verification status:
+- Confirmed:
+  - GOOGLE_SHEETS_ID
+  - EXECUTION_SPREADSHEET_ID
+  - APP_LOGGING_SPREADSHEET_ID
+  - BMC_SPREADSHEET_ID
+- Pending final verification:
+  - STRATEGY_SPREADSHEET_ID
 
 ### API Isolation
 

@@ -4,16 +4,26 @@ Browser-based interface for Colin (AI Chief of Staff) at YourDesignStore. Gives 
 
 ## Stack
 
-Node.js + Express · Alpine.js · Anthropic Claude SDK (Opus) · Notion SDK · SSE · No build step
+Node.js + Express · Alpine.js SPA · Anthropic Claude SDK (Opus) · Notion SDK · SSE · Lightweight asset build (`npm run build`)
 
 ## Architecture
 
 ```
-Browser (Alpine.js)  ←— SSE —→  Express Server  ←— SDK —→  Claude API
-                                       |
-                                  Tool Handler
-                                 /     |     \
-                            Notion   Files   Approval Gate
+Browser (Alpine.js SPA)
+        |
+        | static shell + JSON/SSE
+        v
+Express Server (server.js)
+        |
+        +-- Routes (controller-thin HTTP layer)
+        |
+        +-- Domain services (dashboard, projects, CRM, marketing ops, tech team, factory)
+        |
+        +-- Infrastructure services (Notion, Sheets, hydration, GitHub, approvals, agent loop)
+        |
+        +-- Tool handler / approval gate
+        |
+        +-- Claude API
 ```
 
 ## File Map
@@ -23,12 +33,31 @@ server.js                          # Express entry, middleware, static serving
 server/config.js                   # Env vars, model config, workspace paths
 server/routes/
   chat.js                          # POST /api/chat (SSE stream), approval resolve
-  notion.js                        # Dashboard, databases, pages, commitments
+  notion.js                        # Notion-backed read routes
+  commitments.js                   # Commitment write routes
+  decisions.js                     # Decision write routes
+  crm.js                           # CRM endpoints
+  marketing-ops.js                 # Marketing operations endpoints
+  tech-team.js                     # Tech team endpoints
+  factory.js                       # Factory config + simulation endpoints
+  bmc.js                           # Business Model Canvas endpoints
+  registry.js                      # Internal project registry endpoints
+  sheets.js                        # Registered Google Sheets access
   documents.js                     # Briefings, decisions, weekly reviews
   skills.js                        # List available skill buttons
 server/services/
   agent.js                         # Claude API agentic loop (tool use cycle)
-  notion.js                        # Notion SDK wrapper, 5-min cache, all queries
+  notion.js                        # Notion SDK wrapper, 5-min cache, raw query primitives
+  dashboard-service.js             # Dashboard summary + action queue composition
+  projects-service.js              # Project enrichment + commitment stats
+  notion-detail-service.js         # Focus area + person detail composition
+  crm-service.js                   # CRM aggregation/filtering
+  marketing-ops-service.js         # Marketing Ops aggregation/filtering
+  tech-team-service.js             # Tech Team aggregation/catalog composition
+  factory-service.js               # Factory config read/write orchestration
+  sheets.js                        # Google Sheets access + cache
+  hydration.js                     # FK hydration between sheet datasets
+  github.js                        # GitHub repo activity wrapper
   prompts.js                       # Load system prompt from Colin's workspace
   approval.js                      # Promise-based write approval queue
 server/tools/
@@ -37,8 +66,11 @@ server/tools/
   tool-handler.js                  # Central dispatch + Notion property converter
 public/
   index.html                       # SPA shell (Alpine.js templates)
-  js/app.js                        # All frontend state and methods
+  js/app.js                        # Built frontend bundle copied from src/js
   css/styles.css                   # Dark theme, responsive layout
+src/js/
+  app.js                           # Root shell + shared utilities + module composition
+  modules/                         # Domain frontend modules (chat, dashboard, commitments, factory, command-shell, CRM, etc.)
 .claude/
   agents/                          # Agent configs (frontend-builder, backend-builder, code-reviewer, devops-infra, ux-auditor, pixel, design-planner, tester, scribe)
   rules/                           # Coding patterns (frontend, server, token efficiency)
@@ -52,16 +84,17 @@ public/
 
 1. **Approval Gate** — All writes pause, send SSE `approval` event, wait for Dan. Never bypass.
 2. **Agent Loop** — Claude responds → tool calls → execute/approve → feed back → repeat until `end_turn`.
-3. **Notion Cache** — 5-min TTL + request dedup + retry with backoff. Clear: `POST /api/notion/cache/clear`.
-4. **SSE Events** — `text`, `tool_use`, `approval`, `error`, `done`. All 5 must be handled.
-5. **Single State** — All frontend state in one `app()` function. No component splitting.
+3. **Thin Routes** — Express routes validate/request-shape/HTTP concerns; business orchestration belongs in domain services.
+4. **Notion + Sheets Infrastructure** — raw SDK/data access stays in infrastructure services; domain services compose product-facing payloads.
+5. **Frontend Modules** — keep domain state in `src/js/modules/*`; `src/js/app.js` should remain a shell/composition layer, not a dumping ground.
+6. **Build Step Exists** — edit `src/js/*`, then build to `public/js/*`.
 
 ## Agent Routing
 
 | Task | Agent | Model | Owns |
 |------|-------|-------|------|
 | Design planning | `design-planner` | Haiku | `design-system/` |
-| Frontend code | `frontend-builder` | Sonnet | `public/` (index.html, app.js, styles.css) |
+| Frontend code | `frontend-builder` | Sonnet | `src/js/`, `public/`, `css/` |
 | Backend code | `backend-builder` | Sonnet | `server/`, `test/`, `server.js` |
 | Quality gate | `code-reviewer` | Sonnet | read-only review |
 | UX consistency | `ux-auditor` | Haiku | read-only audit |
@@ -93,7 +126,7 @@ public/
 `devops-infra` → `code-reviewer`
 
 **After code changes (always):**
-`code-reviewer` → `tester` (integration tests) → `scribe` (update docs)
+`code-reviewer` → `tester` (tests) → `scribe` (update docs)
 
 Do not skip steps. The lead session orchestrates — call each agent in order, passing context forward. For full-stack features, backend-builder's handoff tells frontend-builder the new endpoint shape.
 
@@ -102,7 +135,7 @@ Do not skip steps. The lead session orchestrates — call each agent in order, p
 ```bash
 cp .env.example .env     # Add ANTHROPIC_API_KEY and NOTION_TOKEN
 npm install
-npm test                 # Run tests (40 tests, node built-in runner)
+npm test                 # Run tests (402 tests, node built-in runner)
 npm run dev              # http://localhost:3000 (watch mode)
 ```
 
@@ -120,6 +153,8 @@ npm run dev              # http://localhost:3000 (watch mode)
 - Never modify `../dan/` (Colin's workspace) — read only
 - Never bypass approval gate for writes
 - CommonJS only on server (`require`/`module.exports`)
-- Alpine.js only on frontend (no React, no build step)
-- All Notion calls through `server/services/notion.js`
+- Alpine.js only on frontend (no React)
+- Frontend source lives in `src/js`; built assets live in `public/js`
+- Keep route handlers thin; move aggregation/enrichment into domain services
+- Raw Notion access goes through `server/services/notion.js`; route/view payload composition goes in domain services
 - Dates from Notion are `{start, end}` objects — handle in templates

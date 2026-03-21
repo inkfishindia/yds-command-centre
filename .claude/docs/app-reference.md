@@ -2,7 +2,48 @@
 
 **Purpose:** Single source of truth for what exists in the app. Read this before building anything. Update this when you change the app.
 
-**Last updated:** 2026-03-20 (Phase 1+2: morning brief, focus area detail, person metrics, action queue, decision creation, sheets pipeline, health strip, inline actions; Productivity sprint: keyboard shortcuts, visibility refresh, nav badges, Cmd+K search, bulk actions; Mobile responsive: @768px @480px bottom nav; Phase 3: decision log view, stale project indicators, team overload badges, getRecentDecisions pagination; Phase 4: Project Registry with 11-project data store, PATCH updates, filter/type toggles, keyboard nav g+r; Knowledge Base feature: notebooks service, registry parser, KB view, search/filter, keyboard nav g+k; Marketing Ops: campaigns/content/sequences/sessions dashboards, 4 new Notion DBs, kanban boards, 5 API endpoints, keyboard nav g+m; Marketing Ops inline actions: PATCH campaigns/:id, campaign commitments link, key metrics endpoint; Marketing Ops enhancements: Sequence Journey Map (table/journey toggle, kanban by stage), Campaign Actions (PATCH inline, loading state), Campaign Commitments (linked detail panel), Key Metrics Callout (collapsible metrics with progress bars); Phase 5: Tech Team module — 10-tab view (command center, sprint board, bugs, specs, decisions, velocity, roadmap, CRM, agents, strategy), 4 new Notion DBs, GitHub service, strategy cascade; Phase 6: Enhanced Sheets Service (SHEET_REGISTRY 25 tabs across 4 spreadsheets), Data Hydration Service (24 FK relationships), Business Model Canvas view (11 sections, parallel load), CRM view (8 endpoints, 6 section tabs), Marketing AI Tools (4 tools: customer_psychology, competitor_analysis, content_strategy, campaign_ideator), Store Expert Tool (knowledge base query/update with path protection))
+**Last updated:** 2026-03-21 (Architecture hardening complete: backend route orchestration extracted into domain services; frontend root app split into chat, commitments, factory, command-shell, BMC, CRM, marketing ops, tech team, registry, projects, team, documents, notion-browser, and dashboard modules; command palette and navigation now use `Cmd/Ctrl+K`, `/`, and `Cmd/Ctrl+Shift+...` shortcuts; build step confirmed via `npm run build`; BMC redesigned as a hybrid executive canvas with summary hero, richer section cards, stronger value-proposition emphasis, and scroll-responsive layout; confirmed local Sheets wiring added for legacy CRM pipeline, execution, app logging, and BMC while strategy remains pending final verification)
+
+---
+
+## Runtime Architecture
+
+### Backend shape
+- `server.js` remains the thin Express entrypoint and route registrar.
+- `server/routes/*.js` now behave as controller-thin HTTP layers.
+- Infrastructure access stays in services like `server/services/notion.js`, `server/services/sheets.js`, `server/services/hydration.js`, and `server/services/github.js`.
+- Domain orchestration now lives in dedicated services:
+  - `server/services/dashboard-service.js`
+  - `server/services/projects-service.js`
+  - `server/services/notion-detail-service.js`
+  - `server/services/crm-service.js`
+  - `server/services/marketing-ops-service.js`
+  - `server/services/tech-team-service.js`
+  - `server/services/factory-service.js`
+
+### Frontend shape
+- The app is still a SPA.
+- `src/js/app.js` is now primarily the composition shell plus shared utility methods.
+- Domain state and actions are split into:
+  - `src/js/modules/chat.js`
+  - `src/js/modules/commitments.js`
+  - `src/js/modules/factory.js`
+  - `src/js/modules/command-shell.js`
+  - `src/js/modules/dashboard.js`
+  - `src/js/modules/bmc.js`
+  - `src/js/modules/crm.js`
+  - `src/js/modules/marketing-ops.js`
+  - `src/js/modules/tech-team.js`
+  - `src/js/modules/registry.js`
+  - `src/js/modules/projects.js`
+  - `src/js/modules/team.js`
+  - `src/js/modules/documents.js`
+  - `src/js/modules/notion-browser.js`
+
+### Build and runtime
+- There is a real frontend asset build step.
+- `npm run build` copies `src/js/*` into `public/js/*` through `scripts/build-assets.mjs`.
+- `npm start` and `npm run dev` both run the build step before starting the server.
 
 ---
 
@@ -169,11 +210,12 @@
 - Shows properties + markdown content for any entity
 - Opened from: dashboard cards, dashboard tables, team cards, notion entries
 
-### Command palette (Cmd+K):
+### Command palette:
 - Searches: navigation views (Chat, Dashboard, Team, Queue, Projects, Registry, Decision Log, Docs), databases, key pages, skills, people (from team), focus areas, overdue commitments
 - Results can navigate to views or open detail panel
 - Arrow keys + Enter to execute
-- `/` opens palette; Vim-style chords also available (see Keyboard Shortcuts)
+- `Cmd/Ctrl+K` and `/` open the palette
+- Direct navigation uses `Cmd/Ctrl+Shift+...` shortcuts (see Keyboard Shortcuts)
 
 ### Marketing Ops shows:
 - **Key Metrics callout** (collapsible section above stats strip): Revenue, Repeat Rate, Customizer to Cart, Customer Count — each with metric card, target, progress bar
@@ -184,15 +226,15 @@
 
 ---
 
-## State Variables (app.js)
+## State Variables (by module)
 
 ### Core
 `view`, `connected`
 
-### Chat
+### Chat (`src/js/modules/chat.js`)
 `messages[]`, `inputText`, `streaming`, `streamingText`, `pendingApprovals[]`, `activeTools[]`
 
-### Dashboard
+### Dashboard (`src/js/modules/dashboard.js`)
 `dashboard`, `dashboardLoading`, `upcomingCommitments[]`, `expandedDecision`, `expandedCommitmentRow`, `showCompletedThisWeek`, `lastRefresh`, `refreshIntervalId`
 `morningBrief`, `briefLoading`, `selectedOverdue[]` (for bulk actions)
 
@@ -208,13 +250,12 @@
 ### Pipeline
 `pipeline`, `pipelineLoading`
 
-### Create Modals
+### Commitments + Write-Back (`src/js/modules/commitments.js`)
 `showCreateCommitment`, `showCreateDecision`, `submittingCommitment`, `submittingDecision`
 `newCommitment` {name, assigneeId, dueDate, focusAreaId, priority, projectId, notes}
 `newDecision` {name, decision, rationale, context, focusAreaId, owner}
-
-### Inline Actions
 `showSnoozeFor` (null or commitment id), `showReassignFor` (null or commitment id), `actionFeedback` (string or null)
+`commitments[]`, `commitmentsLoading`, `commitmentsView`, `commitmentFilters`, `editDropdown`, `undoToast`, `quickNoteText`, `quickNoteSaving`, `writeErrors`, `peopleList`
 
 ### Decision Filters
 `decisionDateRange` ('all'|'week'|'month'|'3months'), `decisionSearch` (keyword string), `decisionFocusArea` (focus area name), `decisionOwner` (owner name)
@@ -222,10 +263,10 @@
 ### Decisions View
 `decisions[]`, `decisionsLoading`
 
-### Projects
+### Projects (`src/js/modules/projects.js`)
 `projects[]`, `projectsLoading`, `projectsFilter: 'Active'`, `projectsTypeFilter: ''`, `expandedProject` (null or project id)
 
-### Registry
+### Registry (`src/js/modules/registry.js`)
 `registry[]`, `registryLoading`, `registryFilter` (status filter string), `registryTypeFilter` (type filter string), `registryExpanded` (null or project slug)
 
 #### Registry Methods
@@ -247,7 +288,7 @@
 | `getFilteredNotebooks()` | Apply `notebooksSearch` + `notebooksCategory` filters to `notebooks.notebooks[]`, return filtered array |
 | `getTotalFilteredNotebooks()` | Return count of filtered notebooks |
 
-### Marketing Ops
+### Marketing Ops (`src/js/modules/marketing-ops.js`)
 `mktops`, `mktopsLoading`, `mktopsSection` ('campaigns'|'content'|'sequences'|'sessions'), `mktopsMetrics[]`, `mktopsMetricsExpanded` (boolean), `mktopsSequenceView` ('table'|'journey'), `mktopsActionLoading` (campaign ID or null), `mktopsCampaignCommitments`, `mktopsCampaignCommitmentsLoading`
 
 #### Marketing Ops Methods
@@ -263,19 +304,37 @@
 | `getCampaignActions(campaign)` | Return array of valid action {property, value} pairs for a campaign |
 | `loadCampaignCommitments(id)` | Fetch GET /api/marketing-ops/campaigns/:id/commitments, store in `mktopsCampaignCommitments`, use beginRequest/endRequest pattern |
 
-### Tech Team
+### Tech Team (`src/js/modules/tech-team.js`)
 `techTeam`, `techTeamLoading`, `techTeamSection` ('command'|'sprint'|'bugs'|'specs'|'decisions'|'velocity'|'roadmap'|'crm'|'agents'|'strategy'), `techTeamLastRefresh`, `techSystemFilter`, `techPriorityFilter`, `techTypeFilter`, `techSprintSearch`, `techActionLoading`, `techExpandedItem`, `techAgents`, `techStrategy`, `techGithub`
 
-### Business Model Canvas
-`bmc`, `bmcLoading`, `bmcSection` ('overview'|'segments'|'business_units'|'flywheels'|'revenue_streams'|'cost_structure'|'channels'|'platforms'|'team'|'hubs'|'partners'|'metrics'), `bmcStats{}`
+### Business Model Canvas (`src/js/modules/bmc.js`)
+`bmc`, `bmcLoading`, `bmcDetailItem`, `bmcDetailKey`
 
 #### BMC Methods
 | Method | Purpose |
 |--------|---------|
 | `loadBMC()` | Fetch aggregated BMC data from GET /api/bmc, store in `bmc` with all 11 sections hydrated |
-| `getBMCSectionData(section)` | Return rows from bmc.canvas[section] for current tab |
+| `getBmcBlockItems(blockKey)` | Return raw rows for a BMC block from `bmc.canvas[blockKey]` |
+| `getBmcTopItems(blockKey, limit)` | Return the top N rows for summary rendering in a section card |
+| `getBmcItemLabel(blockKey, item)` | Pick the most human-readable title field for an item |
+| `getBmcItemPreview(blockKey, item)` | Pick a short secondary line used in card previews |
+| `getBmcStatus(blockKey, item)` | Derive a status/priority pill label from the item data |
+| `getBmcStatusClass(value)` | Map a status string to the visual pill class |
+| `getBmcSectionSummary(blockKey)` | Return a short strategic description for each BMC section |
+| `getBmcHeroMetrics()` | Build the top summary cards from BMC stats and block totals |
+| `getBmcSpotlight(blockKey)` | Return the lead item used in the hero spotlight cards |
+| `openBmcDetail(blockKey, item)` | Open the detail drawer with the section key + selected item |
+| `getBmcDetailTitle()` | Resolve the detail drawer title from the active block/item |
 
-### CRM
+### Business Model Canvas shows:
+- Executive summary hero with a strategic positioning line, spotlight cards, and 4 key totals
+- Hybrid BMC grid preserving classic left/center/right/bottom structure while using richer modern section cards
+- Value Proposition block visually emphasized as the primary strategic center
+- Section cards show top items only by default with preview text and status pills instead of flat list rows
+- Detail drawer labeled `Canvas Detail`, designed to feel edit-ready later while the page remains read-first today
+- Page-level scroll is preferred over nested inner-card scrolling; mobile stacks into a single-column reading flow
+
+### CRM (`src/js/modules/crm.js`)
 `crm`, `crmLoading`, `crmSection` ('overview'|'people'|'projects'|'tasks'|'campaigns'|'business-units'), `crmActiveRow` (null or selected row index)
 
 #### CRM Methods
@@ -301,23 +360,43 @@
 | `getTechPriorityClass(priority)` | Return CSS class for priority level |
 | `getTechTypeClass(type)` | Return CSS class for item type |
 
-### Team
+### Team (`src/js/modules/team.js`)
 `teamData[]`, `teamLoading`
 
-### Documents
+### Documents (`src/js/modules/documents.js`)
 `documents{briefings, decisions, weekly-reviews}`, `docsTab`, `docsLoading`, `activeDoc`
 
 ### Keyboard Shortcuts
-`_chordPending` (current chord buffer for multi-key sequences), `_chordTimeout` (timer ID for 500ms chord window), `_lastVisible` (timestamp of last visibility change, triggers dashboard refresh if 60+ seconds)
+- `Cmd/Ctrl+K` or `/` opens command palette
+- `Cmd/Ctrl+Shift+D` Dashboard
+- `Cmd/Ctrl+Shift+P` Projects
+- `Cmd/Ctrl+Shift+T` Team
+- `Cmd/Ctrl+Shift+Q` Queue
+- `Cmd/Ctrl+Shift+F` Documents
+- `Cmd/Ctrl+Shift+L` Decision Log
+- `Cmd/Ctrl+Shift+R` Registry
+- `Cmd/Ctrl+Shift+K` Knowledge Base
+- `Cmd/Ctrl+Shift+O` Notion
+- `Cmd/Ctrl+Shift+U` Factory
+- `Cmd/Ctrl+Shift+B` BMC
+- `Cmd/Ctrl+Shift+I` CRM
+- `Cmd/Ctrl+Shift+M` Marketing Ops
+- `Cmd/Ctrl+Shift+E` Tech Team
+- `Cmd/Ctrl+Shift+N` New Commitment
+- `Cmd/Ctrl+Shift+J` New Decision
+- `_lastVisible` triggers dashboard refresh when the tab returns after 60s+
 
-### Notion Browser
+### Notion Browser (`src/js/modules/notion-browser.js`)
 `notionDatabases[]`, `notionEntries[]`, `notionLoading`, `notionActiveDb`, `notionActivePage`, `notionPageContent`, `notionKeyPages[]`, `notionHasMore`, `notionNextCursor`, `notionRelated`, `notionRelatedLoading`, `notionSearchQuery`, `notionFilterStatus`
 
 ### Detail Panel
 `detailPanel` (null or {id, name, url, properties, content, loading})
 
-### Command Palette
+### Command Palette + Navigation (`src/js/modules/command-shell.js`)
 `cmdPaletteOpen`, `cmdSearch`, `cmdSelectedIndex`
+
+### Factory (`src/js/modules/factory.js`)
+`factoryZoneDetail`, `factorySimOpen`, `factorySimConfig`, `factorySimPreset`, `_factoryBaseCache`, `factoryConfig`, `factoryConfigLoading`, `factoryEditingMachine`, `factoryEditingZone`, `factoryShowFormulas`, `factoryMachineEdits`, `factoryZoneEdits`, `factoryOperatingEdits`, `factoryEditingOperating`, `factoryError`
 
 ---
 
@@ -430,11 +509,21 @@
 
 ### Environment Variables
 - `GOOGLE_SERVICE_ACCOUNT_KEY` (optional) — Path to Google service account JSON file
+- `GOOGLE_SHEETS_ID` (optional) — Legacy CRM pipeline spreadsheet ID (`LEAD_FLOWS` source)
 - `STRATEGY_SPREADSHEET_ID` (optional) — Strategy spreadsheet ID
 - `EXECUTION_SPREADSHEET_ID` (optional) — Execution spreadsheet ID
 - `APP_LOGGING_SPREADSHEET_ID` (optional) — App logging spreadsheet ID
 - `BMC_SPREADSHEET_ID` (optional) — Business Model Canvas spreadsheet ID
 - Returns `{available: false}` if required env vars are missing
+
+### Current Local Verification Status
+- Confirmed locally in `.env`:
+  - `GOOGLE_SHEETS_ID` → legacy CRM pipeline workbook (`CRM - Core`, `LEAD_FLOWS`)
+  - `EXECUTION_SPREADSHEET_ID` → execution workbook with exact matches for `PROJECTS`, `TASKS`, `PEOPLE & CAPACITY`, `CAMPAIGNS`, `EXECUTIVE DASHBOARD`, `TIME TRACKING`
+  - `APP_LOGGING_SPREADSHEET_ID` → app workbook with exact matches for `Login` and `BrainDump`
+  - `BMC_SPREADSHEET_ID` → BMC workbook with exact matches for the 11 BMC sections used by the app
+- Still pending final verification:
+  - `STRATEGY_SPREADSHEET_ID`
 
 ---
 
