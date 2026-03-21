@@ -469,6 +469,46 @@ async function getAllCommitments(includeCancelled = false) {
 }
 
 /**
+ * Fetch only active commitments — excludes both Done and Cancelled.
+ * Used by the dashboard and action queue where completed work is irrelevant.
+ * Significantly reduces payload size vs getAllCommitments() on large workspaces.
+ */
+async function getActiveCommitments() {
+  return deduplicatedFetch('active_commitments', async () => {
+    const notion = getClient();
+    const commitments = [];
+    let cursor;
+    const params = {
+      database_id: DB.COMMITMENTS,
+      page_size: 100,
+      filter: {
+        and: [
+          { property: 'Status', select: { does_not_equal: 'Done' } },
+          { property: 'Status', select: { does_not_equal: 'Cancelled' } },
+        ],
+      },
+    };
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        ...params,
+        start_cursor: cursor,
+      }));
+      commitments.push(...response.results.map(page => {
+        const simplified = simplify(page.properties);
+        if (!simplified.Priority) simplified.Priority = 'Unset';
+        if (!simplified.Type) simplified.Type = 'Unset';
+        return { id: page.id, last_edited_time: page.last_edited_time, ...simplified };
+      }));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+    return commitments;
+  }).catch(err => {
+    console.error('Failed to fetch active commitments:', err.message);
+    return [];
+  });
+}
+
+/**
  * Fetch commitments completed (Status = Done) in the last N days.
  * Uses last_edited_time as the recency signal.
  */
@@ -581,13 +621,15 @@ async function getDashboardSummary() {
     return cachedDashboard.data;
   }
 
+  // Use getActiveCommitments() (excludes Done + Cancelled) instead of getAllCommitments()
+  // to avoid fetching completed work that the dashboard doesn't display.
   const [focusAreas, overdue, decisions, people, projects, allCommitments, upcoming, audiencesResult, platformsResult, recentlyCompleted] = await Promise.all([
     getFocusAreas(),
     getOverdueCommitments(),
     getRecentDecisions(7),
     getPeople(),
     getProjects(),
-    getAllCommitments(),
+    getActiveCommitments(),
     getUpcomingCommitments(7),
     queryDatabase(DB.AUDIENCES, { pageSize: 50 }),
     queryDatabase(DB.PLATFORMS, { pageSize: 50 }),
@@ -645,20 +687,19 @@ async function getDashboardSummary() {
   const commitmentsByPerson = {};
   const activeCommitmentsByPerson = {};
 
+  // allCommitments is now active-only (getActiveCommitments excludes Done + Cancelled),
+  // so every item here is active — no need for isActive guards below.
   for (const c of allCommitments) {
     const assignedIds = c['Assigned To'] || [];
     const normalizedAssignedIds = Array.isArray(assignedIds)
       ? assignedIds.map(id => id.replace(/-/g, ''))
       : [];
-    const isActive = c.Status && !['Done', 'Cancelled'].includes(c.Status);
 
     for (const personId of normalizedAssignedIds) {
       if (!commitmentsByPerson[personId]) commitmentsByPerson[personId] = [];
       commitmentsByPerson[personId].push(c);
-      if (isActive) {
-        if (!activeCommitmentsByPerson[personId]) activeCommitmentsByPerson[personId] = [];
-        activeCommitmentsByPerson[personId].push(c);
-      }
+      if (!activeCommitmentsByPerson[personId]) activeCommitmentsByPerson[personId] = [];
+      activeCommitmentsByPerson[personId].push(c);
     }
 
     const faIds = c['Focus Area'] || c['Focus Areas'] || c['Focus area'] || [];
@@ -673,8 +714,8 @@ async function getDashboardSummary() {
         faAllDates[nid].push(dueStart);
       }
 
-      // Overdue: active, due < today
-      if (isActive && dueStart && dueStart < todayStr) {
+      // Overdue: due < today (all items here are active — no guard needed)
+      if (dueStart && dueStart < todayStr) {
         if (!faOverdue[nid]) faOverdue[nid] = [];
         faOverdue[nid].push(c);
       }
@@ -813,9 +854,9 @@ async function getDashboardSummary() {
     };
   });
 
-  // Count unassigned active commitments (no entries in 'Assigned To')
+  // Count unassigned active commitments (no entries in 'Assigned To').
+  // allCommitments is already active-only, so no Done/Cancelled guard needed.
   const unassignedCount = allCommitments.filter(c => {
-    if (c.Status && ['Done', 'Cancelled'].includes(c.Status)) return false;
     const assignedIds = c['Assigned To'] || [];
     return !Array.isArray(assignedIds) || assignedIds.length === 0;
   }).length;
@@ -2200,6 +2241,7 @@ module.exports = {
   getPeople,
   getProjects,
   getAllCommitments,
+  getActiveCommitments,
   getCommitmentsForKanban,
   getDashboardSummary,
   buildMorningBriefFromDashboard,

@@ -2035,32 +2035,32 @@
 
         <!-- Commitment Filters -->
         <div class="commitment-filters" x-show="!commitmentsLoading && commitments.length > 0">
-          <select class="notion-filter-select" x-model="commitmentFilters.focusArea">
+          <select class="notion-filter-select" x-model="commitmentFilters.focusArea" @change="resetCommitmentsLimit()">
             <option value="">All Focus Areas</option>
             <template x-for="fa in getCommitmentFilterOptions().focusAreas" :key="fa">
               <option :value="fa" x-text="fa"></option>
             </template>
           </select>
-          <select class="notion-filter-select" x-model="commitmentFilters.person">
+          <select class="notion-filter-select" x-model="commitmentFilters.person" @change="resetCommitmentsLimit()">
             <option value="">All People</option>
             <template x-for="p in getCommitmentFilterOptions().people" :key="p">
               <option :value="p" x-text="p"></option>
             </template>
           </select>
-          <select class="notion-filter-select" x-model="commitmentFilters.priority">
+          <select class="notion-filter-select" x-model="commitmentFilters.priority" @change="resetCommitmentsLimit()">
             <option value="">All Priorities</option>
             <template x-for="pr in getCommitmentFilterOptions().priorities" :key="pr">
               <option :value="pr" x-text="pr"></option>
             </template>
           </select>
-          <select class="notion-filter-select" x-model="commitmentFilters.status">
+          <select class="notion-filter-select" x-model="commitmentFilters.status" @change="resetCommitmentsLimit()">
             <option value="">All Statuses</option>
             <option value="Not Started">Not Started</option>
             <option value="In Progress">In Progress</option>
             <option value="Blocked">Blocked</option>
             <option value="Done">Done</option>
           </select>
-          <button class="btn btn-small" @click="commitmentFilters = { focusArea: '', person: '', priority: '', status: '' }">Clear</button>
+          <button class="btn btn-small" @click="commitmentFilters = { focusArea: '', person: '', priority: '', status: '' }; resetCommitmentsLimit()">Clear</button>
         </div>
 
         <!-- Loading -->
@@ -2122,6 +2122,9 @@
         <!-- List view -->
         <template x-if="!commitmentsLoading && commitments.length > 0 && commitmentsView === 'list'">
           <div>
+            <div class="commitments-pagination-info" x-show="getFilteredCommitmentsTotal() > 0">
+              Showing <span x-text="Math.min(commitmentsDisplayLimit, getFilteredCommitmentsTotal())"></span> of <span x-text="getFilteredCommitmentsTotal()"></span> commitments
+            </div>
             <div class="commitments-mobile-list">
               <template x-for="c in getFilteredCommitments()" :key="'mobile-' + c.id">
                 <button class="commitment-mobile-card" @click="openDetailPanel(c.id, c.Name)">
@@ -2164,6 +2167,12 @@
                 </template>
               </tbody>
             </table>
+            </div>
+            <div class="commitments-load-more" x-show="commitmentsDisplayLimit < getFilteredCommitmentsTotal()">
+              <button class="btn btn-small" @click="loadMoreCommitments()">
+                Load more
+                <span x-text="'(' + Math.min(30, getFilteredCommitmentsTotal() - commitmentsDisplayLimit) + ' more)'"></span>
+              </button>
             </div>
           </div>
         </template>

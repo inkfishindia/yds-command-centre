@@ -20,7 +20,7 @@ describe('Notion Service — Pure Functions', () => {
     const expected = [
       'getClient', 'simplify', 'getFocusAreas', 'getOverdueCommitments',
       'getUpcomingCommitments', 'getRecentDecisions', 'getPeople',
-      'getProjects', 'getAllCommitments', 'getDashboardSummary',
+      'getProjects', 'getAllCommitments', 'getActiveCommitments', 'getDashboardSummary',
       'listDatabases', 'queryDatabase', 'getPage', 'getPageContent',
       'getRelatedPages', 'getKeyPages', 'clearCache',
     ];

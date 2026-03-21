@@ -147,6 +147,7 @@ body {
   justify-content: center;
   gap: 2px;
   transition: all 0.15s;
+  position: relative;
 }
 
 .nav-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
@@ -2597,6 +2598,20 @@ tr:hover .table-link { color: var(--accent); }
   border-bottom: 1px solid var(--border);
 }
 
+/* === Commitments Pagination === */
+
+.commitments-pagination-info {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.commitments-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 1.25rem 0 0.5rem;
+}
+
 /* === Kanban Board === */
 
 .kanban-board {
@@ -2713,14 +2728,6 @@ tr:hover .table-link { color: var(--accent); }
 .kanban-overdue-text { color: var(--red) !important; }
 
 .kanban-overdue-row td { background: var(--red-glow); }
-
-.kanban-empty {
-  font-size: 12px;
-  color: var(--text-muted);
-  text-align: center;
-  padding: 1rem 0;
-  font-style: italic;
-}
 
 @media (max-width: 768px) {
   .kanban-board { grid-template-columns: repeat(2, minmax(200px, 1fr)); }
@@ -4986,11 +4993,6 @@ tr:hover .table-link { color: var(--accent); }
    SPRINT 2: PERSON VIEW
    ================================================================ */
 
-.person-view-header {
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
 .capacity-badge {
   display: inline-block;
   font-size: 11px;
@@ -5354,10 +5356,6 @@ tr:hover .table-link { color: var(--accent); }
    ================================================================ */
 
 /* --- Nav badge --- */
-.nav-btn {
-  position: relative;
-}
-
 .nav-badge {
   position: absolute;
   top: 4px;
@@ -6475,6 +6473,7 @@ tr:hover .table-link { color: var(--accent); }
 .kanban-empty {
   color: var(--text-muted);
   font-size: 12px;
+  font-style: italic;
   text-align: center;
   padding: 1rem 0;
 }
@@ -7152,13 +7151,6 @@ tr:hover .table-link { color: var(--accent); }
   align-items: center;
   flex-wrap: wrap;
 }
-.kanban-card-actions {
-  display: flex;
-  gap: 0.35rem;
-  margin-top: 0.5rem;
-  flex-wrap: wrap;
-}
-
 /* Responsive — Tech Team */
 @media (max-width: 768px) {
   .tech-view { padding: 1rem; }

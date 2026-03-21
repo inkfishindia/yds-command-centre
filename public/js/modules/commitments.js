@@ -5,6 +5,7 @@ export function createCommitmentsModule() {
     commitmentsLoading: false,
     commitmentsView: 'kanban',
     commitmentFilters: { focusArea: '', person: '', priority: '', status: '' },
+    commitmentsDisplayLimit: 30,
 
     // Write-back state
     editDropdown: null,
@@ -53,10 +54,10 @@ export function createCommitmentsModule() {
     },
 
     getCommitmentsByStatus(status) {
-      return this.getFilteredCommitments().filter(c => (c.Status || 'Not Started') === status);
+      return this.getAllFilteredCommitments().filter(c => (c.Status || 'Not Started') === status);
     },
 
-    getFilteredCommitments() {
+    getAllFilteredCommitments() {
       let filtered = this.commitments;
       if (this.commitmentFilters.focusArea) {
         const focusArea = this.commitmentFilters.focusArea;
@@ -73,6 +74,22 @@ export function createCommitmentsModule() {
         filtered = filtered.filter(c => (c.Status || 'Not Started') === this.commitmentFilters.status);
       }
       return filtered;
+    },
+
+    getFilteredCommitments() {
+      return this.getAllFilteredCommitments().slice(0, this.commitmentsDisplayLimit);
+    },
+
+    getFilteredCommitmentsTotal() {
+      return this.getAllFilteredCommitments().length;
+    },
+
+    loadMoreCommitments() {
+      this.commitmentsDisplayLimit += 30;
+    },
+
+    resetCommitmentsLimit() {
+      this.commitmentsDisplayLimit = 30;
     },
 
     isCommitmentOverdue(commitment) {

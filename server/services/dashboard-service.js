@@ -31,7 +31,7 @@ function enrichActionQueueCommitments(allCommitments, people, focusAreas, today)
   focusAreas.forEach((focusArea) => { focusAreaLookup[focusArea.id.replace(/-/g, '')] = focusArea.Name; });
 
   return allCommitments
-    .filter((commitment) => !['Done', 'Cancelled'].includes(commitment.Status))
+    .filter((commitment) => !['Done', 'Cancelled'].includes(commitment.Status)) // defensive guard
     .map((commitment) => {
       const assignedIds = Array.isArray(commitment['Assigned To']) ? commitment['Assigned To'] : [];
       const assignedNames = assignedIds.map((id) => peopleLookup[id.replace(/-/g, '')] || 'Unknown');
@@ -98,8 +98,10 @@ async function getActionQueuePayload() {
   const cached = getFreshCache(actionQueueResponseCache, ACTION_QUEUE_CACHE_TTL);
   if (cached) return cached;
 
+  // Use getActiveCommitments() (excludes Done + Cancelled) — the action queue
+  // only surfaces in-flight work, so fetching completed items is wasteful.
   const [allCommitments, people, focusAreas] = await Promise.all([
-    notionService.getAllCommitments(),
+    notionService.getActiveCommitments(),
     notionService.getPeople(),
     notionService.getFocusAreas(),
   ]);
