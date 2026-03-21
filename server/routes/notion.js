@@ -47,7 +47,7 @@ router.get('/focus-areas', async (req, res) => {
   try {
     const areas = await notionService.getFocusAreas();
     res.json({ focusAreas: areas });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'Failed to load focus areas' });
   }
 });
@@ -74,7 +74,7 @@ router.get('/commitments/overdue', async (req, res) => {
   try {
     const overdue = await notionService.getOverdueCommitments();
     res.json({ commitments: overdue });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'Failed to load commitments' });
   }
 });
@@ -87,7 +87,7 @@ router.get('/commitments/upcoming', async (req, res) => {
     const days = Math.min(Math.max(parseInt(req.query.days) || 7, 1), 90);
     const commitments = await notionService.getUpcomingCommitments(days);
     res.json({ commitments });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'Failed to load upcoming commitments' });
   }
 });
@@ -100,7 +100,7 @@ router.get('/decisions', async (req, res) => {
     const days = Math.min(Math.max(parseInt(req.query.days) || 30, 1), 365);
     const decisions = await notionService.getRecentDecisions(days);
     res.json({ decisions });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'Failed to load decisions' });
   }
 });
@@ -112,7 +112,7 @@ router.get('/people', async (req, res) => {
   try {
     const people = await notionService.getPeople();
     res.json({ people });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'Failed to load people' });
   }
 });

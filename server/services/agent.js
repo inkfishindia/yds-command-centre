@@ -82,7 +82,6 @@ async function chat(userMessage, skill, onText, onApproval, onToolUse) {
     });
 
     let assistantContent = [];
-    let currentText = '';
     let toolUseBlocks = [];
 
     // Collect the streamed response (with timeout)
@@ -90,7 +89,6 @@ async function chat(userMessage, skill, onText, onApproval, onToolUse) {
       for await (const event of stream) {
         if (event.type === 'content_block_delta') {
           if (event.delta.type === 'text_delta') {
-            currentText += event.delta.text;
             onText(event.delta.text);
           }
         }

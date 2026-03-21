@@ -63,7 +63,7 @@ router.get('/:category/:filename', async (req, res) => {
   try {
     const content = await readDocument(filePath);
     res.json({ filename, content, category: req.params.category });
-  } catch (err) {
+  } catch {
     res.status(404).json({ error: 'File not found' });
   }
 });

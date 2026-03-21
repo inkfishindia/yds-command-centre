@@ -135,8 +135,12 @@ Do not skip steps. The lead session orchestrates — call each agent in order, p
 ```bash
 cp .env.example .env     # Add ANTHROPIC_API_KEY and NOTION_TOKEN
 npm install
-npm test                 # Run tests (402 tests, node built-in runner)
+npm test                 # Run tests (node built-in runner)
+npm run lint             # ESLint — errors only (no style warnings)
 npm run dev              # http://localhost:3000 (watch mode)
+
+# Enable pre-commit hook (lint + test before every commit):
+git config core.hooksPath .githooks
 ```
 
 ## Env Vars

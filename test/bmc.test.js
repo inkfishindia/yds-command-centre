@@ -1,5 +1,63 @@
-const { describe, it } = require('node:test');
+const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
+
+// ── Config injection helpers ──────────────────────────────────────────────────
+// dotenv re-reads .env on every require of config.js, so clearing process.env
+// is insufficient. We inject a fake config directly into require.cache so that
+// sheets.js and hydration.js see an unconfigured environment regardless of what
+// is in the project's .env file.
+
+const CONFIG_PATH = require.resolve('../server/config');
+const SHEETS_PATH = require.resolve('../server/services/sheets');
+const HYDRATION_PATH = require.resolve('../server/services/hydration');
+
+const UNCONFIGURED_CONFIG = {
+  PORT: 3000,
+  ANTHROPIC_API_KEY: '',
+  NOTION_TOKEN: '',
+  MODEL: 'claude-opus-4-20250514',
+  GOOGLE_SERVICE_ACCOUNT_KEY: '',
+  GOOGLE_SHEETS_ID: '',
+  GITHUB_TOKEN: '',
+  GITHUB_REPO_OWNER: 'inkfishindia',
+  GITHUB_REPO_NAME: 'YD-CRM',
+  STRATEGY_SHEETS_ID: '',
+  STRATEGY_SPREADSHEET_ID: '',
+  EXECUTION_SPREADSHEET_ID: '',
+  APP_LOGGING_SPREADSHEET_ID: '',
+  BMC_SPREADSHEET_ID: '',
+  COLIN_WORKSPACE: '/tmp/fake-colin',
+  CLAUDE_MD: '/tmp/fake-colin/CLAUDE.md',
+  COLIN_MD: '/tmp/fake-colin/.claude/agents/colin.md',
+  NOTION_HUB: '/tmp/fake-colin/.claude/notion-hub.md',
+  SKILLS_DIR: '/tmp/fake-colin/.claude/skills',
+  BRIEFINGS_DIR: '/tmp/fake-colin/briefings',
+  DECISIONS_DIR: '/tmp/fake-colin/decisions',
+  WEEKLY_REVIEWS_DIR: '/tmp/fake-colin/weekly-reviews',
+  SESSIONS_DIR: '/tmp/fake-sessions',
+};
+
+function saveAndClearEnv() {
+  const savedConfig = require.cache[CONFIG_PATH];
+  require.cache[CONFIG_PATH] = {
+    id: CONFIG_PATH, filename: CONFIG_PATH, loaded: true,
+    exports: UNCONFIGURED_CONFIG,
+    parent: null, children: [], paths: [],
+  };
+  delete require.cache[SHEETS_PATH];
+  delete require.cache[HYDRATION_PATH];
+  return savedConfig;
+}
+
+function restoreEnv(savedConfig) {
+  if (savedConfig) {
+    require.cache[CONFIG_PATH] = savedConfig;
+  } else {
+    delete require.cache[CONFIG_PATH];
+  }
+  delete require.cache[SHEETS_PATH];
+  delete require.cache[HYDRATION_PATH];
+}
 
 // ── BMC_SECTIONS constant ─────────────────────────────────────────────────────
 
@@ -138,6 +196,11 @@ describe('BMC Route — section count', () => {
 // ── isSpreadsheetConfigured — BMC ─────────────────────────────────────────────
 
 describe('BMC — isSpreadsheetConfigured (unconfigured env)', () => {
+  let savedEnv;
+
+  beforeEach(() => { savedEnv = saveAndClearEnv(); });
+  afterEach(() => restoreEnv(savedEnv));
+
   it('returns false for BMC when env vars not set', () => {
     const { isSpreadsheetConfigured } = require('../server/services/sheets');
     assert.equal(isSpreadsheetConfigured('BMC'), false);
@@ -147,6 +210,11 @@ describe('BMC — isSpreadsheetConfigured (unconfigured env)', () => {
 // ── hydrateSheetData — unconfigured ──────────────────────────────────────────
 
 describe('BMC — hydrateSheetData (unconfigured)', () => {
+  let savedEnv;
+
+  beforeEach(() => { savedEnv = saveAndClearEnv(); });
+  afterEach(() => restoreEnv(savedEnv));
+
   for (const key of EXPECTED_SHEET_KEYS) {
     it(`hydrateSheetData('${key}') returns { available: false } when not configured`, async () => {
       const { hydrateSheetData } = require('../server/services/hydration');

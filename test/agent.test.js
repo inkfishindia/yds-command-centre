@@ -349,7 +349,7 @@ describe('Agent — approval gate', () => {
   it('calls onApproval callback and continues after approval resolves', async () => {
     let approvalResolve;
     const fakeApproval = {
-      createApproval: (toolName, toolInput, toolUseId) => {
+      createApproval: (_toolName, _toolInput, _toolUseId) => {
         const promise = new Promise((resolve) => { approvalResolve = resolve; });
         return { id: 'approval_test_1', promise };
       },
@@ -374,7 +374,7 @@ describe('Agent — approval gate', () => {
         };
       },
       requiresApprovalStub: (name) => name === 'write_file',
-      executeToolStub: async (toolName, toolInput) => {
+      executeToolStub: async (toolName, _toolInput) => {
         executeToolCalls.push(toolName);
         return { ok: true };
       },

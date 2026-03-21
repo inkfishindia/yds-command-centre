@@ -1,0 +1,13 @@
+#!/bin/sh
+# Pre-commit hook: lint + test
+# Enable with: git config core.hooksPath .githooks
+
+set -e
+
+echo "Running lint..."
+npm run lint
+
+echo "Running tests..."
+npm test
+
+echo "Pre-commit checks passed."
