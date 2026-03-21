@@ -9,8 +9,28 @@ const config = require('./server/config');
 const app = express();
 const SLOW_REQUEST_THRESHOLD_MS = 250;
 
-// Middleware
-app.use(cors());
+// ── CORS whitelist ────────────────────────────────────────────────────────────
+// Allow only explicit origins. In dev, defaults to localhost only.
+// Add extra origins via ALLOWED_ORIGINS env var (comma-separated).
+const allowedOrigins = new Set([
+  'http://localhost:3000',
+  `http://localhost:${config.PORT}`,
+]);
+if (process.env.ALLOWED_ORIGINS) {
+  for (const origin of process.env.ALLOWED_ORIGINS.split(',')) {
+    const trimmed = origin.trim();
+    if (trimmed) allowedOrigins.add(trimmed);
+  }
+}
+app.use(cors({
+  origin(origin, callback) {
+    // Allow same-origin / non-browser requests (origin is undefined for server-to-server)
+    if (!origin || allowedOrigins.has(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error(`CORS: origin not allowed — ${origin}`));
+  },
+}));
 app.use(helmet({
   contentSecurityPolicy: false, // Alpine.js requires inline eval via x-data attributes
 }));

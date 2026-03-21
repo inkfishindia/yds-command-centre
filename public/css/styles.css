@@ -10,7 +10,7 @@
   --border-light: #2a2a2a;
   --text-primary: #e5e5e5;
   --text-secondary: #888888;
-  --text-muted: #555555;
+  --text-muted: #777777;
   --accent: #3b82f6;
   --accent-dim: #1e3a5f;
   --green: #22c55e;
@@ -71,6 +71,29 @@ body {
   flex-direction: column;
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* === Skip Link (accessibility) === */
+
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 1rem;
+  z-index: 9999;
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: var(--radius);
+  text-decoration: none;
+  transition: top 0.1s;
+}
+
+.skip-link:focus {
+  top: 1rem;
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
 /* === Header === */
@@ -5930,9 +5953,9 @@ tr:hover .table-link { color: var(--accent); }
   .commitment-actions { flex-direction: column; gap: 0.25rem; }
   .commitment-actions .action-btn { width: 100%; }
 
-  /* Sidebar already hidden at 768px, but ensure narrower icon size if ever shown */
-  .nav-btn { width: 36px; height: 36px; }
-  .nav-icon-svg { width: 16px; height: 16px; }
+  /* Sidebar already hidden at 768px, but ensure touch-friendly size if ever shown */
+  .nav-btn { width: 44px; height: 44px; }
+  .nav-icon-svg { width: 18px; height: 18px; }
 }
 
 /* --- Keyboard Shortcut Hint (sidebar) --- */

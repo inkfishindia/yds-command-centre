@@ -163,6 +163,11 @@ export function createChatModule() {
       const approval = { ...data, timeRemaining: TIMEOUT_MS / 1000, expired: false };
       this.pendingApprovals.push(approval);
 
+      // Move focus to the Approve button so keyboard users don't tab behind the prompt
+      this.$nextTick(() => {
+        document.querySelector('.approval-actions button')?.focus();
+      });
+
       const intervalId = setInterval(() => {
         const now = Date.now();
         const remaining = Math.max(0, Math.round((expiresAt - now) / 1000));
@@ -221,6 +226,10 @@ export function createChatModule() {
           delete this._approvalTimers[approvalId];
         }
         this.pendingApprovals = this.pendingApprovals.filter(item => item.approvalId !== approvalId);
+        // Return focus to chat input once approval is resolved
+        this.$nextTick(() => {
+          this.$refs.chatInput?.focus();
+        });
       } catch (err) {
         console.error('Approval error:', err);
         if (approval) {

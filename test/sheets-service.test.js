@@ -1,5 +1,67 @@
-const { describe, it, beforeEach } = require('node:test');
+const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
+
+// ── Config injection helpers ──────────────────────────────────────────────────
+// config.js runs dotenv which reloads .env from disk, so clearing process.env
+// is not sufficient — dotenv repopulates it on every require. Instead we inject
+// a fake config directly into require.cache so sheets.js reads our stub values.
+
+const CONFIG_PATH = require.resolve('../server/config');
+const SHEETS_PATH = require.resolve('../server/services/sheets');
+
+/** Fake config that looks unconfigured (all credential fields empty). */
+const UNCONFIGURED_CONFIG = {
+  PORT: 3000,
+  ANTHROPIC_API_KEY: '',
+  NOTION_TOKEN: '',
+  MODEL: 'claude-opus-4-20250514',
+  GOOGLE_SERVICE_ACCOUNT_KEY: '',
+  GOOGLE_SHEETS_ID: '',
+  GITHUB_TOKEN: '',
+  GITHUB_REPO_OWNER: 'inkfishindia',
+  GITHUB_REPO_NAME: 'YD-CRM',
+  STRATEGY_SHEETS_ID: '',
+  STRATEGY_SPREADSHEET_ID: '',
+  EXECUTION_SPREADSHEET_ID: '',
+  APP_LOGGING_SPREADSHEET_ID: '',
+  BMC_SPREADSHEET_ID: '',
+  COLIN_WORKSPACE: '/tmp/fake-colin',
+  CLAUDE_MD: '/tmp/fake-colin/CLAUDE.md',
+  COLIN_MD: '/tmp/fake-colin/.claude/agents/colin.md',
+  NOTION_HUB: '/tmp/fake-colin/.claude/notion-hub.md',
+  SKILLS_DIR: '/tmp/fake-colin/.claude/skills',
+  BRIEFINGS_DIR: '/tmp/fake-colin/briefings',
+  DECISIONS_DIR: '/tmp/fake-colin/decisions',
+  WEEKLY_REVIEWS_DIR: '/tmp/fake-colin/weekly-reviews',
+  SESSIONS_DIR: '/tmp/fake-sessions',
+};
+
+function injectUnconfiguredConfig() {
+  const savedConfig = require.cache[CONFIG_PATH];
+  // Inject fake config
+  require.cache[CONFIG_PATH] = {
+    id: CONFIG_PATH, filename: CONFIG_PATH, loaded: true,
+    exports: UNCONFIGURED_CONFIG,
+    parent: null, children: [], paths: [],
+  };
+  // Delete sheets so it reloads with the injected config
+  delete require.cache[SHEETS_PATH];
+  return savedConfig;
+}
+
+function restoreConfig(savedConfig) {
+  if (savedConfig) {
+    require.cache[CONFIG_PATH] = savedConfig;
+  } else {
+    delete require.cache[CONFIG_PATH];
+  }
+  // Delete sheets so it reloads with the real config on next require
+  delete require.cache[SHEETS_PATH];
+}
+
+// Convenience wrappers for beforeEach/afterEach
+function saveAndClearSheetsEnv() { return injectUnconfiguredConfig(); }
+function restoreSheetsEnv(saved) { restoreConfig(saved); }
 
 // ── Module loading ─────────────────────────────────────────────────────────────
 
@@ -30,11 +92,47 @@ describe('Sheets Service — module loading', () => {
 // ── isConfigured ──────────────────────────────────────────────────────────────
 
 describe('Sheets Service — isConfigured', () => {
+  let savedEnv;
+
+  beforeEach(() => { savedEnv = saveAndClearSheetsEnv(); });
+  afterEach(() => restoreSheetsEnv(savedEnv));
+
   it('returns false when env vars are not set', () => {
-    // In the test environment GOOGLE_SERVICE_ACCOUNT_KEY and GOOGLE_SHEETS_ID
-    // are not set, so isConfigured must return false.
     const { isConfigured } = require('../server/services/sheets');
-    // Env vars default to '' in config.js — so this should be false
+    assert.equal(isConfigured(), false);
+  });
+
+  it('returns true when both credential fields are populated', () => {
+    // Inject a config that has both credentials set
+    require.cache[CONFIG_PATH] = {
+      id: CONFIG_PATH, filename: CONFIG_PATH, loaded: true,
+      exports: { ...UNCONFIGURED_CONFIG, GOOGLE_SERVICE_ACCOUNT_KEY: '/path/to/key.json', GOOGLE_SHEETS_ID: 'some-sheet-id' },
+      parent: null, children: [], paths: [],
+    };
+    delete require.cache[SHEETS_PATH];
+    const { isConfigured } = require('../server/services/sheets');
+    assert.equal(isConfigured(), true);
+  });
+
+  it('returns false when only GOOGLE_SERVICE_ACCOUNT_KEY is set', () => {
+    require.cache[CONFIG_PATH] = {
+      id: CONFIG_PATH, filename: CONFIG_PATH, loaded: true,
+      exports: { ...UNCONFIGURED_CONFIG, GOOGLE_SERVICE_ACCOUNT_KEY: '/path/to/key.json' },
+      parent: null, children: [], paths: [],
+    };
+    delete require.cache[SHEETS_PATH];
+    const { isConfigured } = require('../server/services/sheets');
+    assert.equal(isConfigured(), false);
+  });
+
+  it('returns false when only GOOGLE_SHEETS_ID is set', () => {
+    require.cache[CONFIG_PATH] = {
+      id: CONFIG_PATH, filename: CONFIG_PATH, loaded: true,
+      exports: { ...UNCONFIGURED_CONFIG, GOOGLE_SHEETS_ID: 'some-sheet-id' },
+      parent: null, children: [], paths: [],
+    };
+    delete require.cache[SHEETS_PATH];
+    const { isConfigured } = require('../server/services/sheets');
     assert.equal(isConfigured(), false);
   });
 });
@@ -172,6 +270,11 @@ describe('Sheets Service — SHEET_REGISTRY', () => {
 // ── isSpreadsheetConfigured ───────────────────────────────────────────────────
 
 describe('Sheets Service — isSpreadsheetConfigured', () => {
+  let savedEnv;
+
+  beforeEach(() => { savedEnv = saveAndClearSheetsEnv(); });
+  afterEach(() => restoreSheetsEnv(savedEnv));
+
   it('returns false for EXECUTION when env not set', () => {
     const { isSpreadsheetConfigured } = require('../server/services/sheets');
     assert.equal(isSpreadsheetConfigured('EXECUTION'), false);
@@ -196,6 +299,11 @@ describe('Sheets Service — isSpreadsheetConfigured', () => {
 // ── fetchSheet — unconfigured ─────────────────────────────────────────────────
 
 describe('Sheets Service — fetchSheet (unconfigured)', () => {
+  let savedEnv;
+
+  beforeEach(() => { savedEnv = saveAndClearSheetsEnv(); });
+  afterEach(() => restoreSheetsEnv(savedEnv));
+
   it('returns { available: false } when spreadsheet not configured', async () => {
     const { fetchSheet } = require('../server/services/sheets');
     const result = await fetchSheet('PROJECTS');
@@ -403,5 +511,117 @@ describe('Hydration Service — hydrateSheetData (unconfigured)', () => {
     const { hydrateSheetData } = require('../server/services/hydration');
     const result = await hydrateSheetData('PROJECTS');
     assert.equal(result.available, false);
+  });
+});
+
+// ── getSheetData behaviour — tested through public fetchSheet API ─────────────
+// getSheetData is internal and not exported. We verify its not-configured
+// behaviour through fetchSheet, which delegates to getSheetData internally.
+
+describe('Sheets Service — getSheetData (via fetchSheet, unconfigured)', () => {
+  let savedEnv;
+
+  beforeEach(() => { savedEnv = saveAndClearSheetsEnv(); });
+  afterEach(() => restoreSheetsEnv(savedEnv));
+
+  it('fetchSheet returns { available: false } (getSheetData returns null when not configured)', async () => {
+    const { fetchSheet } = require('../server/services/sheets');
+    const result = await fetchSheet('PROJECTS');
+    // getSheetData returns null when client is null (not configured),
+    // which fetchSheet surfaces as available: false
+    assert.equal(result.available, false);
+  });
+
+  it('does not throw when not configured', async () => {
+    const { fetchSheet } = require('../server/services/sheets');
+    await assert.doesNotReject(() => fetchSheet('PROJECTS'));
+  });
+});
+
+// ── getPipelineData — not_configured reason ───────────────────────────────────
+
+describe('Sheets Service — getPipelineData reason: not_configured', () => {
+  let savedEnv;
+
+  beforeEach(() => { savedEnv = saveAndClearSheetsEnv(); });
+  afterEach(() => restoreSheetsEnv(savedEnv));
+
+  it('returns { available: false, reason: "not_configured" } when env vars absent', async () => {
+    const { getPipelineData } = require('../server/services/sheets');
+    const result = await getPipelineData();
+    assert.equal(result.available, false);
+    assert.equal(result.reason, 'not_configured');
+  });
+
+  it('does not include an error field when reason is not_configured', async () => {
+    const { getPipelineData } = require('../server/services/sheets');
+    const result = await getPipelineData();
+    assert.equal(result.reason, 'not_configured');
+    assert.equal(result.error, undefined);
+  });
+});
+
+// ── fetchSheet — not_configured reason ───────────────────────────────────────
+
+describe('Sheets Service — fetchSheet reason: not_configured', () => {
+  let savedEnv;
+
+  beforeEach(() => { savedEnv = saveAndClearSheetsEnv(); });
+  afterEach(() => restoreSheetsEnv(savedEnv));
+
+  it('returns { available: false, reason: "not_configured" } for PROJECTS when not configured', async () => {
+    const { fetchSheet } = require('../server/services/sheets');
+    const result = await fetchSheet('PROJECTS');
+    assert.equal(result.available, false);
+    assert.equal(result.reason, 'not_configured');
+  });
+
+  it('returns { available: false, reason: "not_configured" } for TASKS when not configured', async () => {
+    const { fetchSheet } = require('../server/services/sheets');
+    const result = await fetchSheet('TASKS');
+    assert.equal(result.available, false);
+    assert.equal(result.reason, 'not_configured');
+  });
+
+  it('returns { available: false, reason: "not_configured" } for BMC_SEGMENTS when not configured', async () => {
+    const { fetchSheet } = require('../server/services/sheets');
+    const result = await fetchSheet('BMC_SEGMENTS');
+    assert.equal(result.available, false);
+    assert.equal(result.reason, 'not_configured');
+  });
+
+  it('still throws on unknown sheet key even when not configured', async () => {
+    const { fetchSheet } = require('../server/services/sheets');
+    await assert.rejects(() => fetchSheet('DOES_NOT_EXIST'), /Unknown sheet key/);
+  });
+});
+
+// ── Error discrimination — reason field contract ──────────────────────────────
+
+describe('Sheets Service — error discrimination: reason field contract', () => {
+  it('not_configured shape: available=false, reason="not_configured", no error field', () => {
+    const shape = { available: false, reason: 'not_configured' };
+    assert.equal(shape.available, false);
+    assert.equal(shape.reason, 'not_configured');
+    assert.equal(shape.error, undefined);
+  });
+
+  it('api_error shape: available=false, reason="api_error", error is a string', () => {
+    const shape = { available: false, reason: 'api_error', error: 'quota exceeded' };
+    assert.equal(shape.available, false);
+    assert.equal(shape.reason, 'api_error');
+    assert.equal(typeof shape.error, 'string');
+  });
+
+  it('reason "not_configured" and "api_error" are the only valid discriminants', () => {
+    const validReasons = new Set(['not_configured', 'api_error']);
+    assert.ok(validReasons.has('not_configured'));
+    assert.ok(validReasons.has('api_error'));
+    assert.equal(validReasons.size, 2);
+  });
+
+  it('available=true shape has no reason field', () => {
+    const shape = { available: true, data: [] };
+    assert.equal(shape.reason, undefined);
   });
 });

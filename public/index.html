@@ -10,6 +10,9 @@
 </head>
 <body x-data="app()" x-init="init()">
 
+  <!-- Skip to main content (keyboard accessibility) -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
   <!-- Header -->
   <header class="header">
     <div class="header-left">
@@ -132,7 +135,7 @@
     </nav>
 
     <!-- Content area -->
-    <main class="content">
+    <main class="content" id="main-content">
 
       <!-- Chat view -->
       <div x-show="view === 'chat'" class="chat-layout">
@@ -209,6 +212,7 @@
               @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
               @input="autoResize($event)"
               placeholder="Message Colin..."
+              aria-label="Message Colin"
               :disabled="streaming"
               rows="1"
               x-ref="chatInput"
@@ -678,14 +682,14 @@
                     @input="expandedDecision = null"
                   >
                   <!-- Focus Area dropdown -->
-                  <select class="decision-filter-select" x-model="decisionFocusArea" @change="expandedDecision = null">
+                  <select class="decision-filter-select" x-model="decisionFocusArea" @change="expandedDecision = null" aria-label="Filter by focus area">
                     <option value="">All Focus Areas</option>
                     <template x-for="fa in getDecisionFilterOptions().focusAreas" :key="fa">
                       <option :value="fa" x-text="fa"></option>
                     </template>
                   </select>
                   <!-- Owner dropdown -->
-                  <select class="decision-filter-select" x-model="decisionOwner" @change="expandedDecision = null">
+                  <select class="decision-filter-select" x-model="decisionOwner" @change="expandedDecision = null" aria-label="Filter by owner">
                     <option value="">All Owners</option>
                     <template x-for="owner in getDecisionFilterOptions().owners" :key="owner">
                       <option :value="owner" x-text="owner"></option>
@@ -1443,7 +1447,7 @@
                 x-model="notionSearchQuery"
               >
               <template x-if="getAvailableStatuses().length > 0">
-                <select class="notion-filter-select" x-model="notionFilterStatus">
+                <select class="notion-filter-select" x-model="notionFilterStatus" aria-label="Filter by status">
                   <option value="">All statuses</option>
                   <template x-for="status in getAvailableStatuses()" :key="status">
                     <option :value="status" x-text="status"></option>
@@ -1688,13 +1692,13 @@
             <!-- Filter bar -->
             <div class="decision-filters">
               <input type="text" class="decision-search" placeholder="Search decisions..." x-model="decisionSearch" @input="expandedDecision = null">
-              <select class="decision-filter-select" x-model="decisionFocusArea" @change="expandedDecision = null">
+              <select class="decision-filter-select" x-model="decisionFocusArea" @change="expandedDecision = null" aria-label="Filter by focus area">
                 <option value="">All Focus Areas</option>
                 <template x-for="fa in getDecisionFilterOptions().focusAreas" :key="fa">
                   <option :value="fa" x-text="fa"></option>
                 </template>
               </select>
-              <select class="decision-filter-select" x-model="decisionOwner" @change="expandedDecision = null">
+              <select class="decision-filter-select" x-model="decisionOwner" @change="expandedDecision = null" aria-label="Filter by owner">
                 <option value="">All Owners</option>
                 <template x-for="owner in getDecisionFilterOptions().owners" :key="owner">
                   <option :value="owner" x-text="owner"></option>
@@ -2035,25 +2039,25 @@
 
         <!-- Commitment Filters -->
         <div class="commitment-filters" x-show="!commitmentsLoading && commitments.length > 0">
-          <select class="notion-filter-select" x-model="commitmentFilters.focusArea" @change="resetCommitmentsLimit()">
+          <select class="notion-filter-select" x-model="commitmentFilters.focusArea" @change="resetCommitmentsLimit()" aria-label="Filter by focus area">
             <option value="">All Focus Areas</option>
             <template x-for="fa in getCommitmentFilterOptions().focusAreas" :key="fa">
               <option :value="fa" x-text="fa"></option>
             </template>
           </select>
-          <select class="notion-filter-select" x-model="commitmentFilters.person" @change="resetCommitmentsLimit()">
+          <select class="notion-filter-select" x-model="commitmentFilters.person" @change="resetCommitmentsLimit()" aria-label="Filter by person">
             <option value="">All People</option>
             <template x-for="p in getCommitmentFilterOptions().people" :key="p">
               <option :value="p" x-text="p"></option>
             </template>
           </select>
-          <select class="notion-filter-select" x-model="commitmentFilters.priority" @change="resetCommitmentsLimit()">
+          <select class="notion-filter-select" x-model="commitmentFilters.priority" @change="resetCommitmentsLimit()" aria-label="Filter by priority">
             <option value="">All Priorities</option>
             <template x-for="pr in getCommitmentFilterOptions().priorities" :key="pr">
               <option :value="pr" x-text="pr"></option>
             </template>
           </select>
-          <select class="notion-filter-select" x-model="commitmentFilters.status" @change="resetCommitmentsLimit()">
+          <select class="notion-filter-select" x-model="commitmentFilters.status" @change="resetCommitmentsLimit()" aria-label="Filter by status">
             <option value="">All Statuses</option>
             <option value="Not Started">Not Started</option>
             <option value="In Progress">In Progress</option>
@@ -3581,18 +3585,18 @@
       <!-- Tab 2: Sprint Board -->
       <div x-show="techTeamSection === 'sprint' && techTeam">
         <div class="tech-filters">
-          <select x-model="techSystemFilter" class="filter-select">
+          <select x-model="techSystemFilter" class="filter-select" aria-label="Filter by system">
             <option value="">All Systems</option>
             <template x-for="s in getTechSystems()" :key="s"><option :value="s" x-text="s"></option></template>
           </select>
-          <select x-model="techPriorityFilter" class="filter-select">
+          <select x-model="techPriorityFilter" class="filter-select" aria-label="Filter by priority">
             <option value="">All Priorities</option>
             <option value="P0 - Critical">P0 Critical</option>
             <option value="P1 - High">P1 High</option>
             <option value="P2 - Medium">P2 Medium</option>
             <option value="P3 - Low">P3 Low</option>
           </select>
-          <select x-model="techTypeFilter" class="filter-select">
+          <select x-model="techTypeFilter" class="filter-select" aria-label="Filter by type">
             <option value="">All Types</option>
             <option value="Bug">Bug</option>
             <option value="Feature">Feature</option>
