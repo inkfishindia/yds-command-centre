@@ -21,10 +21,29 @@ import { createChatModule } from './modules/chat.js';
 
 configureMarkdown();
 
+// Lazy module registry: maps view name -> factory function.
+// These are NOT initialized at startup — only when the user first navigates to the view.
+const LAZY_MODULE_FACTORIES = {
+  bmc: createBmcModule,
+  crm: createCrmModule,
+  marketingOps: createMarketingOpsModule,
+  techTeam: createTechTeamModule,
+  registry: createRegistryModule,
+  projects: createProjectsModule,
+  team: createTeamModule,
+  docs: createDocumentsModule,
+  notion: createNotionBrowserModule,
+  commitments: createCommitmentsModule,
+  factory: createFactoryModule,
+};
+
 function app() {
   return {
     // Navigation
     view: 'dashboard',
+
+    // Tracks which lazy modules have been initialized
+    _initializedModules: {},
 
     // Connection status
     connected: false,
@@ -41,18 +60,37 @@ function app() {
       { name: 'Emily', domain: 'Marketing campaigns', icon: 'E' },
     ],
 
+    // Stub state for lazy modules — prevents Alpine binding errors before the module inits.
+    // Must use the exact property names each module declares. When _ensureModule() runs,
+    // Object.assign will overwrite these stubs with the real module state + methods.
+    // bmc
+    bmc: null, bmcLoading: false, bmcDetailItem: null, bmcDetailKey: '', bmcSearch: '', bmcFilter: 'highlights', bmcFocus: '',
+    // crm
+    crm: null, crmLoading: false, crmSection: 'overview', crmSearch: '', crmExpandedItem: null, crmSectionData: null,
+    // marketing-ops
+    mktops: null, mktopsLoading: false, mktopsSection: 'overview', mktopsLastRefresh: null,
+    // tech-team
+    techTeam: null, techTeamLoading: false,
+    // registry
+    registry: null, registryLoading: false, registryFilter: '', registryTypeFilter: '', registryExpanded: null,
+    // projects
+    projects: [], projectsLoading: false, projectsFilter: 'Active', projectsTypeFilter: '', expandedProject: null,
+    // team
+    teamData: [], teamLoading: false,
+    // documents
+    documents: { briefings: [], decisions: [], 'weekly-reviews': [] }, docsTab: 'briefings', docsLoading: false, activeDoc: null,
+    // notion-browser
+    notionDatabases: [], notionKeyPages: [], notionLoading: false, notionCurrentDb: null, notionCurrentPage: null, notionRecords: [], notionBreadcrumb: [],
+    // commitments — editDropdown must exist before init() registers the document click handler
+    commitments: [], commitmentsLoading: false, commitmentsView: 'kanban',
+    commitmentFilters: { focusArea: '', person: '', priority: '', status: '' },
+    editDropdown: null, showCreateCommitment: false, showCreateDecision: false,
+    showSnoozeFor: null, showReassignFor: null, selectedOverdue: [],
+    // factory
+    factoryConfig: null, factoryConfigLoading: false,
+
+    // Eager modules — always initialized
     ...createDashboardModule(),
-    ...createBmcModule(),
-    ...createCrmModule(),
-    ...createMarketingOpsModule(),
-    ...createTechTeamModule(),
-    ...createRegistryModule(),
-    ...createProjectsModule(),
-    ...createTeamModule(),
-    ...createDocumentsModule(),
-    ...createNotionBrowserModule(),
-    ...createCommitmentsModule(),
-    ...createFactoryModule(),
     ...createCommandShellModule(),
     ...createChatModule(),
 
@@ -84,6 +122,17 @@ function app() {
     // Visibility-based auto-refresh
     _lastVisible: Date.now(),
     _requestControllers: {},
+
+    // Lazily initialize a module the first time its view is navigated to.
+    // Merges all state and methods from the factory into `this` (the Alpine component).
+    _ensureModule(name) {
+      if (this._initializedModules[name]) return;
+      const factory = LAZY_MODULE_FACTORIES[name];
+      if (!factory) return;
+      const mod = factory();
+      Object.assign(this, mod);
+      this._initializedModules[name] = true;
+    },
 
     // Initialization
     async init() {
@@ -119,7 +168,12 @@ function app() {
         }
       });
 
-      document.addEventListener('click', (event) => this.handleCommitmentDocumentClick(event));
+      document.addEventListener('click', (event) => {
+        // Guard: commitments module may not be initialized yet when this fires
+        if (typeof this.handleCommitmentDocumentClick === 'function') {
+          this.handleCommitmentDocumentClick(event);
+        }
+      });
 
       // Auto-load dashboard on start
       if (window.innerWidth <= 768) {
@@ -131,6 +185,20 @@ function app() {
       this.refreshIntervalId = setInterval(() => {
         this.loadDashboard();
       }, 300000);
+
+      // Independent action queue refresh every 3 minutes — runs regardless of active view.
+      // Uses silent mode (no loading spinner) so it doesn't disrupt other views.
+      this._aqIntervalId = setInterval(() => {
+        if (document.visibilityState === 'visible' && !this._requestControllers?.actionQueue) {
+          this.loadActionQueue({ silent: true });
+        }
+      }, 180000);
+
+      // Clean up intervals on page unload
+      window.addEventListener('unload', () => {
+        clearInterval(this.refreshIntervalId);
+        clearInterval(this._aqIntervalId);
+      });
     },
 
     beginRequest(key) {

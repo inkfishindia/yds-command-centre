@@ -55,19 +55,25 @@ function getClient() {
 
 async function getSheetData(range) {
   const client = getClient();
+  // Config error — not an unexpected condition, no warning needed
   if (!client) return null;
 
   const cached = getCached(`sheet_${range}`);
   if (cached) return cached;
 
-  const response = await client.spreadsheets.values.get({
-    spreadsheetId: config.GOOGLE_SHEETS_ID,
-    range,
-  });
+  try {
+    const response = await client.spreadsheets.values.get({
+      spreadsheetId: config.GOOGLE_SHEETS_ID,
+      range,
+    });
 
-  const data = response.data.values || [];
-  setCache(`sheet_${range}`, data);
-  return data;
+    const data = response.data.values || [];
+    setCache(`sheet_${range}`, data);
+    return data;
+  } catch (err) {
+    console.warn(`[sheets] getSheetData("${range}") API error:`, err.message);
+    throw err; // Re-throw so callers (getPipelineData) can apply their own error shape
+  }
 }
 
 // Parse sheet rows into objects using the header row (row[0]).
@@ -92,12 +98,13 @@ function parseRows(rows) {
  */
 async function getPipelineData() {
   if (!isConfigured()) {
-    return { available: false };
+    return { available: false, reason: 'not_configured' };
   }
 
   try {
     const rows = await getSheetData('LEAD_FLOWS!A:Z');
-    if (!rows) return { available: false };
+    // getSheetData returns null when client init failed (config error)
+    if (!rows) return { available: false, reason: 'not_configured' };
 
     const leads = parseRows(rows);
 
@@ -141,8 +148,8 @@ async function getPipelineData() {
       timestamp: new Date().toISOString(),
     };
   } catch (err) {
-    console.error('Sheets pipeline error:', err.message);
-    return { available: false, error: err.message };
+    console.warn('[sheets] getPipelineData API error:', err.message);
+    return { available: false, reason: 'api_error', error: err.message };
   }
 }
 
@@ -155,7 +162,7 @@ async function getPipelineData() {
  */
 async function getStrategyCascade() {
   if (!config.STRATEGY_SHEETS_ID || !config.GOOGLE_SERVICE_ACCOUNT_KEY) {
-    return { available: false };
+    return { available: false, reason: 'not_configured' };
   }
 
   // Strategy cascade uses its own sheet ID but shares the Google auth.
@@ -169,8 +176,8 @@ async function getStrategyCascade() {
     });
     client = google.sheets({ version: 'v4', auth });
   } catch (err) {
-    console.error('Strategy cascade auth error:', err.message);
-    return { available: false };
+    console.warn('[sheets] getStrategyCascade auth init error:', err.message);
+    return { available: false, reason: 'api_error', error: err.message };
   }
 
   const cached = getCached('strategy_cascade');
@@ -208,8 +215,8 @@ async function getStrategyCascade() {
     setCache('strategy_cascade', result);
     return result;
   } catch (err) {
-    console.error('Sheets strategy cascade error:', err.message);
-    return { available: false, error: err.message };
+    console.warn('[sheets] getStrategyCascade API error:', err.message);
+    return { available: false, reason: 'api_error', error: err.message };
   }
 }
 
@@ -329,7 +336,7 @@ async function fetchSheet(sheetKey) {
   const entry = SHEET_REGISTRY[sheetKey];
   if (!entry) throw new Error(`Unknown sheet key: ${sheetKey}`);
   if (!isSpreadsheetConfigured(entry.spreadsheetKey)) {
-    return { available: false };
+    return { available: false, reason: 'not_configured' };
   }
 
   const cacheKey = `sheet_reg_${sheetKey}`;
@@ -338,31 +345,36 @@ async function fetchSheet(sheetKey) {
 
   const spreadsheetId = getSpreadsheetId(entry.spreadsheetKey);
   const client = getReadWriteClient();
-  if (!client) return { available: false };
+  if (!client) return { available: false, reason: 'not_configured' };
 
-  const sheetName = entry.sheetName.includes(' ') ? `'${entry.sheetName}'` : entry.sheetName;
-  const response = await client.spreadsheets.values.get({
-    spreadsheetId,
-    range: sheetName,
-  });
+  try {
+    const sheetName = entry.sheetName.includes(' ') ? `'${entry.sheetName}'` : entry.sheetName;
+    const response = await client.spreadsheets.values.get({
+      spreadsheetId,
+      range: sheetName,
+    });
 
-  const rows = response.data.values || [];
-  if (rows.length < 2) {
-    const result = { available: true, headers: rows[0] || [], rows: [] };
+    const rows = response.data.values || [];
+    if (rows.length < 2) {
+      const result = { available: true, headers: rows[0] || [], rows: [] };
+      setCache(cacheKey, result);
+      return result;
+    }
+
+    const headers = rows[0];
+    const data = rows.slice(1).map((row, index) => {
+      const obj = { rowIndex: index + 2 }; // 1-based, +1 for header row
+      headers.forEach((h, i) => { obj[h] = row[i] || null; });
+      return obj;
+    });
+
+    const result = { available: true, headers, rows: data };
     setCache(cacheKey, result);
     return result;
+  } catch (err) {
+    console.warn(`[sheets] fetchSheet("${sheetKey}") API error:`, err.message);
+    return { available: false, reason: 'api_error', error: err.message };
   }
-
-  const headers = rows[0];
-  const data = rows.slice(1).map((row, index) => {
-    const obj = { rowIndex: index + 2 }; // 1-based, +1 for header row
-    headers.forEach((h, i) => { obj[h] = row[i] || null; });
-    return obj;
-  });
-
-  const result = { available: true, headers, rows: data };
-  setCache(cacheKey, result);
-  return result;
 }
 
 async function appendRow(sheetKey, rowData) {

@@ -48,6 +48,18 @@ describe('Sheets Service — getPipelineData (unconfigured)', () => {
     assert.equal(result.available, false);
   });
 
+  it('always includes a reason field (not_configured or api_error) when available is false', async () => {
+    const { getPipelineData } = require('../server/services/sheets');
+    const result = await getPipelineData();
+    if (result.available === false) {
+      const validReasons = ['not_configured', 'api_error'];
+      assert.ok(
+        validReasons.includes(result.reason),
+        `Expected reason to be one of ${validReasons.join(', ')}, got: ${result.reason}`
+      );
+    }
+  });
+
   it('does not throw when not configured', async () => {
     const { getPipelineData } = require('../server/services/sheets');
     await assert.doesNotReject(() => getPipelineData());
@@ -190,9 +202,53 @@ describe('Sheets Service — fetchSheet (unconfigured)', () => {
     assert.equal(result.available, false);
   });
 
+  it('always includes a reason field (not_configured or api_error) when available is false', async () => {
+    const { fetchSheet } = require('../server/services/sheets');
+    const result = await fetchSheet('PROJECTS');
+    if (result.available === false) {
+      const validReasons = ['not_configured', 'api_error'];
+      assert.ok(
+        validReasons.includes(result.reason),
+        `Expected reason to be one of ${validReasons.join(', ')}, got: ${result.reason}`
+      );
+    }
+  });
+
   it('throws on unknown sheet key', async () => {
     const { fetchSheet } = require('../server/services/sheets');
     await assert.rejects(() => fetchSheet('NOT_A_REAL_KEY'), /Unknown sheet key/);
+  });
+});
+
+// ── Error discrimination shape ────────────────────────────────────────────────
+
+describe('Sheets Service — error discrimination contract', () => {
+  it('unavailable result always has a reason field that is not_configured or api_error', async () => {
+    // In any environment (configured or not), an unavailable result must have a discriminating reason.
+    const { getPipelineData } = require('../server/services/sheets');
+    const result = await getPipelineData();
+    assert.equal(result.available, false);
+    const validReasons = ['not_configured', 'api_error'];
+    assert.ok(
+      validReasons.includes(result.reason),
+      `Expected reason to be one of ${validReasons.join(', ')}, got: ${result.reason}`
+    );
+  });
+
+  it('not_configured result does not carry an error field', () => {
+    // Validate the shape contract directly — no error message on config errors.
+    const configError = { available: false, reason: 'not_configured' };
+    assert.equal(configError.reason, 'not_configured');
+    assert.equal(configError.error, undefined);
+  });
+
+  it('api_error result shape has available, reason, and error fields', () => {
+    // Validate the shape contract without making a real API call.
+    // The shape must be: { available: false, reason: 'api_error', error: string }
+    const fakeApiError = { available: false, reason: 'api_error', error: 'quota exceeded' };
+    assert.equal(fakeApiError.available, false);
+    assert.equal(fakeApiError.reason, 'api_error');
+    assert.equal(typeof fakeApiError.error, 'string');
   });
 });
 

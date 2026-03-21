@@ -57,6 +57,9 @@ export function createCommandShellModule() {
     },
 
     openNavigationTarget(action) {
+      // Ensure lazy module is initialized before setting the view so Alpine
+      // can bind to the module's state and methods without errors.
+      this._ensureModule(action);
       this.view = action;
       if (action === 'dashboard') this.loadDashboard();
       else if (action === 'projects') this.loadProjects();
@@ -211,9 +214,11 @@ export function createCommandShellModule() {
       if (item.action) {
         this.openNavigationTarget(item.action);
       } else if (item.dbRef) {
+        this._ensureModule('notion');
         this.view = 'notion';
         this.openNotionDb(item.dbRef);
       } else if (item.pageRef) {
+        this._ensureModule('notion');
         this.view = 'notion';
         this.openNotionPage(item.pageRef.id, item.pageRef.name);
       } else if (item.skillRef) {

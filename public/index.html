@@ -58,7 +58,7 @@
         <span class="nav-label">Dash</span>
         <span class="nav-badge nav-badge-danger" x-show="dashboard && dashboard.overdue && dashboard.overdue.length > 0" x-text="dashboard.overdue.length" x-cloak></span>
       </button>
-      <button class="nav-btn" :class="view === 'team' && 'nav-active'" @click="view = 'team'; loadTeam()" aria-label="Team" :aria-current="view === 'team' ? 'page' : false" :title="getShortcutTooltip('Team', 'team')">
+      <button class="nav-btn" :class="view === 'team' && 'nav-active'" @click="openNavigationTarget('team')" aria-label="Team" :aria-current="view === 'team' ? 'page' : false" :title="getShortcutTooltip('Team', 'team')">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zm5 2a2 2 0 11-4 0 2 2 0 014 0zm-4 7a4 4 0 00-8 0v1h8v-1zM6 8a2 2 0 11-4 0 2 2 0 014 0zm10 7a3.99 3.99 0 00-1.46-3.08A3.98 3.98 0 0118 15v1h-2zM3.08 11.92A3.99 3.99 0 002 15v1h2v-1c0-.88.28-1.69.76-2.36-.37-.24-.7-.53-.99-.85l.31.13z"/></svg>
         <span class="nav-label">Team</span>
         <span class="nav-badge nav-badge-warn" x-show="getOverloadedCount() > 0" x-text="getOverloadedCount()" x-cloak></span>
@@ -72,7 +72,7 @@
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/></svg>
         <span class="nav-label">KB</span>
       </button>
-      <button class="nav-btn" :class="view === 'docs' && 'nav-active'" @click="view = 'docs'; loadDocuments()" aria-label="Documents" :aria-current="view === 'docs' ? 'page' : false" :title="getShortcutTooltip('Documents', 'docs')">
+      <button class="nav-btn" :class="view === 'docs' && 'nav-active'" @click="openNavigationTarget('docs')" aria-label="Documents" :aria-current="view === 'docs' ? 'page' : false" :title="getShortcutTooltip('Documents', 'docs')">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>
         <span class="nav-label">Docs</span>
       </button>
@@ -81,41 +81,41 @@
         <span class="nav-label">Log</span>
         <span class="nav-badge" x-show="dashboard && dashboard.recentDecisions && dashboard.recentDecisions.length > 0" x-text="dashboard?.recentDecisions?.length" x-cloak></span>
       </button>
-      <button class="nav-btn" :class="view === 'notion' && 'nav-active'" @click="view = 'notion'; loadNotion()" aria-label="Notion browser" :aria-current="view === 'notion' ? 'page' : false" :title="getShortcutTooltip('Notion', 'notion')">
+      <button class="nav-btn" :class="view === 'notion' && 'nav-active'" @click="openNavigationTarget('notion')" aria-label="Notion browser" :aria-current="view === 'notion' ? 'page' : false" :title="getShortcutTooltip('Notion', 'notion')">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2z"/></svg>
         <span class="nav-label">Notion</span>
       </button>
-      <button class="nav-btn" :class="view === 'projects' && 'nav-active'" @click="view = 'projects'; if(!projects.length) loadProjects()" aria-label="Projects" :aria-current="view === 'projects' ? 'page' : false" :title="getShortcutTooltip('Projects', 'projects')">
+      <button class="nav-btn" :class="view === 'projects' && 'nav-active'" @click="openNavigationTarget('projects')" aria-label="Projects" :aria-current="view === 'projects' ? 'page' : false" :title="getShortcutTooltip('Projects', 'projects')">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"/></svg>
         <span class="nav-label">Proj</span>
       </button>
-      <button class="nav-btn" :class="view === 'registry' && 'nav-active'" @click="view = 'registry'; loadRegistry()" aria-label="Registry" :aria-current="view === 'registry' ? 'page' : false" :title="getShortcutTooltip('Registry', 'registry')">
+      <button class="nav-btn" :class="view === 'registry' && 'nav-active'" @click="openNavigationTarget('registry')" aria-label="Registry" :aria-current="view === 'registry' ? 'page' : false" :title="getShortcutTooltip('Registry', 'registry')">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
         <span class="nav-label">Reg</span>
       </button>
-      <button class="nav-btn" :class="view === 'commitments' && 'nav-active'" @click="view = 'commitments'; if(!commitments.length) loadCommitments()" aria-label="Commitments" :aria-current="view === 'commitments' ? 'page' : false">
+      <button class="nav-btn" :class="view === 'commitments' && 'nav-active'" @click="openNavigationTarget('commitments')" aria-label="Commitments" :aria-current="view === 'commitments' ? 'page' : false">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
         <span class="nav-label">Tasks</span>
       </button>
-      <button class="nav-btn" :class="view === 'factory' && 'nav-active'" @click="view = 'factory'; if(!factoryConfig) loadFactoryConfig()" aria-label="Factory" :aria-current="view === 'factory' ? 'page' : false">
+      <button class="nav-btn" :class="view === 'factory' && 'nav-active'" @click="openNavigationTarget('factory')" aria-label="Factory" :aria-current="view === 'factory' ? 'page' : false">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
         <span class="nav-label">Factory</span>
       </button>
-      <button class="nav-btn" :class="view === 'marketingOps' && 'nav-active'" @click="view = 'marketingOps'; loadMarketingOps()" aria-label="Marketing Ops" :aria-current="view === 'marketingOps' ? 'page' : false" :title="getShortcutTooltip('Marketing Ops', 'marketingOps')">
+      <button class="nav-btn" :class="view === 'marketingOps' && 'nav-active'" @click="openNavigationTarget('marketingOps')" aria-label="Marketing Ops" :aria-current="view === 'marketingOps' ? 'page' : false" :title="getShortcutTooltip('Marketing Ops', 'marketingOps')">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0114 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L7.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 016 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.789l1.599.799L10 4.323V3a1 1 0 011-1z" clip-rule="evenodd"/></svg>
         <span class="nav-label">Mktg</span>
         <span class="nav-badge" x-show="mktops?.stats?.blockedCampaigns?.length > 0" x-text="mktops?.stats?.blockedCampaigns?.length" x-cloak></span>
       </button>
-      <button class="nav-btn" :class="view === 'techTeam' && 'nav-active'" @click="view = 'techTeam'; loadTechTeam()" aria-label="Tech Team" :aria-current="view === 'techTeam' ? 'page' : false" :title="getShortcutTooltip('Tech Team', 'techTeam')">
+      <button class="nav-btn" :class="view === 'techTeam' && 'nav-active'" @click="openNavigationTarget('techTeam')" aria-label="Tech Team" :aria-current="view === 'techTeam' ? 'page' : false" :title="getShortcutTooltip('Tech Team', 'techTeam')">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
         <span class="nav-label">Tech</span>
         <span class="nav-badge" x-show="techTeam?.stats?.blocked > 0" x-text="techTeam?.stats?.blocked" x-cloak></span>
       </button>
-      <button class="nav-btn" :class="view === 'bmc' && 'nav-active'" @click="view = 'bmc'; loadBmc()" aria-label="Business Model Canvas" :aria-current="view === 'bmc' ? 'page' : false" :title="getShortcutTooltip('Business Model Canvas', 'bmc')">
+      <button class="nav-btn" :class="view === 'bmc' && 'nav-active'" @click="openNavigationTarget('bmc')" aria-label="Business Model Canvas" :aria-current="view === 'bmc' ? 'page' : false" :title="getShortcutTooltip('Business Model Canvas', 'bmc')">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 5a1 1 0 011-1h5a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1V9zm8 0a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1V9z"/></svg>
         <span class="nav-label">Canvas</span>
       </button>
-      <button class="nav-btn" :class="view === 'crm' && 'nav-active'" @click="view = 'crm'; loadCrm()" aria-label="CRM" :aria-current="view === 'crm' ? 'page' : false" :title="getShortcutTooltip('CRM', 'crm')">
+      <button class="nav-btn" :class="view === 'crm' && 'nav-active'" @click="openNavigationTarget('crm')" aria-label="CRM" :aria-current="view === 'crm' ? 'page' : false" :title="getShortcutTooltip('CRM', 'crm')">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
         <span class="nav-label">CRM</span>
       </button>
@@ -272,11 +272,11 @@
             <span class="dashboard-mobile-shortcut-label">Action Queue</span>
             <span class="dashboard-mobile-shortcut-value" x-text="(actionQueue?.dansQueueCount || 0) + (actionQueue?.runnersQueueCount || 0)"></span>
           </button>
-          <button class="dashboard-mobile-shortcut" @click="view = 'projects'; if (!projects.length) loadProjects()">
+          <button class="dashboard-mobile-shortcut" @click="openNavigationTarget('projects')">
             <span class="dashboard-mobile-shortcut-label">Projects</span>
             <span class="dashboard-mobile-shortcut-value" x-text="getGlobalMetrics().activeProjects"></span>
           </button>
-          <button class="dashboard-mobile-shortcut" @click="view = 'commitments'; if (!commitments.length) loadCommitments()">
+          <button class="dashboard-mobile-shortcut" @click="openNavigationTarget('commitments')">
             <span class="dashboard-mobile-shortcut-label">Tasks</span>
             <span class="dashboard-mobile-shortcut-value" x-text="getGlobalMetrics().openCommitments"></span>
           </button>
@@ -331,7 +331,7 @@
                 <div class="kpi-number" x-text="dashboard.recentDecisions.length"></div>
                 <div class="kpi-label">Recent Decisions</div>
               </div>
-              <div class="kpi-card kpi-card--clickable kpi-accent-green" @click="view = 'team'; loadTeam()">
+              <div class="kpi-card kpi-card--clickable kpi-accent-green" @click="openNavigationTarget('team')">
                 <div class="kpi-number" x-text="(teamData && teamData.length) || '—'"></div>
                 <div class="kpi-label">Team</div>
               </div>
@@ -1238,7 +1238,7 @@
       <div x-show="view === 'personView'" class="person-view">
         <!-- Header -->
         <div class="person-view-header focus-area-header">
-          <button class="view-back-btn" @click="view = 'team'; loadTeam()">&#8592; Team</button>
+          <button class="view-back-btn" @click="openNavigationTarget('team')">&#8592; Team</button>
           <template x-if="personDetail && personDetail.person">
             <span>
               <span class="person-view-name" x-text="personDetail.person.Name || personDetail.person.name || ''"></span>
@@ -4756,11 +4756,11 @@
       <span>Queue</span>
       <span class="mobile-nav-badge" x-show="actionQueue && actionQueue.dansQueueCount > 0" x-text="actionQueue?.dansQueueCount" aria-hidden="true"></span>
     </button>
-    <button class="mobile-nav-btn" :class="view === 'techTeam' && 'mobile-nav-active'" @click="view = 'techTeam'; loadTechTeam()" aria-label="Tech">
+    <button class="mobile-nav-btn" :class="view === 'techTeam' && 'mobile-nav-active'" @click="openNavigationTarget('techTeam')" aria-label="Tech">
       &lt;/&gt;
       <span>Tech</span>
     </button>
-    <button class="mobile-nav-btn" :class="view === 'marketingOps' && 'mobile-nav-active'" @click="view = 'marketingOps'; loadMarketingOps()" aria-label="Marketing">
+    <button class="mobile-nav-btn" :class="view === 'marketingOps' && 'mobile-nav-active'" @click="openNavigationTarget('marketingOps')" aria-label="Marketing">
       <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0114 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L7.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 016 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.789l1.599.799L10 4.323V3a1 1 0 011-1z" clip-rule="evenodd"/></svg>
       <span>Mktg</span>
     </button>
@@ -4768,7 +4768,7 @@
       <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v6a2 2 0 01-2 2H6l-4 4V5z"/></svg>
       <span>Chat</span>
     </button>
-    <button class="mobile-nav-btn" :class="view === 'team' && 'mobile-nav-active'" @click="view = 'team'; loadTeam()" aria-label="Team">
+    <button class="mobile-nav-btn" :class="view === 'team' && 'mobile-nav-active'" @click="openNavigationTarget('team')" aria-label="Team">
       <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zm5 2a2 2 0 11-4 0 2 2 0 014 0zm-4 7a4 4 0 00-8 0v1h8v-1z"/></svg>
       <span>Team</span>
     </button>

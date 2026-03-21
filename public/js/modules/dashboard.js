@@ -51,9 +51,9 @@ export function createDashboardModule() {
       }
     },
 
-    async loadActionQueue() {
+    async loadActionQueue({ silent = false } = {}) {
       const signal = this.beginRequest('actionQueue');
-      this.actionQueueLoading = true;
+      if (!silent) this.actionQueueLoading = true;
       try {
         const res = await fetch('/api/notion/action-queue', { signal });
         if (res.ok) this.actionQueue = await res.json();
@@ -62,7 +62,7 @@ export function createDashboardModule() {
         console.error('Action queue failed:', e);
       } finally {
         this.endRequest('actionQueue', signal);
-        this.actionQueueLoading = false;
+        if (!silent) this.actionQueueLoading = false;
       }
     },
 
