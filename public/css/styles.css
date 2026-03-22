@@ -5399,6 +5399,8 @@ tr:hover .table-link { color: var(--accent); }
 /* --- Action Queue View --- */
 .action-queue-view {
   padding: 1.5rem 2rem;
+  overflow-y: auto;
+  height: 100%;
 }
 
 .queue-header {
@@ -9212,7 +9214,7 @@ tr:hover .table-link { color: var(--accent); }
 
 /* ── CRM ──────────────────────────────────────────────────────────── */
 
-.crm-view { padding: 0 1.5rem 1.5rem; }
+.crm-view { padding: 0 1.5rem 1.5rem; overflow-y: auto; height: 100%; }
 
 .crm-pipeline-summary h3 {
   font-weight: 600;
@@ -9285,6 +9287,13 @@ tr:hover .table-link { color: var(--accent); }
 }
 
 /* ===== Feature: Overview Dashboard ===== */
+
+.view-scroll-container {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
 
 .overview-view {
   max-width: 1200px;
