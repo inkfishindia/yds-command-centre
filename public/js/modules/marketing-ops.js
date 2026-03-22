@@ -61,6 +61,13 @@ export function createMarketingOpsModule() {
     // Month-level fetch cache
     _calendarMonthCache: {},
 
+    // Pre-computed rendered arrays for Alpine x-for (avoids method calls in templates)
+    _renderedCalendarDays: [],
+    _renderedWeekDays: [],
+
+    // Lazily-built icon lookup map
+    _contentTypeIcons: null,
+
     runMarketingAiTool(toolName) {
       const inputs = this.mktopsAiInputs;
       let prompt = '';
@@ -119,8 +126,9 @@ export function createMarketingOpsModule() {
       // Serve from cache immediately if available
       if (this._calendarMonthCache[month]) {
         this.calendarData = this._calendarMonthCache[month];
-        this._calendarDaysKey = null; // invalidate memoized days
+        this._calendarDaysKey = null;
         this.calendarLoading = false;
+        this._rebuildCalendarView();
         this._prefetchAdjacentMonths(month);
         return;
       }
@@ -140,8 +148,9 @@ export function createMarketingOpsModule() {
         console.error('Calendar load error:', err);
         this.calendarData = { items: [] };
       } finally {
-        this._calendarDaysKey = null; // invalidate memoized days
+        this._calendarDaysKey = null;
         this.calendarLoading = false;
+        this._rebuildCalendarView();
         this._prefetchAdjacentMonths(month);
       }
     },
@@ -259,6 +268,7 @@ export function createMarketingOpsModule() {
       } else {
         this.calendarFilters.contentTypes = [...this.calendarFilters.contentTypes, type];
       }
+      this._rebuildCalendarView();
     },
 
     getUpcomingThisWeek() {
@@ -410,6 +420,49 @@ export function createMarketingOpsModule() {
       }
     },
 
+    _getIconMap() {
+      if (this._contentTypeIcons) return this._contentTypeIcons;
+      this._contentTypeIcons = {};
+      for (const type of ['Carousel', 'Reel', 'Feed Post', 'Story', 'Email', 'WhatsApp', 'Blog']) {
+        this._contentTypeIcons[type] = this.getContentTypeIcon(type);
+      }
+      this._contentTypeIcons['_default'] = this.getContentTypeIcon('Other');
+      return this._contentTypeIcons;
+    },
+
+    _rebuildCalendarView() {
+      const iconMap = this._getIconMap();
+      const activeTypes = this.calendarFilters.contentTypes;
+      const filterStatus = this.calendarFilters.status;
+      const filterPillar = this.calendarFilters.pillar;
+
+      const filterFn = (items) => {
+        return items.filter(item => {
+          if (activeTypes.length > 0 && item.contentType && !activeTypes.includes(item.contentType)) return false;
+          if (filterStatus !== 'all' && item.status !== filterStatus) return false;
+          if (filterPillar !== 'all' && item.contentPillar !== filterPillar) return false;
+          return true;
+        });
+      };
+
+      // Month view
+      const rawDays = this.getCalendarDays();
+      this._renderedCalendarDays = rawDays.map(cell => ({
+        ...cell,
+        filtered: filterFn(cell.items),
+      }));
+
+      // Week view — always compute so toggling is instant
+      const rawWeek = this.getWeekDays();
+      this._renderedWeekDays = rawWeek.map(day => ({
+        ...day,
+        filtered: filterFn(day.items),
+      }));
+
+      // Suppress unused-variable lint warning — iconMap is available for future chip pre-baking
+      void iconMap;
+    },
+
     getChipType(item) {
       return (item && item.contentType) || 'Other';
     },
@@ -488,48 +541,53 @@ export function createMarketingOpsModule() {
       } catch {
         return;
       }
-      if (data.fromDate === targetDate) return; // same day, no-op
+      if (!data.id || data.fromDate === targetDate) return;
 
-      // Optimistic UI: move item in local cache immediately
-      const month = this.calendarMonth;
-      if (this._calendarMonthCache[month]) {
-        const cached = this._calendarMonthCache[month];
-        if (cached.items) {
-          cached.items = cached.items.map(item =>
-            item.id === data.id ? { ...item, publishDate: targetDate } : item
-          );
-        }
-        if (cached.byDate) {
-          if (cached.byDate[data.fromDate]) {
-            cached.byDate[data.fromDate] = cached.byDate[data.fromDate].filter(i => i.id !== data.id);
-          }
-          const moved = (cached.items || []).find(i => i.id === data.id);
-          if (moved) {
-            cached.byDate[targetDate] = [...(cached.byDate[targetDate] || []), moved];
-          }
-        }
-        this.calendarData = { ...cached };
-        this._calendarDaysKey = null;
+      // Optimistic: move item in live calendarData immediately, no server wait
+      const items = this.calendarData && this.calendarData.items;
+      if (!items) return;
+
+      const item = items.find(i => i.id === data.id);
+      if (!item) return;
+
+      const oldDate = item.publishDate;
+      item.publishDate = targetDate;
+
+      // Update byDate map in place
+      const byDate = this.calendarData.byDate || {};
+      if (byDate[oldDate]) {
+        byDate[oldDate] = byDate[oldDate].filter(i => i.id !== data.id);
       }
+      if (!byDate[targetDate]) byDate[targetDate] = [];
+      byDate[targetDate].push(item);
+      this.calendarData.byDate = byDate;
 
+      // Rebuild rendered arrays immediately — no loading state, no flash
+      this._calendarDaysKey = null;
+      this._rebuildCalendarView();
+
+      // Fire PATCH in background
       try {
         const res = await fetch(`/api/marketing-ops/content/${data.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ publishDate: targetDate }),
         });
-        // Always re-sync with server after PATCH (success or failure)
+        if (!res.ok) throw new Error('PATCH failed');
+        // Invalidate month cache so next explicit reload fetches fresh data
         delete this._calendarMonthCache[this.calendarMonth];
-        this._calendarDaysKey = null;
-        await this.loadCalendar();
-        if (!res.ok) {
-          console.error('Reschedule failed, reverted.');
-        }
       } catch (err) {
-        console.error('Reschedule error:', err);
-        delete this._calendarMonthCache[this.calendarMonth];
+        console.error('Reschedule error — reverting:', err);
+        // Revert optimistic move
+        item.publishDate = oldDate;
+        if (byDate[targetDate]) {
+          byDate[targetDate] = byDate[targetDate].filter(i => i.id !== data.id);
+        }
+        if (!byDate[oldDate]) byDate[oldDate] = [];
+        byDate[oldDate].push(item);
+        this.calendarData.byDate = { ...byDate };
         this._calendarDaysKey = null;
-        await this.loadCalendar();
+        this._rebuildCalendarView();
       }
     },
 

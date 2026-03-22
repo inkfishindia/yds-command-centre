@@ -3455,8 +3455,8 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
                   </button>
                   <div class="calendar-view-toggle" role="group" aria-label="Calendar view">
-                    <button class="view-toggle-btn" :class="calendarViewMode === 'month' && 'view-toggle-active'" @click="calendarViewMode = 'month'" aria-pressed="calendarViewMode === 'month'">Month</button>
-                    <button class="view-toggle-btn" :class="calendarViewMode === 'week' && 'view-toggle-active'" @click="calendarViewMode = 'week'" aria-pressed="calendarViewMode === 'week'">Week</button>
+                    <button class="view-toggle-btn" :class="calendarViewMode === 'month' && 'view-toggle-active'" @click="calendarViewMode = 'month'; _rebuildCalendarView()" aria-pressed="calendarViewMode === 'month'">Month</button>
+                    <button class="view-toggle-btn" :class="calendarViewMode === 'week' && 'view-toggle-active'" @click="calendarViewMode = 'week'; _rebuildCalendarView()" aria-pressed="calendarViewMode === 'week'">Week</button>
                   </div>
                 </div>
 
@@ -3478,7 +3478,7 @@
                   </div>
                   <div class="calendar-filter-group">
                     <label for="cal-status-filter">Status</label>
-                    <select id="cal-status-filter" class="calendar-filter-select" x-model="calendarFilters.status">
+                    <select id="cal-status-filter" class="calendar-filter-select" x-model="calendarFilters.status" @change="_rebuildCalendarView()">
                       <option value="all">All</option>
                       <option value="Idea">Idea</option>
                       <option value="Briefed">Briefed</option>
@@ -3492,7 +3492,7 @@
                   </div>
                   <div class="calendar-filter-group">
                     <label for="cal-pillar-filter">Pillar</label>
-                    <select id="cal-pillar-filter" class="calendar-filter-select" x-model="calendarFilters.pillar">
+                    <select id="cal-pillar-filter" class="calendar-filter-select" x-model="calendarFilters.pillar" @change="_rebuildCalendarView()">
                       <option value="all">All</option>
                       <option value="Education">Education</option>
                       <option value="Social Proof">Social Proof</option>
@@ -3515,7 +3515,7 @@
 
                   <!-- Calendar grid -->
                   <div class="calendar-grid" role="grid">
-                    <template x-for="cell in getCalendarDays()" :key="cell.date">
+                    <template x-for="cell in _renderedCalendarDays" :key="cell.date">
                       <div
                         class="calendar-day"
                         :class="{ today: cell.isToday, 'other-month': !cell.isCurrentMonth }"
@@ -3531,8 +3531,8 @@
                         @drop="handleCalendarDrop($event, cell.date)"
                       >
                         <span class="calendar-day-number" x-text="cell.dayNum"></span>
-                        <div class="day-content" x-data="{ filtered: getFilteredCalendarItems(cell.items) }">
-                          <template x-for="(item, idx) in filtered.slice(0, 4)" :key="item.id || idx">
+                        <div class="day-content">
+                          <template x-for="(item, idx) in cell.filtered.slice(0, 4)" :key="item.id || idx">
                             <button
                               class="calendar-chip"
                               :data-type="getChipType(item)"
@@ -3549,8 +3549,8 @@
                           </template>
                           <span
                             class="chip-overflow"
-                            x-show="filtered.length > 4"
-                            x-text="'+' + (filtered.length - 4) + ' more'"
+                            x-show="cell.filtered.length > 4"
+                            x-text="'+' + (cell.filtered.length - 4) + ' more'"
                           ></span>
                           <button
                             class="day-add-btn"
@@ -3567,7 +3567,7 @@
                 <!-- Week View -->
                 <div class="calendar-week-view" x-show="calendarViewMode === 'week'">
                   <div class="week-grid">
-                    <template x-for="day in getWeekDays()" :key="day.date">
+                    <template x-for="day in _renderedWeekDays" :key="day.date">
                       <div class="week-day-column" :class="{ today: day.isToday, 'drag-over': false }"
                         @dragover.prevent
                         @dragenter.prevent="$event.currentTarget.classList.add('drag-over')"
@@ -3578,7 +3578,7 @@
                           <span class="week-day-num" x-text="day.dayNum"></span>
                         </div>
                         <div class="week-day-items">
-                          <template x-for="item in getFilteredCalendarItems(day.items)" :key="item.id">
+                          <template x-for="item in day.filtered" :key="item.id">
                             <div class="week-item-card"
                               draggable="true"
                               @dragstart="$event.dataTransfer.setData('text/plain', JSON.stringify({id: item.id, name: item.name, fromDate: day.date}))"
