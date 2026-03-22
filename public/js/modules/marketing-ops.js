@@ -9,6 +9,12 @@ export function createMarketingOpsModule() {
     // Marketing AI Tools inputs
     mktopsAiInputs: { segment: '', context: '', competitor: '', focus: '', topic: '', audience: '', goal: '', product: '', budget: '' },
 
+    // Marketing Tasks
+    mktopsTasks: null,
+    mktopsTasksLoading: false,
+    mktopsTasksSummary: null,
+    mktopsTasksFilter: { priority: 'all', channel: 'all', type: 'all' },
+
     // ── Content Calendar ─────────────────────────────────────
     calendarMonth: (() => {
       const d = new Date();
@@ -44,6 +50,9 @@ export function createMarketingOpsModule() {
     contentSaving: false,
     contentPendingApproval: false,
     contentSaveError: null,
+
+    // Calendar view mode: 'month' | 'week'
+    calendarViewMode: 'month',
 
     // Calendar memoization
     _calendarDaysKey: null,
@@ -409,6 +418,169 @@ export function createMarketingOpsModule() {
       if (!dateStr) return '';
       const d = new Date(dateStr + 'T00:00:00');
       return d.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+    },
+
+    // ── Marketing Tasks ──────────────────────────────────
+
+    async loadMarketingTasks() {
+      this.mktopsTasksLoading = true;
+      try {
+        const [tasksRes, summaryRes] = await Promise.all([
+          fetch('/api/marketing-ops/tasks'),
+          fetch('/api/marketing-ops/tasks/summary'),
+        ]);
+        if (tasksRes.ok) {
+          const data = await tasksRes.json();
+          this.mktopsTasks = data.tasks || [];
+        }
+        if (summaryRes.ok) {
+          this.mktopsTasksSummary = await summaryRes.json();
+        }
+      } catch (err) {
+        console.error('Marketing Tasks load error:', err);
+        this.mktopsTasks = [];
+      } finally {
+        this.mktopsTasksLoading = false;
+      }
+    },
+
+    getTasksByStatus(status) {
+      if (!this.mktopsTasks) return [];
+      return this.mktopsTasks.filter(task => {
+        if (task.status !== status) return false;
+        const f = this.mktopsTasksFilter;
+        if (f.priority !== 'all' && task.priority !== f.priority) return false;
+        if (f.channel !== 'all' && task.channel !== f.channel) return false;
+        if (f.type !== 'all' && task.type !== f.type) return false;
+        return true;
+      });
+    },
+
+    getTaskPriorityClass(priority) {
+      switch ((priority || '').toLowerCase()) {
+        case 'urgent': return 'task-priority-urgent';
+        case 'high':   return 'task-priority-high';
+        case 'medium': return 'task-priority-medium';
+        case 'low':    return 'task-priority-low';
+        default:       return 'task-priority-default';
+      }
+    },
+
+    isTaskOverdue(task) {
+      if (!task.dueDate) return false;
+      const due = new Date(task.dueDate + 'T23:59:59');
+      return due < new Date();
+    },
+
+    formatTaskDue(dateStr) {
+      if (!dateStr) return '';
+      const d = new Date(dateStr + 'T00:00:00');
+      return d.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+    },
+
+    // ── Drag-and-Drop Rescheduling ────────────────────────────
+
+    async handleCalendarDrop(event, targetDate) {
+      event.currentTarget.classList.remove('drag-over');
+      let data;
+      try {
+        data = JSON.parse(event.dataTransfer.getData('text/plain'));
+      } catch {
+        return;
+      }
+      if (data.fromDate === targetDate) return; // same day, no-op
+
+      // Optimistic UI: move item in local cache immediately
+      const month = this.calendarMonth;
+      if (this._calendarMonthCache[month]) {
+        const cached = this._calendarMonthCache[month];
+        if (cached.items) {
+          cached.items = cached.items.map(item =>
+            item.id === data.id ? { ...item, publishDate: targetDate } : item
+          );
+        }
+        if (cached.byDate) {
+          if (cached.byDate[data.fromDate]) {
+            cached.byDate[data.fromDate] = cached.byDate[data.fromDate].filter(i => i.id !== data.id);
+          }
+          const moved = (cached.items || []).find(i => i.id === data.id);
+          if (moved) {
+            cached.byDate[targetDate] = [...(cached.byDate[targetDate] || []), moved];
+          }
+        }
+        this.calendarData = { ...cached };
+        this._calendarDaysKey = null;
+      }
+
+      try {
+        const res = await fetch(`/api/marketing-ops/content/${data.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ publishDate: targetDate }),
+        });
+        // Always re-sync with server after PATCH (success or failure)
+        delete this._calendarMonthCache[this.calendarMonth];
+        this._calendarDaysKey = null;
+        await this.loadCalendar();
+        if (!res.ok) {
+          console.error('Reschedule failed, reverted.');
+        }
+      } catch (err) {
+        console.error('Reschedule error:', err);
+        delete this._calendarMonthCache[this.calendarMonth];
+        this._calendarDaysKey = null;
+        await this.loadCalendar();
+      }
+    },
+
+    // ── Week View ─────────────────────────────────────────────
+
+    getWeekDays() {
+      const [year, month] = this.calendarMonth.split('-').map(Number);
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0, 10);
+
+      // Use today if in current displayed month, otherwise 1st of month
+      const referenceDate = (today.getFullYear() === year && today.getMonth() + 1 === month)
+        ? today
+        : new Date(year, month - 1, 1);
+
+      const dayOfWeek = referenceDate.getDay();
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(referenceDate);
+      monday.setDate(referenceDate.getDate() + mondayOffset);
+
+      const days = [];
+      const byDate = (this.calendarData && this.calendarData.byDate) || {};
+      const allItems = (this.calendarData && this.calendarData.items) || [];
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        const items = byDate[dateStr] !== undefined
+          ? byDate[dateStr]
+          : allItems.filter(item => item.publishDate === dateStr);
+        days.push({
+          date: dateStr,
+          dayNum: d.getDate(),
+          dayName: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
+          isToday: dateStr === todayStr,
+          isCurrentMonth: d.getMonth() + 1 === month,
+          items,
+        });
+      }
+      return days;
+    },
+
+    navigateWeek(direction) {
+      // Shift the reference month by 7 days from the first of the current display month
+      const [year, month] = this.calendarMonth.split('-').map(Number);
+      const d = new Date(year, month - 1, 1);
+      d.setDate(d.getDate() + direction * 7);
+      this.calendarMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      this._calendarDaysKey = null;
+      this.loadCalendar();
     },
   };
 }

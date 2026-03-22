@@ -3321,6 +3321,7 @@
             <button class="filter-pill" :class="mktopsSection === 'sequences' && 'filter-pill-active'" @click="mktopsSection = 'sequences'">Sequences</button>
             <button class="filter-pill" :class="mktopsSection === 'sessions' && 'filter-pill-active'" @click="mktopsSection = 'sessions'">Sessions</button>
             <button class="filter-pill" :class="mktopsSection === 'aitools' && 'filter-pill-active'" @click="mktopsSection = 'aitools'">AI Tools</button>
+            <button class="filter-pill" :class="mktopsSection === 'tasks' && 'filter-pill-active'" @click="mktopsSection = 'tasks'; if (!mktopsTasks && !mktopsTasksLoading) loadMarketingTasks()">Tasks</button>
           </div>
 
           <!-- CAMPAIGNS SECTION -->
@@ -3441,18 +3442,22 @@
             <template x-if="!calendarLoading">
               <div class="calendar-wrapper">
 
-                <!-- Month navigation -->
+                <!-- Month/Week navigation -->
                 <div class="calendar-header">
-                  <button class="btn-ghost" @click="navigateMonth(-1)" aria-label="Previous month">
+                  <button class="btn-ghost" @click="calendarViewMode === 'week' ? navigateWeek(-1) : navigateMonth(-1)" aria-label="Previous">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
                     Prev
                   </button>
                   <h2 x-text="getCalendarMonthLabel()"></h2>
                   <button class="btn-ghost" @click="goToToday()" x-show="!isCurrentCalendarMonth()">Today</button>
-                  <button class="btn-ghost" @click="navigateMonth(1)" aria-label="Next month">
+                  <button class="btn-ghost" @click="calendarViewMode === 'week' ? navigateWeek(1) : navigateMonth(1)" aria-label="Next">
                     Next
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
                   </button>
+                  <div class="calendar-view-toggle" role="group" aria-label="Calendar view">
+                    <button class="view-toggle-btn" :class="calendarViewMode === 'month' && 'view-toggle-active'" @click="calendarViewMode = 'month'" aria-pressed="calendarViewMode === 'month'">Month</button>
+                    <button class="view-toggle-btn" :class="calendarViewMode === 'week' && 'view-toggle-active'" @click="calendarViewMode = 'week'" aria-pressed="calendarViewMode === 'week'">Week</button>
+                  </div>
                 </div>
 
                 <!-- Filter bar -->
@@ -3499,55 +3504,102 @@
                   </div>
                 </div>
 
-                <!-- Weekday headers -->
-                <div class="calendar-weekdays" role="row">
-                  <template x-for="day in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']" :key="day">
-                    <div class="calendar-weekday" role="columnheader" x-text="day"></div>
-                  </template>
+                <!-- Month View -->
+                <div x-show="calendarViewMode === 'month'">
+                  <!-- Weekday headers -->
+                  <div class="calendar-weekdays" role="row">
+                    <template x-for="day in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']" :key="day">
+                      <div class="calendar-weekday" role="columnheader" x-text="day"></div>
+                    </template>
+                  </div>
+
+                  <!-- Calendar grid -->
+                  <div class="calendar-grid" role="grid">
+                    <template x-for="cell in getCalendarDays()" :key="cell.date">
+                      <div
+                        class="calendar-day"
+                        :class="{ today: cell.isToday, 'other-month': !cell.isCurrentMonth }"
+                        role="gridcell"
+                        tabindex="0"
+                        :aria-label="'Add content for ' + cell.date"
+                        @click="openContentModal('create', cell.date, null)"
+                        @keydown.enter="openContentModal('create', cell.date, null)"
+                        @keydown.space.prevent="openContentModal('create', cell.date, null)"
+                        @dragover.prevent
+                        @dragenter.prevent="$event.currentTarget.classList.add('drag-over')"
+                        @dragleave="$event.currentTarget.classList.remove('drag-over')"
+                        @drop="handleCalendarDrop($event, cell.date)"
+                      >
+                        <span class="calendar-day-number" x-text="cell.dayNum"></span>
+                        <div class="day-content" x-data="{ filtered: getFilteredCalendarItems(cell.items) }">
+                          <template x-for="(item, idx) in filtered.slice(0, 4)" :key="item.id || idx">
+                            <button
+                              class="calendar-chip"
+                              :data-type="getChipType(item)"
+                              :title="item.name + (item.contentPillar ? '\n' + item.contentPillar : '') + (item.hook ? '\n' + item.hook.slice(0, 80) : '') + (item.owner ? '\nOwner: ' + item.owner : '')"
+                              @click.stop="openContentModal('edit', cell.date, item)"
+                              draggable="true"
+                              @dragstart="$event.dataTransfer.setData('text/plain', JSON.stringify({id: item.id, name: item.name, fromDate: cell.date}))"
+                            >
+                              <span class="chip-icon" x-html="getContentTypeIcon(item.contentType)" aria-hidden="true"></span>
+                              <span class="chip-name" x-text="item.name && item.name.length > 22 ? item.name.slice(0, 20) + '…' : item.name"></span>
+                              <span class="chip-pillar" x-text="item.contentPillar" x-show="item.contentPillar"></span>
+                              <span class="chip-owner" x-show="item.owner" x-text="item.owner ? item.owner.charAt(0) : ''" :title="item.owner || ''"></span>
+                            </button>
+                          </template>
+                          <span
+                            class="chip-overflow"
+                            x-show="filtered.length > 4"
+                            x-text="'+' + (filtered.length - 4) + ' more'"
+                          ></span>
+                          <button
+                            class="day-add-btn"
+                            x-show="cell.isCurrentMonth"
+                            @click.stop="openContentModal('create', cell.date, null)"
+                            aria-label="Add content for this date"
+                          >+ Add</button>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
                 </div>
 
-                <!-- Calendar grid -->
-                <div class="calendar-grid" role="grid">
-                  <template x-for="cell in getCalendarDays()" :key="cell.date">
-                    <div
-                      class="calendar-day"
-                      :class="{ today: cell.isToday, 'other-month': !cell.isCurrentMonth }"
-                      role="gridcell"
-                      tabindex="0"
-                      :aria-label="'Add content for ' + cell.date"
-                      @click="openContentModal('create', cell.date, null)"
-                      @keydown.enter="openContentModal('create', cell.date, null)"
-                      @keydown.space.prevent="openContentModal('create', cell.date, null)"
-                    >
-                      <span class="calendar-day-number" x-text="cell.dayNum"></span>
-                      <div class="day-content" x-data="{ filtered: getFilteredCalendarItems(cell.items) }">
-                        <template x-for="(item, idx) in filtered.slice(0, 4)" :key="item.id || idx">
-                          <button
-                            class="calendar-chip"
-                            :data-type="getChipType(item)"
-                            :title="item.name + (item.contentPillar ? '\n' + item.contentPillar : '') + (item.hook ? '\n' + item.hook.slice(0, 80) : '') + (item.owner ? '\nOwner: ' + item.owner : '')"
-                            @click.stop="openContentModal('edit', cell.date, item)"
-                          >
-                            <span class="chip-icon" x-html="getContentTypeIcon(item.contentType)" aria-hidden="true"></span>
-                            <span class="chip-name" x-text="item.name && item.name.length > 22 ? item.name.slice(0, 20) + '…' : item.name"></span>
-                            <span class="chip-pillar" x-text="item.contentPillar" x-show="item.contentPillar"></span>
-                            <span class="chip-owner" x-show="item.owner" x-text="item.owner ? item.owner.charAt(0) : ''" :title="item.owner || ''"></span>
-                          </button>
-                        </template>
-                        <span
-                          class="chip-overflow"
-                          x-show="filtered.length > 4"
-                          x-text="'+' + (filtered.length - 4) + ' more'"
-                        ></span>
-                        <button
-                          class="day-add-btn"
-                          x-show="cell.isCurrentMonth"
-                          @click.stop="openContentModal('create', cell.date, null)"
-                          aria-label="Add content for this date"
-                        >+ Add</button>
+                <!-- Week View -->
+                <div class="calendar-week-view" x-show="calendarViewMode === 'week'">
+                  <div class="week-grid">
+                    <template x-for="day in getWeekDays()" :key="day.date">
+                      <div class="week-day-column" :class="{ today: day.isToday, 'drag-over': false }"
+                        @dragover.prevent
+                        @dragenter.prevent="$event.currentTarget.classList.add('drag-over')"
+                        @dragleave="$event.currentTarget.classList.remove('drag-over')"
+                        @drop="handleCalendarDrop($event, day.date)">
+                        <div class="week-day-header">
+                          <span class="week-day-name" x-text="day.dayName"></span>
+                          <span class="week-day-num" x-text="day.dayNum"></span>
+                        </div>
+                        <div class="week-day-items">
+                          <template x-for="item in getFilteredCalendarItems(day.items)" :key="item.id">
+                            <div class="week-item-card"
+                              draggable="true"
+                              @dragstart="$event.dataTransfer.setData('text/plain', JSON.stringify({id: item.id, name: item.name, fromDate: day.date}))"
+                              @click="openContentModal('edit', day.date, item)">
+                              <span class="week-item-icon" x-html="getContentTypeIcon(item.contentType)" aria-hidden="true"></span>
+                              <div class="week-item-body">
+                                <p class="week-item-name" x-text="item.name"></p>
+                                <div class="week-item-meta">
+                                  <span class="badge" :data-status="(item.status || '').toLowerCase().replace(/\s+/g,'-')" x-text="item.status"></span>
+                                  <span class="week-item-pillar" x-text="item.contentPillar" x-show="item.contentPillar"></span>
+                                  <span class="week-item-owner" x-text="item.owner" x-show="item.owner"></span>
+                                </div>
+                                <p class="week-item-hook" x-text="item.hook" x-show="item.hook"></p>
+                              </div>
+                            </div>
+                          </template>
+                          <button class="day-add-btn" @click="openContentModal('create', day.date, null)" aria-label="Add content for this date">+ Add</button>
+                        </div>
                       </div>
-                    </div>
-                  </template>
+                    </template>
+                  </div>
                 </div>
 
                 <!-- Upcoming this week -->
@@ -3995,6 +4047,179 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- TASKS SECTION -->
+          <div x-show="mktopsSection === 'tasks'">
+
+            <!-- Loading skeleton -->
+            <template x-if="mktopsTasksLoading">
+              <div style="display:flex;flex-direction:column;gap:0.75rem;padding:1rem 0">
+                <div class="skeleton skeleton-card" style="height:80px"></div>
+                <div class="skeleton skeleton-card" style="height:340px"></div>
+              </div>
+            </template>
+
+            <template x-if="!mktopsTasksLoading && mktopsTasks !== null">
+              <div>
+                <!-- Summary strip -->
+                <div class="mktops-tasks-summary">
+                  <div class="mktops-task-stat">
+                    <div class="mktops-task-stat-number" x-text="mktopsTasksSummary?.total || 0"></div>
+                    <div class="mktops-task-stat-label">Total Tasks</div>
+                  </div>
+                  <div class="mktops-task-stat" :class="(mktopsTasksSummary?.overdue || 0) > 0 && 'mktops-task-stat--alert'">
+                    <div class="mktops-task-stat-number" x-text="mktopsTasksSummary?.overdue || 0"></div>
+                    <div class="mktops-task-stat-label">Overdue</div>
+                  </div>
+                  <div class="mktops-task-stat">
+                    <div class="mktops-task-stat-number" x-text="mktopsTasksSummary?.inProgress || 0"></div>
+                    <div class="mktops-task-stat-label">In Progress</div>
+                  </div>
+                  <div class="mktops-task-stat" :class="(mktopsTasksSummary?.blocked || 0) > 0 && 'mktops-task-stat--alert'">
+                    <div class="mktops-task-stat-number" x-text="mktopsTasksSummary?.blocked || 0"></div>
+                    <div class="mktops-task-stat-label">Blocked</div>
+                  </div>
+                </div>
+
+                <!-- Filter bar -->
+                <div class="mktops-filters" style="margin-bottom:1rem">
+                  <select class="filter-search" x-model="mktopsTasksFilter.priority" style="cursor:pointer">
+                    <option value="all">All Priorities</option>
+                    <option value="Urgent">Urgent</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                  <select class="filter-search" x-model="mktopsTasksFilter.channel" style="cursor:pointer">
+                    <option value="all">All Channels</option>
+                    <option value="Google Ads">Google Ads</option>
+                    <option value="Meta Ads">Meta Ads</option>
+                    <option value="Email">Email</option>
+                    <option value="WhatsApp">WhatsApp</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Website">Website</option>
+                    <option value="SEO">SEO</option>
+                    <option value="Cross-channel">Cross-channel</option>
+                  </select>
+                  <select class="filter-search" x-model="mktopsTasksFilter.type" style="cursor:pointer">
+                    <option value="all">All Types</option>
+                    <option value="Deliverable">Deliverable</option>
+                    <option value="Review">Review</option>
+                    <option value="Setup">Setup</option>
+                    <option value="Creative">Creative</option>
+                    <option value="Analysis">Analysis</option>
+                    <option value="Follow-up">Follow-up</option>
+                  </select>
+                </div>
+
+                <!-- Kanban board -->
+                <div class="mktops-tasks-board">
+
+                  <!-- Not Started -->
+                  <div class="kanban-column">
+                    <div class="kanban-column-header">
+                      <span>Not Started</span>
+                      <span class="kanban-count" x-text="getTasksByStatus('Not Started').length"></span>
+                    </div>
+                    <template x-if="getTasksByStatus('Not Started').length === 0">
+                      <div class="kanban-empty">No tasks</div>
+                    </template>
+                    <template x-for="task in getTasksByStatus('Not Started')" :key="task.id">
+                      <div class="mktops-task-card" :data-priority="(task.priority || '').toLowerCase()">
+                        <div class="kanban-card-name" x-text="task.title || task.task || 'Untitled'"></div>
+                        <div class="mktops-task-card-tags">
+                          <span class="task-priority-badge" :data-priority="(task.priority || '').toLowerCase()" x-text="task.priority || ''"></span>
+                          <span class="task-channel-tag" x-text="task.channel || ''"></span>
+                          <span class="task-channel-tag" x-text="task.type || ''"></span>
+                        </div>
+                        <div class="mktops-task-card-footer">
+                          <span class="kanban-due" :class="isTaskOverdue(task) && 'task-overdue'" x-text="formatTaskDue(task.dueDate)"></span>
+                          <span class="task-assignee" x-text="task.assignedTo || ''"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- In Progress -->
+                  <div class="kanban-column">
+                    <div class="kanban-column-header">
+                      <span>In Progress</span>
+                      <span class="kanban-count" x-text="getTasksByStatus('In Progress').length"></span>
+                    </div>
+                    <template x-if="getTasksByStatus('In Progress').length === 0">
+                      <div class="kanban-empty">No tasks</div>
+                    </template>
+                    <template x-for="task in getTasksByStatus('In Progress')" :key="task.id">
+                      <div class="mktops-task-card" :data-priority="(task.priority || '').toLowerCase()">
+                        <div class="kanban-card-name" x-text="task.title || task.task || 'Untitled'"></div>
+                        <div class="mktops-task-card-tags">
+                          <span class="task-priority-badge" :data-priority="(task.priority || '').toLowerCase()" x-text="task.priority || ''"></span>
+                          <span class="task-channel-tag" x-text="task.channel || ''"></span>
+                          <span class="task-channel-tag" x-text="task.type || ''"></span>
+                        </div>
+                        <div class="mktops-task-card-footer">
+                          <span class="kanban-due" :class="isTaskOverdue(task) && 'task-overdue'" x-text="formatTaskDue(task.dueDate)"></span>
+                          <span class="task-assignee" x-text="task.assignedTo || ''"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- Blocked -->
+                  <div class="kanban-column kanban-column--blocked">
+                    <div class="kanban-column-header">
+                      <span>Blocked</span>
+                      <span class="kanban-count" x-text="getTasksByStatus('Blocked').length"></span>
+                    </div>
+                    <template x-if="getTasksByStatus('Blocked').length === 0">
+                      <div class="kanban-empty">No tasks</div>
+                    </template>
+                    <template x-for="task in getTasksByStatus('Blocked')" :key="task.id">
+                      <div class="mktops-task-card mktops-task-card--blocked" :data-priority="(task.priority || '').toLowerCase()">
+                        <div class="kanban-card-name" x-text="task.title || task.task || 'Untitled'"></div>
+                        <div class="mktops-task-card-tags">
+                          <span class="task-priority-badge" :data-priority="(task.priority || '').toLowerCase()" x-text="task.priority || ''"></span>
+                          <span class="task-channel-tag" x-text="task.channel || ''"></span>
+                          <span class="task-channel-tag" x-text="task.type || ''"></span>
+                        </div>
+                        <div class="mktops-task-card-footer">
+                          <span class="kanban-due" :class="isTaskOverdue(task) && 'task-overdue'" x-text="formatTaskDue(task.dueDate)"></span>
+                          <span class="task-assignee" x-text="task.assignedTo || ''"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- Done -->
+                  <div class="kanban-column">
+                    <div class="kanban-column-header">
+                      <span>Done</span>
+                      <span class="kanban-count" x-text="getTasksByStatus('Done').length"></span>
+                    </div>
+                    <template x-if="getTasksByStatus('Done').length === 0">
+                      <div class="kanban-empty">No tasks</div>
+                    </template>
+                    <template x-for="task in getTasksByStatus('Done')" :key="task.id">
+                      <div class="mktops-task-card mktops-task-card--done" :data-priority="(task.priority || '').toLowerCase()">
+                        <div class="kanban-card-name" x-text="task.title || task.task || 'Untitled'"></div>
+                        <div class="mktops-task-card-tags">
+                          <span class="task-priority-badge" :data-priority="(task.priority || '').toLowerCase()" x-text="task.priority || ''"></span>
+                          <span class="task-channel-tag" x-text="task.channel || ''"></span>
+                          <span class="task-channel-tag" x-text="task.type || ''"></span>
+                        </div>
+                        <div class="mktops-task-card-footer">
+                          <span class="kanban-due" x-text="formatTaskDue(task.dueDate)"></span>
+                          <span class="task-assignee" x-text="task.assignedTo || ''"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+
+                </div>
+              </div>
+            </template>
+
           </div>
 
         </div>
