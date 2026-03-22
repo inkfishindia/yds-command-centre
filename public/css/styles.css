@@ -38,6 +38,8 @@
   --amber-glow: rgba(245, 158, 11, 0.08);
   --red-glow: rgba(239, 68, 68, 0.08);
   --purple-glow: rgba(168, 85, 247, 0.08);
+  --indigo: #6366f1;
+  --text-inverse: #fff;
   /* Transition presets */
   --transition-fast: 150ms ease;
   --transition-normal: 200ms ease;
@@ -82,7 +84,7 @@ body {
   z-index: 9999;
   padding: 0.5rem 1rem;
   background: var(--accent);
-  color: #fff;
+  color: var(--text-inverse);
   font-size: 14px;
   font-weight: 600;
   border-radius: var(--radius);
@@ -92,7 +94,7 @@ body {
 
 .skip-link:focus {
   top: 1rem;
-  outline: 2px solid #fff;
+  outline: 2px solid var(--text-inverse);
   outline-offset: 2px;
 }
 
@@ -1151,9 +1153,9 @@ tr:hover .table-link { color: var(--accent); }
   font-size: 0.75rem;
   font-weight: 600;
 }
-.workload-low  { background: rgba(34,197,94,0.15); color: #22c55e; }
-.workload-med  { background: rgba(245,158,11,0.15); color: #f59e0b; }
-.workload-high { background: rgba(239,68,68,0.15);  color: #ef4444; }
+.workload-low  { background: rgba(34,197,94,0.15); color: var(--green); }
+.workload-med  { background: rgba(245,158,11,0.15); color: var(--amber); }
+.workload-high { background: rgba(239,68,68,0.15);  color: var(--red); }
 
 .project-count-badge {
   display: inline-flex;
@@ -2336,12 +2338,12 @@ tr:hover .table-link { color: var(--accent); }
 .filter-pill-active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--text-inverse);
 }
 
-.filter-pill-mission.filter-pill-active  { background: #3b82f6; border-color: #3b82f6; }
-.filter-pill-initiative.filter-pill-active { background: #8b5cf6; border-color: #8b5cf6; }
-.filter-pill-experiment.filter-pill-active { background: #f59e0b; border-color: #f59e0b; }
+.filter-pill-mission.filter-pill-active  { background: var(--accent); border-color: var(--accent); }
+.filter-pill-initiative.filter-pill-active { background: var(--purple); border-color: var(--purple); }
+.filter-pill-experiment.filter-pill-active { background: var(--amber); border-color: var(--amber); }
 
 .projects-grid {
   display: grid;
@@ -2405,7 +2407,7 @@ tr:hover .table-link { color: var(--accent); }
 }
 
 /* Project type badges (data-type attribute) */
-.badge[data-type="mission brief"]  { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.badge[data-type="mission brief"]  { background: rgba(59,130,246,0.15); color: var(--accent); }
 .badge[data-type="initiative"]     { background: rgba(139,92,246,0.15); color: #a78bfa; }
 .badge[data-type="experiment"]     { background: rgba(245,158,11,0.15); color: #fbbf24; }
 
@@ -4331,7 +4333,7 @@ tr:hover .table-link { color: var(--accent); }
   transform: translateX(-50%);
   z-index: 200;
   background: var(--danger, #ef4444);
-  color: #fff;
+  color: var(--text-inverse);
   padding: 0.5rem 1.25rem;
   border-radius: var(--radius);
   font-size: 0.85rem;
@@ -4416,7 +4418,7 @@ tr:hover .table-link { color: var(--accent); }
 .factory-edit-save-btn {
   padding: 0.3rem 0.7rem;
   background: var(--accent);
-  color: #fff;
+  color: var(--text-inverse);
   border: none;
   border-radius: var(--radius-sm);
   font-size: 12px;
@@ -4506,7 +4508,7 @@ tr:hover .table-link { color: var(--accent); }
 .factory-rule-pill-shared_resource,
 .factory-rule-pill-uses_shared_resource {
   background: rgba(59, 130, 246, 0.18);
-  color: #60a5fa;
+  color: var(--accent);
 }
 
 .factory-rule-pill-people_based {
@@ -5149,13 +5151,13 @@ tr:hover .table-link { color: var(--accent); }
 .action-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 
 .action-done { border-color: var(--green); color: var(--green); }
-.action-done:hover { background: var(--green); color: #fff; }
+.action-done:hover { background: var(--green); color: var(--text-inverse); }
 
 .action-snooze { border-color: var(--amber); color: var(--amber); }
-.action-snooze:hover { background: var(--amber); color: #fff; }
+.action-snooze:hover { background: var(--amber); color: var(--text-inverse); }
 
 .action-reassign { border-color: var(--accent); color: var(--accent); }
-.action-reassign:hover { background: var(--accent); color: #fff; }
+.action-reassign:hover { background: var(--accent); color: var(--text-inverse); }
 
 /* Snooze date picker popover */
 .snooze-picker {
@@ -5182,7 +5184,7 @@ tr:hover .table-link { color: var(--accent); }
   font-family: var(--font-ui);
   transition: all var(--transition-fast);
 }
-.snooze-preset:hover { background: var(--amber); border-color: var(--amber); color: #fff; }
+.snooze-preset:hover { background: var(--amber); border-color: var(--amber); color: var(--text-inverse); }
 
 .snooze-date-input {
   padding: 0.2rem 0.4rem;
@@ -5386,7 +5388,7 @@ tr:hover .table-link { color: var(--accent); }
   min-width: 16px;
   height: 16px;
   background: var(--red);
-  color: #fff;
+  color: var(--text-inverse);
   border-radius: 99px;
   font-size: 10px;
   font-weight: 700;
@@ -5453,7 +5455,7 @@ tr:hover .table-link { color: var(--accent); }
   height: 18px;
   border-radius: 99px;
   background: var(--red);
-  color: #fff;
+  color: var(--text-inverse);
   font-size: 10px;
   font-weight: 700;
   padding: 0 4px;
@@ -5921,7 +5923,7 @@ tr:hover .table-link { color: var(--accent); }
   height: 16px;
   border-radius: 999px;
   background: var(--red);
-  color: #fff;
+  color: var(--text-inverse);
   font-size: 9px;
   font-weight: 700;
   display: flex;
@@ -6519,7 +6521,7 @@ tr:hover .table-link { color: var(--accent); }
 [data-status="at-risk"] { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
 [data-status="blocked"] { background: rgba(239, 68, 68, 0.15); color: var(--red); }
 [data-status="needs-dan"] { background: rgba(168, 85, 247, 0.15); color: var(--purple); }
-[data-status="info"] { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+[data-status="info"] { background: rgba(59, 130, 246, 0.15); color: var(--accent); }
 
 /* Table wrapper for horizontal scroll */
 .table-wrap {
@@ -6563,11 +6565,11 @@ tr:hover .table-link { color: var(--accent); }
 }
 .view-toggle-active {
   background: var(--accent);
-  color: #fff;
+  color: var(--text-inverse);
 }
 .view-toggle-active:hover {
   background: var(--accent);
-  color: #fff;
+  color: var(--text-inverse);
 }
 
 /* ===== Feature: Campaign Inline Actions ===== */
@@ -6598,7 +6600,7 @@ tr:hover .table-link { color: var(--accent); }
 }
 .kanban-card-actions .action-btn:hover {
   background: var(--accent);
-  color: #fff;
+  color: var(--text-inverse);
   border-color: var(--accent);
 }
 .kanban-card-actions .action-btn:focus {
@@ -6611,7 +6613,7 @@ tr:hover .table-link { color: var(--accent); }
 }
 .kanban-card-actions .action-btn-danger:hover {
   background: var(--red);
-  color: #fff;
+  color: var(--text-inverse);
 }
 .kanban-card-actions .action-btn:disabled,
 .kanban-card-actions .action-btn:disabled:hover {
@@ -6854,13 +6856,13 @@ tr:hover .table-link { color: var(--accent); }
   color: var(--text-primary);
 }
 
-.calendar-filter-chip.type-carousel.active     { border-color: #a855f7; background: rgba(168,85,247,0.12); }
-.calendar-filter-chip.type-reel.active         { border-color: #ef4444; background: rgba(239,68,68,0.12); }
-.calendar-filter-chip.type-feed-post.active    { border-color: #3b82f6; background: rgba(59,130,246,0.12); }
-.calendar-filter-chip.type-story.active        { border-color: #f59e0b; background: rgba(245,158,11,0.12); }
-.calendar-filter-chip.type-video.active        { border-color: #14b8a6; background: rgba(20,184,166,0.12); }
-.calendar-filter-chip.type-blog.active         { border-color: #22c55e; background: rgba(34,197,94,0.12); }
-.calendar-filter-chip.type-email.active        { border-color: #6366f1; background: rgba(99,102,241,0.12); }
+.calendar-filter-chip.type-carousel.active     { border-color: var(--purple); background: rgba(168,85,247,0.12); }
+.calendar-filter-chip.type-reel.active         { border-color: var(--red); background: rgba(239,68,68,0.12); }
+.calendar-filter-chip.type-feed-post.active    { border-color: var(--accent); background: rgba(59,130,246,0.12); }
+.calendar-filter-chip.type-story.active        { border-color: var(--amber); background: rgba(245,158,11,0.12); }
+.calendar-filter-chip.type-video.active        { border-color: var(--teal); background: rgba(20,184,166,0.12); }
+.calendar-filter-chip.type-blog.active         { border-color: var(--green); background: rgba(34,197,94,0.12); }
+.calendar-filter-chip.type-email.active        { border-color: var(--indigo, #6366f1); background: rgba(99,102,241,0.12); }
 
 .calendar-filter-select {
   padding: 0.25rem 0.6rem;
