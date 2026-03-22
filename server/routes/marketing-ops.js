@@ -22,6 +22,24 @@ router.get('/campaigns', async (req, res) => {
   }
 });
 
+// GET /api/marketing-ops/content/calendar?month=YYYY-MM
+router.get('/content/calendar', async (req, res) => {
+  const month = req.query.month;
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+    return res.status(400).json({ error: 'month query parameter is required in YYYY-MM format' });
+  }
+  const [, mo] = month.split('-').map(Number);
+  if (mo < 1 || mo > 12) {
+    return res.status(400).json({ error: 'Invalid month value' });
+  }
+  try {
+    res.json(await marketingOpsService.getContentForMonth(month));
+  } catch (err) {
+    console.error('Content calendar month error:', err);
+    res.status(500).json({ error: 'Failed to load content calendar for month' });
+  }
+});
+
 // GET /api/marketing-ops/content
 router.get('/content', async (req, res) => {
   try {
@@ -29,6 +47,159 @@ router.get('/content', async (req, res) => {
   } catch (err) {
     console.error('Content calendar error:', err);
     res.status(500).json({ error: 'Failed to load content calendar' });
+  }
+});
+
+// POST /api/marketing-ops/content — create a new content calendar item
+router.post('/content', async (req, res) => {
+  const {
+    name, status, contentType, channels, publishDate, owner, campaignId, notes,
+    contentPillar, hook, audienceSegment, productFocus, caption, visualBrief,
+  } = req.body;
+
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+
+  const VALID_STATUSES = ['Idea', 'Briefed', 'Drafted', 'In Design', 'Brand Review', 'Approved', 'Scheduled', 'Published'];
+  if (status && !VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ error: `Invalid status. Allowed: ${VALID_STATUSES.join(', ')}` });
+  }
+
+  const VALID_CONTENT_TYPES = ['Feed Post', 'Carousel', 'Reel', 'Story', 'Email', 'WhatsApp', 'Blog'];
+  if (contentType && !VALID_CONTENT_TYPES.includes(contentType)) {
+    return res.status(400).json({ error: `Invalid contentType. Allowed: ${VALID_CONTENT_TYPES.join(', ')}` });
+  }
+
+  const VALID_CHANNELS = ['Email', 'LinkedIn', 'Twitter', 'Instagram', 'Website'];
+  if (channels !== undefined) {
+    if (!Array.isArray(channels)) {
+      return res.status(400).json({ error: 'channels must be an array' });
+    }
+    const invalid = channels.filter(c => !VALID_CHANNELS.includes(c));
+    if (invalid.length > 0) {
+      return res.status(400).json({ error: `Invalid channel(s): ${invalid.join(', ')}. Allowed: ${VALID_CHANNELS.join(', ')}` });
+    }
+  }
+
+  if (publishDate && !/^\d{4}-\d{2}-\d{2}$/.test(publishDate)) {
+    return res.status(400).json({ error: 'publishDate must be in YYYY-MM-DD format' });
+  }
+
+  if (campaignId && !/^[a-f0-9]{32}$|^[a-f0-9-]{36}$/.test(campaignId)) {
+    return res.status(400).json({ error: 'Invalid campaignId format' });
+  }
+
+  const VALID_CONTENT_PILLARS = ['Education', 'Social Proof', 'Product', 'Behind the Scenes', 'Community', 'Promotional'];
+  if (contentPillar && !VALID_CONTENT_PILLARS.includes(contentPillar)) {
+    return res.status(400).json({ error: `Invalid contentPillar. Allowed: ${VALID_CONTENT_PILLARS.join(', ')}` });
+  }
+
+  const VALID_OWNERS = ['Corey', 'Dickie', 'Jessica', 'Pixel', 'Studio', 'Harry', 'Bimal'];
+  if (owner !== undefined && !VALID_OWNERS.includes(owner)) {
+    return res.status(400).json({ error: `Invalid owner. Allowed: ${VALID_OWNERS.join(', ')}` });
+  }
+
+  if (audienceSegment !== undefined && !Array.isArray(audienceSegment)) {
+    return res.status(400).json({ error: 'audienceSegment must be an array' });
+  }
+
+  if (productFocus !== undefined && !Array.isArray(productFocus)) {
+    return res.status(400).json({ error: 'productFocus must be an array' });
+  }
+
+  try {
+    const result = await marketingOpsService.createContent({
+      name: name.trim(),
+      status: status || 'Idea',
+      contentType: contentType || null,
+      channels: channels || [],
+      publishDate: publishDate || null,
+      owner: owner || null,
+      campaignId: campaignId || null,
+      notes: notes || null,
+      contentPillar: contentPillar || null,
+      hook: hook || null,
+      audienceSegment: audienceSegment || null,
+      productFocus: productFocus || null,
+      caption: caption || null,
+      visualBrief: visualBrief || null,
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    console.error('Create content error:', err);
+    res.status(500).json({ error: 'Failed to create content item' });
+  }
+});
+
+// PATCH /api/marketing-ops/content/:id — update a content calendar item
+router.patch('/content/:id', async (req, res) => {
+  const pageId = req.params.id;
+  if (!/^[a-f0-9]{32}$|^[a-f0-9-]{36}$/.test(pageId)) {
+    return res.status(400).json({ error: 'Invalid page ID format' });
+  }
+
+  const {
+    name, status, contentType, channels, publishDate, notes, owner,
+    contentPillar, hook, audienceSegment, productFocus, caption, visualBrief,
+  } = req.body;
+
+  if (Object.keys(req.body).length === 0) {
+    return res.status(400).json({ error: 'At least one field is required' });
+  }
+
+  const VALID_STATUSES = ['Idea', 'Briefed', 'Drafted', 'In Design', 'Brand Review', 'Approved', 'Scheduled', 'Published'];
+  if (status !== undefined && !VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ error: `Invalid status. Allowed: ${VALID_STATUSES.join(', ')}` });
+  }
+
+  const VALID_CONTENT_TYPES = ['Feed Post', 'Carousel', 'Reel', 'Story', 'Email', 'WhatsApp', 'Blog'];
+  if (contentType !== undefined && !VALID_CONTENT_TYPES.includes(contentType)) {
+    return res.status(400).json({ error: `Invalid contentType. Allowed: ${VALID_CONTENT_TYPES.join(', ')}` });
+  }
+
+  const VALID_CHANNELS = ['Email', 'LinkedIn', 'Twitter', 'Instagram', 'Website'];
+  if (channels !== undefined) {
+    if (!Array.isArray(channels)) {
+      return res.status(400).json({ error: 'channels must be an array' });
+    }
+    const invalid = channels.filter(c => !VALID_CHANNELS.includes(c));
+    if (invalid.length > 0) {
+      return res.status(400).json({ error: `Invalid channel(s): ${invalid.join(', ')}. Allowed: ${VALID_CHANNELS.join(', ')}` });
+    }
+  }
+
+  if (publishDate !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(publishDate)) {
+    return res.status(400).json({ error: 'publishDate must be in YYYY-MM-DD format' });
+  }
+
+  const VALID_CONTENT_PILLARS = ['Education', 'Social Proof', 'Product', 'Behind the Scenes', 'Community', 'Promotional'];
+  if (contentPillar !== undefined && !VALID_CONTENT_PILLARS.includes(contentPillar)) {
+    return res.status(400).json({ error: `Invalid contentPillar. Allowed: ${VALID_CONTENT_PILLARS.join(', ')}` });
+  }
+
+  const VALID_OWNERS = ['Corey', 'Dickie', 'Jessica', 'Pixel', 'Studio', 'Harry', 'Bimal'];
+  if (owner !== undefined && !VALID_OWNERS.includes(owner)) {
+    return res.status(400).json({ error: `Invalid owner. Allowed: ${VALID_OWNERS.join(', ')}` });
+  }
+
+  if (audienceSegment !== undefined && !Array.isArray(audienceSegment)) {
+    return res.status(400).json({ error: 'audienceSegment must be an array' });
+  }
+
+  if (productFocus !== undefined && !Array.isArray(productFocus)) {
+    return res.status(400).json({ error: 'productFocus must be an array' });
+  }
+
+  try {
+    const result = await marketingOpsService.updateContent(pageId, {
+      name, status, contentType, channels, publishDate, notes, owner,
+      contentPillar, hook, audienceSegment, productFocus, caption, visualBrief,
+    });
+    res.json(result);
+  } catch (err) {
+    console.error('Update content error:', err);
+    res.status(500).json({ error: 'Failed to update content item' });
   }
 });
 
@@ -50,6 +221,30 @@ router.get('/sessions', async (req, res) => {
   } catch (err) {
     console.error('Sessions log error:', err);
     res.status(500).json({ error: 'Failed to load sessions' });
+  }
+});
+
+// GET /api/marketing-ops/tasks — marketing tasks with optional ?status=&priority=&channel= filters
+router.get('/tasks', async (req, res) => {
+  try {
+    const filters = {};
+    if (req.query.status) filters.status = req.query.status;
+    if (req.query.priority) filters.priority = req.query.priority;
+    if (req.query.channel) filters.channel = req.query.channel;
+    res.json(await marketingOpsService.getMarketingTasks(filters));
+  } catch (err) {
+    console.error('Marketing tasks error:', err);
+    res.status(500).json({ error: 'Failed to load marketing tasks' });
+  }
+});
+
+// GET /api/marketing-ops/tasks/summary — aggregated stats across all marketing tasks
+router.get('/tasks/summary', async (req, res) => {
+  try {
+    res.json(await marketingOpsService.getMarketingTasksSummary());
+  } catch (err) {
+    console.error('Marketing tasks summary error:', err);
+    res.status(500).json({ error: 'Failed to load marketing tasks summary' });
   }
 });
 

@@ -62,6 +62,7 @@ export function createCommandShellModule() {
       this._ensureModule(action);
       this.view = action;
       if (action === 'dashboard') this.loadDashboard();
+      else if (action === 'overview') this.loadOverview();
       else if (action === 'projects') this.loadProjects();
       else if (action === 'commitments') this.loadCommitments();
       else if (action === 'team') this.loadTeam();

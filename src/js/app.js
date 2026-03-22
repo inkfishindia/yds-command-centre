@@ -18,12 +18,14 @@ import { createCommitmentsModule } from './modules/commitments.js';
 import { createFactoryModule } from './modules/factory.js';
 import { createCommandShellModule } from './modules/command-shell.js';
 import { createChatModule } from './modules/chat.js';
+import { createOverviewModule } from './modules/overview.js';
 
 configureMarkdown();
 
 // Lazy module registry: maps view name -> factory function.
 // These are NOT initialized at startup — only when the user first navigates to the view.
 const LAZY_MODULE_FACTORIES = {
+  overview: createOverviewModule,
   bmc: createBmcModule,
   crm: createCrmModule,
   marketingOps: createMarketingOpsModule,
@@ -63,6 +65,8 @@ function app() {
     // Stub state for lazy modules — prevents Alpine binding errors before the module inits.
     // Must use the exact property names each module declares. When _ensureModule() runs,
     // Object.assign will overwrite these stubs with the real module state + methods.
+    // overview
+    overview: null, overviewLoading: false,
     // bmc
     bmc: null, bmcLoading: false, bmcDetailItem: null, bmcDetailKey: '', bmcSearch: '', bmcFilter: 'highlights', bmcFocus: '',
     // crm

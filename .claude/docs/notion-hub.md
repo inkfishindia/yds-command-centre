@@ -23,6 +23,9 @@
 | Spec Library | 5be6d7cf5607407cbca010b422bceb7e | 5be6d7cf-5607-407c-bca0-10b422bceb7e | Technical specification pipeline |
 | Tech Decision Log | 1f9193d41ac3409484d2d0ae1442c95b | 1f9193d4-1ac3-4094-84d2-d0ae1442c95b | Technical decision records |
 | Sprint Archive | 9ba8330aa3c044d195b27eb450e278f2 | 9ba8330a-a3c0-44d1-95b2-7eb450e278f2 | Sprint velocity history |
+| AI Team | 17f15cb3920948fb9721a776bbbcc6ea | 1c3600b0-b9cb-45f5-8687-fc41cbe30301 | AI agent roster & capabilities |
+| Marketing Tasks | 1fa22f26f31842439dba9788e08ca413 | b44daab1-c281-4e88-8ea4-6e9371370c28 | Marketing action items & assignments |
+| Tech Backlog | 4bb401d876dd4068851784c5cdb06363 | e5a12af5-9f92-4a9e-ac7c-aac006f5ef6c | Tech backlog items |
 
 **Future Databases** (IDs TBD — Nirmal to create)
 - Agent Registry — AI agent configuration and capabilities
@@ -105,6 +108,11 @@ Database ID: `ee87ff54-6d2a-4684-99a9-419475b9cb3c`
 | Team Notes | text | Retrospective notes |
 | Focus | text | Sprint theme/goals |
 
+### Tech Backlog
+**DB ID:** `4bb401d876dd4068851784c5cdb06363` | **Verified:** 2026-03-21 via Notion MCP
+
+**Purpose:** Backlog of tech work items waiting to be pulled into sprints. Schema to be fully documented after first data load.
+
 ---
 
 ## PEOPLE IDS — Full Team
@@ -132,6 +140,28 @@ Database ID: `ee87ff54-6d2a-4684-99a9-419475b9cb3c`
 | JW / Jessica (Creative) | 308247aa0d7b81b1a1fdfd6569d9b202 |
 | Copy Lead / Harry | 308247aa0d7b810f8322f160169f2344 |
 | Tech Advisor | 308247aa0d7b811fa554f1a77b7e20bc |
+
+### AI Team Database
+**DB ID:** `17f15cb3920948fb9721a776bbbcc6ea` | **Verified:** 2026-03-21 via Notion MCP
+
+| Property | Type | Options / Notes |
+|---|---|---|
+| Name | title | Agent name |
+| Function | select | Strategy & Ops, Marketing & Growth, Sales & Revenue, Product & Tech, Brand & Creative, Operations |
+| Status | select | Active, Building, Planned |
+| Tier | select | Core Team, Specialist Tool, Personal, Archived |
+| Persona | text | Agent personality/role description |
+| Scope | text | What the agent handles |
+| Operating Rhythm | text | How often/when agent operates |
+| Knowledge Loaded | text | What knowledge the agent has |
+| Escalation Rules | text | When to escalate to human |
+| Tools Connected | text | List of connected tools |
+| Project Link | url | Link to agent project |
+| Notebook llm | url | NotebookLM link |
+| Focus Areas | relation | → Focus Areas DB |
+| Human Counterpart | relation | → People DB |
+| Platforms | relation | → Platforms DB |
+| Audiences | relation | → Audiences DB |
 
 ---
 
@@ -286,16 +316,52 @@ Database ID: `ee87ff54-6d2a-4684-99a9-419475b9cb3c`
 | Notes | text | Campaign brief/goals |
 
 ### Content Calendar Properties
-| Property | Type | Values |
+**DB ID:** `227f3365feab476e88791f2a4d0a72b9` | **Verified:** 2026-03-21 via Notion MCP
+**Title field is `Title` (not `Name`). Owner is a `select` (not text/relation).**
+
+| Property | Type | Options / Notes |
 |---|---|---|
-| Name | title | Content piece title |
-| Status | select | Planned, In Progress, Scheduled, Published, Archived |
-| Content Type | select | Blog, Email, Social, Video, Guide, Case Study |
-| Channel | multi_select | Email, LinkedIn, Twitter, Instagram, Website, etc. |
+| Title | title | Content piece title |
+| Status | select | Idea, Briefed, Drafted, In Design, Brand Review, Approved, Scheduled, Published |
+| Content Type | select | Feed Post, Carousel, Reel, Story, Email, WhatsApp, Blog |
+| Content Pillar | select | Education, Social Proof, Product, Behind the Scenes, Community, Promotional |
+| Owner | select | Corey, Dickie, Jessica, Pixel, Studio, Harry, Bimal |
 | Publish Date | date | Scheduled publication date |
-| Owner | relation → People | Content creator |
-| Campaign | relation → Campaigns | Linked campaign |
-| Notes | text | Brief description or key message |
+| Hook | text | Attention-grabbing headline |
+| Caption / Copy | text | Social media caption |
+| Visual Brief | text | Design/asset notes |
+| Audience Segment | multi_select | Creative Professionals, AI Artists, Founders & Small Businesses, Curious Creators, Corporate / Bulk, Dropship Partners |
+| Product Focus | multi_select | T-shirts, Hoodies, Sweatshirts, Polo, Totes, Mugs, Phone Cases, Caps |
+| Campaign | relation | Campaigns DB (cff40f34-13a8-4c64-b5bf-edafeffb0b88) |
+| Brand Review Status | select | Pending, Approved, Revision |
+| Brand Review Notes | text | Reviewer feedback |
+| Ad Repurpose | checkbox | Flag for cross-channel reuse |
+| Reach | number | Performance metric |
+| Engagement Rate | number | Performance metric |
+| Saves | number | Performance metric |
+| Shares | number | Performance metric |
+
+**Views:** Default table, Weekly Calendar, Pipeline Board (by Status), Pillar Balance (by Content Pillar), Brand Review Queue (Status = Brand Review), Ad-Ready Content (Ad Repurpose + Brand Review Approved)
+
+### Marketing Tasks
+**DB ID:** `1fa22f26f31842439dba9788e08ca413` | **Verified:** 2026-03-21 via Notion MCP
+
+| Property | Type | Options / Notes |
+|---|---|---|
+| Task | title | Task name |
+| Status | select | Not Started, In Progress, Blocked, Done, Cancelled |
+| Priority | select | Urgent, High, Medium, Low |
+| Type | select | Deliverable, Review, Setup, Creative, Analysis, Follow-up |
+| Channel | select | Google Ads, Meta Ads, Email, WhatsApp, Instagram, Website, SEO, Cross-channel |
+| Assigned To | person | Team member |
+| Due Date | date | Deadline |
+| Campaign | relation | → Marketing Campaigns DB |
+| Notes | text | Task details |
+| Task ID | auto_increment_id | Auto-generated |
+| Created | created_time | Auto |
+| Last Edited | last_edited_time | Auto |
+
+**Views:** Default table, Task Board (by Status), By Due Date (calendar)
 
 ### Sequence Properties
 | Property | Type | Values |

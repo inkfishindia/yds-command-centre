@@ -29,9 +29,9 @@ describe('Notion Service — Pure Functions', () => {
     }
   });
 
-  it('listDatabases returns 15 databases', () => {
+  it('listDatabases returns 18 databases', () => {
     const dbs = notionService.listDatabases();
-    assert.equal(dbs.length, 15);
+    assert.equal(dbs.length, 18);
     const names = dbs.map(d => d.name);
     assert.ok(names.includes('Focus Areas'));
     assert.ok(names.includes('Projects'));

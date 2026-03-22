@@ -61,6 +61,10 @@
         <span class="nav-label">Dash</span>
         <span class="nav-badge nav-badge-danger" x-show="dashboard && dashboard.overdue && dashboard.overdue.length > 0" x-text="dashboard.overdue.length" x-cloak></span>
       </button>
+      <button class="nav-btn" :class="view === 'overview' && 'nav-active'" @click="openNavigationTarget('overview')" aria-label="Overview" :aria-current="view === 'overview' ? 'page' : false">
+        <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"/><path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"/></svg>
+        <span class="nav-label">Overview</span>
+      </button>
       <button class="nav-btn" :class="view === 'team' && 'nav-active'" @click="openNavigationTarget('team')" aria-label="Team" :aria-current="view === 'team' ? 'page' : false" :title="getShortcutTooltip('Team', 'team')">
         <svg class="nav-icon-svg" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zm5 2a2 2 0 11-4 0 2 2 0 014 0zm-4 7a4 4 0 00-8 0v1h8v-1zM6 8a2 2 0 11-4 0 2 2 0 014 0zm10 7a3.99 3.99 0 00-1.46-3.08A3.98 3.98 0 0118 15v1h-2zM3.08 11.92A3.99 3.99 0 002 15v1h2v-1c0-.88.28-1.69.76-2.36-.37-.24-.7-.53-.99-.85l.31.13z"/></svg>
         <span class="nav-label">Team</span>
@@ -254,6 +258,182 @@
           </template>
         </div>
       </div>
+
+      <!-- Overview -->
+      <section x-show="view === 'overview'" x-cloak style="height:100%;overflow:hidden;display:flex;flex-direction:column">
+        <div class="overview-view" x-show="!overviewLoading && overview">
+
+          <!-- ATTENTION BANNER -->
+          <div class="overview-attention-banner" x-show="overview?.attention?.counts">
+            <h2 class="overview-section-title">Needs Attention</h2>
+            <div class="overview-attention-counts">
+              <div class="attention-count attention-dan" x-show="overview.attention.counts.waitingOnDan > 0">
+                <span class="attention-number" x-text="overview.attention.counts.waitingOnDan"></span>
+                <span class="attention-label">Waiting on Dan</span>
+              </div>
+              <div class="attention-count attention-blocked" x-show="overview.attention.counts.blockedTotal > 0">
+                <span class="attention-number" x-text="overview.attention.counts.blockedTotal"></span>
+                <span class="attention-label">Blocked</span>
+              </div>
+              <div class="attention-count attention-overdue" x-show="overview.attention.counts.overdueTotal > 0">
+                <span class="attention-number" x-text="overview.attention.counts.overdueTotal"></span>
+                <span class="attention-label">Overdue</span>
+              </div>
+              <div class="attention-count attention-upcoming">
+                <span class="attention-number" x-text="overview.attention.counts.upcomingThisWeek || 0"></span>
+                <span class="attention-label">Due This Week</span>
+              </div>
+            </div>
+
+            <!-- Blocked items list -->
+            <div class="overview-blocked-list" x-show="overview.attention.blockedItems?.length > 0">
+              <template x-for="item in (overview.attention.blockedItems || []).slice(0, 8)" :key="item.id">
+                <div class="overview-blocked-item">
+                  <span class="blocked-source-tag" x-text="item.source"></span>
+                  <span class="blocked-item-name" x-text="item.name"></span>
+                  <span class="blocked-item-meta">
+                    <span x-show="item.daysOverdue > 0" class="overdue-badge" x-text="item.daysOverdue + 'd overdue'"></span>
+                    <span x-show="item.owner" class="blocked-owner" x-text="item.owner"></span>
+                  </span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- HEALTH GRID -->
+          <div class="overview-health-grid">
+
+            <!-- Focus Areas -->
+            <div class="overview-health-card" tabindex="0" role="button" @click="openNavigationTarget('dashboard')" @keydown.enter="openNavigationTarget('dashboard')">
+              <h3 class="health-card-title">Focus Areas</h3>
+              <div class="health-distribution" x-show="overview.health?.focusAreas">
+                <div class="health-bar">
+                  <div class="health-bar-segment health-on-track" :style="'width:' + (overview.health.focusAreas.distribution?.onTrack || 0) / Math.max((overview.health.focusAreas.distribution?.onTrack || 0) + (overview.health.focusAreas.distribution?.atRisk || 0) + (overview.health.focusAreas.distribution?.offTrack || 0), 1) * 100 + '%'"></div>
+                  <div class="health-bar-segment health-at-risk" :style="'width:' + (overview.health.focusAreas.distribution?.atRisk || 0) / Math.max((overview.health.focusAreas.distribution?.onTrack || 0) + (overview.health.focusAreas.distribution?.atRisk || 0) + (overview.health.focusAreas.distribution?.offTrack || 0), 1) * 100 + '%'"></div>
+                  <div class="health-bar-segment health-off-track" :style="'width:' + (overview.health.focusAreas.distribution?.offTrack || 0) / Math.max((overview.health.focusAreas.distribution?.onTrack || 0) + (overview.health.focusAreas.distribution?.atRisk || 0) + (overview.health.focusAreas.distribution?.offTrack || 0), 1) * 100 + '%'"></div>
+                </div>
+                <div class="health-bar-legend">
+                  <span class="legend-item"><span class="legend-dot" style="background: var(--green)"></span> On Track <span x-text="overview.health.focusAreas.distribution?.onTrack || 0"></span></span>
+                  <span class="legend-item"><span class="legend-dot" style="background: var(--amber)"></span> At Risk <span x-text="overview.health.focusAreas.distribution?.atRisk || 0"></span></span>
+                  <span class="legend-item"><span class="legend-dot" style="background: var(--red)"></span> Off Track <span x-text="overview.health.focusAreas.distribution?.offTrack || 0"></span></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Marketing -->
+            <div class="overview-health-card" tabindex="0" role="button" @click="openNavigationTarget('marketingOps')" @keydown.enter="openNavigationTarget('marketingOps')">
+              <h3 class="health-card-title">Marketing</h3>
+              <div class="health-metrics" x-show="overview.health?.marketing">
+                <div class="health-metric">
+                  <span class="metric-value" x-text="overview.health.marketing.activeCampaigns || 0"></span>
+                  <span class="metric-label">Active Campaigns</span>
+                </div>
+                <div class="health-metric">
+                  <span class="metric-value" x-text="overview.health.marketing.contentInPipeline || 0"></span>
+                  <span class="metric-label">Content Pipeline</span>
+                </div>
+                <div class="health-metric" :class="(overview.health.marketing.tasksOverdue || 0) > 0 && 'metric-alert'">
+                  <span class="metric-value" x-text="overview.health.marketing.tasksOverdue || 0"></span>
+                  <span class="metric-label">Tasks Overdue</span>
+                </div>
+                <div class="health-metric">
+                  <span class="metric-value" x-text="overview.health.marketing.tasksTotal || 0"></span>
+                  <span class="metric-label">Total Tasks</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tech -->
+            <div class="overview-health-card" tabindex="0" role="button" @click="openNavigationTarget('techTeam')" @keydown.enter="openNavigationTarget('techTeam')">
+              <h3 class="health-card-title">Tech</h3>
+              <div class="health-metrics" x-show="overview.health?.tech">
+                <div class="health-metric">
+                  <span class="metric-value" x-text="(overview.health.tech.sprintPctComplete || 0) + '%'"></span>
+                  <span class="metric-label">Sprint Progress</span>
+                </div>
+                <div class="health-metric" :class="(overview.health.tech.sprintBlocked || 0) > 0 && 'metric-alert'">
+                  <span class="metric-value" x-text="overview.health.tech.sprintBlocked || 0"></span>
+                  <span class="metric-label">Blocked</span>
+                </div>
+                <div class="health-metric">
+                  <span class="metric-value" x-text="overview.health.tech.backlogTotal || 0"></span>
+                  <span class="metric-label">Backlog (<span x-text="overview.health.tech.backlogP0P1 || 0"></span> P0-P1)</span>
+                </div>
+                <div class="health-metric">
+                  <span class="metric-value" x-text="overview.health.tech.specsInReview || 0"></span>
+                  <span class="metric-label">Specs in Review</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- AI Team & Sessions -->
+            <div class="overview-health-card">
+              <h3 class="health-card-title">AI Team & Activity</h3>
+              <div class="health-metrics" x-show="overview.health?.aiTeam">
+                <div class="health-metric">
+                  <span class="metric-value" x-text="overview.health.aiTeam.active || 0"></span>
+                  <span class="metric-label">Active Agents</span>
+                </div>
+                <div class="health-metric">
+                  <span class="metric-value" x-text="overview.health.aiTeam.total || 0"></span>
+                  <span class="metric-label">Total Agents</span>
+                </div>
+                <div class="health-metric">
+                  <span class="metric-value" x-text="overview.health.sessions?.last30Days || 0"></span>
+                  <span class="metric-label">Sessions (30d)</span>
+                </div>
+                <div class="health-metric">
+                  <span class="metric-value" x-text="overview.health.aiTeam.building || 0"></span>
+                  <span class="metric-label">Building</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- INSIGHTS -->
+          <div class="overview-insights" x-show="overview.insights">
+            <h2 class="overview-section-title">Completion Rates</h2>
+            <div class="overview-completion-grid">
+              <template x-for="[label, data] in Object.entries(overview.insights?.completionRates || {})" :key="label">
+                <div class="completion-card">
+                  <div class="completion-ring">
+                    <span class="completion-pct" x-text="(data.pct || 0) + '%'"></span>
+                  </div>
+                  <span class="completion-label" x-text="label"></span>
+                  <span class="completion-detail" x-text="(data.done || 0) + '/' + (data.total || 0)"></span>
+                </div>
+              </template>
+            </div>
+
+            <!-- Recent Decisions -->
+            <div class="overview-decisions" x-show="overview.insights?.recentDecisions?.length > 0">
+              <h3 class="overview-subsection-title">Recent Decisions</h3>
+              <template x-for="d in (overview.insights.recentDecisions || []).slice(0, 5)" :key="d.id">
+                <div class="overview-decision-item">
+                  <span class="decision-name" x-text="d.Name || '—'"></span>
+                  <span class="decision-date" x-text="formatDate(d.Date)"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading -->
+        <div class="overview-loading" x-show="overviewLoading">
+          <div class="skeleton-grid">
+            <div class="skeleton-card pulse"></div>
+            <div class="skeleton-card pulse"></div>
+            <div class="skeleton-card pulse"></div>
+            <div class="skeleton-card pulse"></div>
+          </div>
+        </div>
+
+        <!-- Empty -->
+        <div class="empty-state" x-show="!overviewLoading && !overview">
+          <p>Unable to load overview. Check your connection.</p>
+          <button class="btn-secondary" @click="loadOverview()">Retry</button>
+        </div>
+      </section>
 
       <!-- Dashboard view -->
       <div x-show="view === 'dashboard'" class="dashboard-view">
@@ -3137,6 +3317,7 @@
           <div class="mktops-tabs">
             <button class="filter-pill" :class="mktopsSection === 'campaigns' && 'filter-pill-active'" @click="mktopsSection = 'campaigns'">Campaigns</button>
             <button class="filter-pill" :class="mktopsSection === 'content' && 'filter-pill-active'" @click="mktopsSection = 'content'">Content Studio</button>
+            <button class="filter-pill" :class="mktopsSection === 'calendar' && 'filter-pill-active'" @click="mktopsSection = 'calendar'; if (!calendarData && !calendarLoading) loadCalendar()">Calendar</button>
             <button class="filter-pill" :class="mktopsSection === 'sequences' && 'filter-pill-active'" @click="mktopsSection = 'sequences'">Sequences</button>
             <button class="filter-pill" :class="mktopsSection === 'sessions' && 'filter-pill-active'" @click="mktopsSection = 'sessions'">Sessions</button>
             <button class="filter-pill" :class="mktopsSection === 'aitools' && 'filter-pill-active'" @click="mktopsSection = 'aitools'">AI Tools</button>
@@ -3240,6 +3421,406 @@
                 </div>
               </template>
             </div>
+          </div>
+
+          <!-- CALENDAR SECTION -->
+          <div x-show="mktopsSection === 'calendar'">
+
+            <!-- Loading skeleton -->
+            <template x-if="calendarLoading">
+              <div class="calendar-wrapper">
+                <div class="calendar-skeleton-grid">
+                  <template x-for="i in 42" :key="i">
+                    <div class="calendar-skeleton-day" :style="'animation-delay:' + (i * 20) + 'ms'"></div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- Calendar UI -->
+            <template x-if="!calendarLoading">
+              <div class="calendar-wrapper">
+
+                <!-- Month navigation -->
+                <div class="calendar-header">
+                  <button class="btn-ghost" @click="navigateMonth(-1)" aria-label="Previous month">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    Prev
+                  </button>
+                  <h2 x-text="getCalendarMonthLabel()"></h2>
+                  <button class="btn-ghost" @click="goToToday()" x-show="!isCurrentCalendarMonth()">Today</button>
+                  <button class="btn-ghost" @click="navigateMonth(1)" aria-label="Next month">
+                    Next
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                  </button>
+                </div>
+
+                <!-- Filter bar -->
+                <div class="calendar-filter-bar">
+                  <div class="calendar-filter-group">
+                    <label>Type</label>
+                    <div class="calendar-filter-chips">
+                      <template x-for="ct in ['Carousel','Reel','Feed Post','Story','Email','WhatsApp','Blog']" :key="ct">
+                        <button
+                          class="calendar-filter-chip"
+                          :class="['type-' + ct.toLowerCase().replace(/\s+/g,'-'), calendarFilters.contentTypes.includes(ct) && 'active']"
+                          @click="toggleContentTypeFilter(ct)"
+                          :aria-pressed="calendarFilters.contentTypes.includes(ct)"
+                          x-text="ct"
+                        ></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="calendar-filter-group">
+                    <label for="cal-status-filter">Status</label>
+                    <select id="cal-status-filter" class="calendar-filter-select" x-model="calendarFilters.status">
+                      <option value="all">All</option>
+                      <option value="Idea">Idea</option>
+                      <option value="Briefed">Briefed</option>
+                      <option value="Drafted">Drafted</option>
+                      <option value="In Design">In Design</option>
+                      <option value="Brand Review">Brand Review</option>
+                      <option value="Approved">Approved</option>
+                      <option value="Scheduled">Scheduled</option>
+                      <option value="Published">Published</option>
+                    </select>
+                  </div>
+                  <div class="calendar-filter-group">
+                    <label for="cal-pillar-filter">Pillar</label>
+                    <select id="cal-pillar-filter" class="calendar-filter-select" x-model="calendarFilters.pillar">
+                      <option value="all">All</option>
+                      <option value="Education">Education</option>
+                      <option value="Social Proof">Social Proof</option>
+                      <option value="Product">Product</option>
+                      <option value="Behind the Scenes">Behind the Scenes</option>
+                      <option value="Community">Community</option>
+                      <option value="Promotional">Promotional</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Weekday headers -->
+                <div class="calendar-weekdays" role="row">
+                  <template x-for="day in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']" :key="day">
+                    <div class="calendar-weekday" role="columnheader" x-text="day"></div>
+                  </template>
+                </div>
+
+                <!-- Calendar grid -->
+                <div class="calendar-grid" role="grid">
+                  <template x-for="cell in getCalendarDays()" :key="cell.date">
+                    <div
+                      class="calendar-day"
+                      :class="{ today: cell.isToday, 'other-month': !cell.isCurrentMonth }"
+                      role="gridcell"
+                      tabindex="0"
+                      :aria-label="'Add content for ' + cell.date"
+                      @click="openContentModal('create', cell.date, null)"
+                      @keydown.enter="openContentModal('create', cell.date, null)"
+                      @keydown.space.prevent="openContentModal('create', cell.date, null)"
+                    >
+                      <span class="calendar-day-number" x-text="cell.dayNum"></span>
+                      <div class="day-content" x-data="{ filtered: getFilteredCalendarItems(cell.items) }">
+                        <template x-for="(item, idx) in filtered.slice(0, 4)" :key="item.id || idx">
+                          <button
+                            class="calendar-chip"
+                            :data-type="getChipType(item)"
+                            :title="item.name + (item.contentPillar ? '\n' + item.contentPillar : '') + (item.hook ? '\n' + item.hook.slice(0, 80) : '') + (item.owner ? '\nOwner: ' + item.owner : '')"
+                            @click.stop="openContentModal('edit', cell.date, item)"
+                          >
+                            <span class="chip-icon" x-html="getContentTypeIcon(item.contentType)" aria-hidden="true"></span>
+                            <span class="chip-name" x-text="item.name && item.name.length > 22 ? item.name.slice(0, 20) + '…' : item.name"></span>
+                            <span class="chip-pillar" x-text="item.contentPillar" x-show="item.contentPillar"></span>
+                            <span class="chip-owner" x-show="item.owner" x-text="item.owner ? item.owner.charAt(0) : ''" :title="item.owner || ''"></span>
+                          </button>
+                        </template>
+                        <span
+                          class="chip-overflow"
+                          x-show="filtered.length > 4"
+                          x-text="'+' + (filtered.length - 4) + ' more'"
+                        ></span>
+                        <button
+                          class="day-add-btn"
+                          x-show="cell.isCurrentMonth"
+                          @click.stop="openContentModal('create', cell.date, null)"
+                          aria-label="Add content for this date"
+                        >+ Add</button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- Upcoming this week -->
+                <template x-if="getUpcomingThisWeek().length > 0">
+                  <div class="calendar-upcoming">
+                    <h3 class="calendar-upcoming-header">Upcoming This Week</h3>
+                    <ul class="calendar-content-list">
+                      <template x-for="item in getUpcomingThisWeek()" :key="item.id">
+                        <li class="calendar-content-item" tabindex="0" role="button" @click="openContentModal('edit', item.publishDate, item)" @keydown.enter="openContentModal('edit', item.publishDate, item)" @keydown.space.prevent="openContentModal('edit', item.publishDate, item)">
+                          <span class="cal-item-date" x-text="formatCalDate(item.publishDate)"></span>
+                          <div class="cal-item-body">
+                            <div class="cal-item-title-row">
+                              <span class="cal-item-type-icon" x-html="getContentTypeIcon(item.contentType)" aria-hidden="true"></span>
+                              <p class="cal-item-name" x-text="item.name"></p>
+                              <span class="cal-item-owner-tag" x-show="item.owner" x-text="item.owner"></span>
+                            </div>
+                            <p class="cal-item-hook" x-show="item.hook" x-text="item.hook"></p>
+                            <div class="cal-item-meta">
+                              <span class="badge" :data-status="(item.status || '').toLowerCase().replace(/\s+/g,'-')" x-text="item.status"></span>
+                              <span class="badge" x-show="item.contentType" x-text="item.contentType"></span>
+                              <span class="cal-item-pillar-tag" x-show="item.contentPillar" x-text="item.contentPillar"></span>
+                              <template x-for="seg in (item.audienceSegment || [])" :key="seg">
+                                <span class="cal-item-segment-tag" x-text="seg"></span>
+                              </template>
+                            </div>
+                          </div>
+                        </li>
+                      </template>
+                    </ul>
+                  </div>
+                </template>
+
+                <!-- Unscheduled items -->
+                <template x-if="getUnscheduledItems().length > 0">
+                  <div class="calendar-unscheduled">
+                    <h3 class="calendar-unscheduled-header">Unscheduled (<span x-text="getUnscheduledItems().length"></span>)</h3>
+                    <ul class="calendar-content-list">
+                      <template x-for="item in getUnscheduledItems()" :key="item.id">
+                        <li class="calendar-content-item" tabindex="0" role="button" @click="openContentModal('edit', '', item)" @keydown.enter="openContentModal('edit', '', item)" @keydown.space.prevent="openContentModal('edit', '', item)">
+                          <span class="cal-item-date" style="color: var(--text-muted)">—</span>
+                          <div class="cal-item-body">
+                            <div class="cal-item-title-row">
+                              <span class="cal-item-type-icon" x-html="getContentTypeIcon(item.contentType)" aria-hidden="true"></span>
+                              <p class="cal-item-name" x-text="item.name"></p>
+                              <span class="cal-item-owner-tag" x-show="item.owner" x-text="item.owner"></span>
+                            </div>
+                            <p class="cal-item-hook" x-show="item.hook" x-text="item.hook"></p>
+                            <div class="cal-item-meta">
+                              <span class="badge" :data-status="(item.status || '').toLowerCase().replace(/\s+/g,'-')" x-text="item.status"></span>
+                              <span class="badge" x-show="item.contentType" x-text="item.contentType"></span>
+                              <span class="cal-item-pillar-tag" x-show="item.contentPillar" x-text="item.contentPillar"></span>
+                              <template x-for="seg in (item.audienceSegment || [])" :key="seg">
+                                <span class="cal-item-segment-tag" x-text="seg"></span>
+                              </template>
+                            </div>
+                          </div>
+                        </li>
+                      </template>
+                    </ul>
+                  </div>
+                </template>
+
+                <!-- Empty state -->
+                <template x-if="!calendarLoading && calendarData && calendarData.items && calendarData.items.length === 0">
+                  <div class="empty-state" style="margin: 1.5rem 0">
+                    <p>No content scheduled for this month.</p>
+                    <p>Click any day cell to add a content item.</p>
+                  </div>
+                </template>
+
+                <!-- No data state (API not connected) -->
+                <template x-if="!calendarLoading && !calendarData">
+                  <div class="empty-state" style="margin: 1.5rem 0">
+                    <p><strong>Content calendar not connected.</strong></p>
+                    <p>The calendar endpoint returned no data. Check that the Content Calendar Notion database is shared with your integration.</p>
+                  </div>
+                </template>
+
+              </div>
+            </template>
+
+            <!-- Content Create/Edit Modal -->
+            <div
+              class="content-modal-overlay"
+              x-show="contentModalOpen"
+              x-cloak
+              @click.self="closeContentModal()"
+              role="dialog"
+              :aria-label="contentModalMode === 'create' ? 'Create content item' : 'Edit content item'"
+              aria-modal="true"
+            >
+              <div class="content-modal-panel" @keydown.escape.window="closeContentModal()">
+                <div class="content-modal-header">
+                  <h3 x-text="contentModalMode === 'create' ? 'Add Content Item' : 'Edit Content Item'"></h3>
+                  <button class="content-modal-close" @click="closeContentModal()" aria-label="Close">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  </button>
+                </div>
+
+                <!-- Approval pending notice -->
+                <div class="content-pending-notice" x-show="contentPendingApproval">
+                  <strong>Pending approval</strong> — this change has been submitted and is awaiting Dan's approval via the chat.
+                </div>
+
+                <form class="content-form" @submit.prevent="saveContent()" x-show="!contentPendingApproval">
+                  <!-- Name -->
+                  <div class="content-form-group">
+                    <label for="cf-name">Name *</label>
+                    <input
+                      id="cf-name"
+                      type="text"
+                      placeholder="Content title"
+                      x-model="contentForm.name"
+                      required
+                      autocomplete="off"
+                    />
+                  </div>
+
+                  <!-- Content Type + Content Pillar -->
+                  <div class="content-form-row">
+                    <div class="content-form-group">
+                      <label for="cf-type">Content Type</label>
+                      <select id="cf-type" x-model="contentForm.contentType">
+                        <option>Feed Post</option>
+                        <option>Carousel</option>
+                        <option>Reel</option>
+                        <option>Story</option>
+                        <option>Email</option>
+                        <option>WhatsApp</option>
+                        <option>Blog</option>
+                      </select>
+                    </div>
+                    <div class="content-form-group">
+                      <label for="cf-pillar">Content Pillar</label>
+                      <select id="cf-pillar" x-model="contentForm.contentPillar">
+                        <option value="">None</option>
+                        <option>Education</option>
+                        <option>Social Proof</option>
+                        <option>Product</option>
+                        <option>Behind the Scenes</option>
+                        <option>Community</option>
+                        <option>Promotional</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Status + Publish Date -->
+                  <div class="content-form-row">
+                    <div class="content-form-group">
+                      <label for="cf-status">Status</label>
+                      <select id="cf-status" x-model="contentForm.status">
+                        <option>Idea</option>
+                        <option>Briefed</option>
+                        <option>Drafted</option>
+                        <option>In Design</option>
+                        <option>Brand Review</option>
+                        <option>Approved</option>
+                        <option>Scheduled</option>
+                        <option>Published</option>
+                      </select>
+                    </div>
+                    <div class="content-form-group">
+                      <label for="cf-date">Publish Date</label>
+                      <input id="cf-date" type="date" x-model="contentForm.publishDate" />
+                    </div>
+                  </div>
+
+                  <!-- Owner -->
+                  <div class="content-form-group">
+                    <label for="cf-owner">Owner</label>
+                    <select id="cf-owner" x-model="contentForm.owner">
+                      <option value="">Unassigned</option>
+                      <option>Corey</option>
+                      <option>Dickie</option>
+                      <option>Jessica</option>
+                      <option>Pixel</option>
+                      <option>Studio</option>
+                      <option>Harry</option>
+                      <option>Bimal</option>
+                    </select>
+                  </div>
+
+                  <!-- Hook -->
+                  <div class="content-form-group">
+                    <label for="cf-hook">Hook / Headline</label>
+                    <input id="cf-hook" type="text" placeholder="The attention-grabbing opening line…" x-model="contentForm.hook" autocomplete="off" />
+                  </div>
+
+                  <!-- Audience Segment -->
+                  <div class="content-form-group">
+                    <label>Audience Segment</label>
+                    <div class="content-checkbox-group">
+                      <template x-for="seg in ['Creative Professionals','AI Artists','Founders &amp; Small Businesses','Curious Creators','Corporate / Bulk','Dropship Partners']" :key="seg">
+                        <label class="content-checkbox-label">
+                          <input
+                            type="checkbox"
+                            :value="seg"
+                            :checked="contentForm.audienceSegment.includes(seg)"
+                            @change="contentForm.audienceSegment.includes(seg) ? contentForm.audienceSegment = contentForm.audienceSegment.filter(s => s !== seg) : contentForm.audienceSegment.push(seg)"
+                          />
+                          <span x-text="seg"></span>
+                        </label>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- Product Focus -->
+                  <div class="content-form-group">
+                    <label>Product Focus</label>
+                    <div class="content-checkbox-group">
+                      <template x-for="pf in ['T-shirts','Hoodies','Sweatshirts','Polo','Totes','Mugs','Phone Cases','Caps']" :key="pf">
+                        <label class="content-checkbox-label">
+                          <input
+                            type="checkbox"
+                            :value="pf"
+                            :checked="contentForm.productFocus.includes(pf)"
+                            @change="contentForm.productFocus.includes(pf) ? contentForm.productFocus = contentForm.productFocus.filter(p => p !== pf) : contentForm.productFocus.push(pf)"
+                          />
+                          <span x-text="pf"></span>
+                        </label>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- Caption -->
+                  <div class="content-form-group">
+                    <label for="cf-caption">Caption / Copy</label>
+                    <textarea id="cf-caption" placeholder="Social media caption…" x-model="contentForm.caption" rows="3"></textarea>
+                  </div>
+
+                  <!-- Visual Brief -->
+                  <div class="content-form-group">
+                    <label for="cf-visual">Visual Brief</label>
+                    <textarea id="cf-visual" placeholder="Design and asset notes for the visual team…" x-model="contentForm.visualBrief" rows="2"></textarea>
+                  </div>
+
+                  <!-- Campaign + Notes -->
+                  <div class="content-form-row">
+                    <div class="content-form-group">
+                      <label for="cf-campaign">Campaign</label>
+                      <select id="cf-campaign" x-model="contentForm.campaignId">
+                        <option value="">None</option>
+                        <template x-for="c in (mktops && mktops.campaigns ? mktops.campaigns : [])" :key="c.id">
+                          <option :value="c.id" x-text="c.Name"></option>
+                        </template>
+                      </select>
+                    </div>
+                    <div class="content-form-group">
+                      <label for="cf-notes">Notes</label>
+                      <input id="cf-notes" type="text" placeholder="Optional notes…" x-model="contentForm.notes" autocomplete="off" />
+                    </div>
+                  </div>
+
+                  <!-- Save error feedback -->
+                  <p x-show="contentSaveError" class="form-error" x-text="contentSaveError"></p>
+
+                  <!-- Actions -->
+                  <div class="content-form-actions">
+                    <button type="button" class="btn-ghost" @click="closeContentModal()" :disabled="contentSaving">Cancel</button>
+                    <button type="submit" class="btn-primary" :disabled="contentSaving || !contentForm.name.trim()">
+                      <span x-show="!contentSaving" x-text="contentModalMode === 'create' ? 'Create' : 'Save'"></span>
+                      <span x-show="contentSaving">Saving…</span>
+                    </button>
+                  </div>
+                </form>
+
+                <!-- Post-approval close button -->
+                <div class="content-form-actions" x-show="contentPendingApproval">
+                  <button type="button" class="btn-ghost" @click="closeContentModal()">Close</button>
+                </div>
+              </div>
+            </div>
+
           </div>
 
           <!-- SEQUENCES SECTION -->

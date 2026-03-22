@@ -199,6 +199,10 @@ const DB = {
   TECH_SPEC_LIBRARY: '5be6d7cf5607407cbca010b422bceb7e',
   TECH_DECISION_LOG: '1f9193d41ac3409484d2d0ae1442c95b',
   TECH_SPRINT_ARCHIVE: '9ba8330aa3c044d195b27eb450e278f2',
+  // New databases
+  AI_TEAM: '17f15cb3920948fb9721a776bbbcc6ea',
+  MARKETING_TASKS: '1fa22f26f31842439dba9788e08ca413',
+  TECH_BACKLOG: '4bb401d876dd4068851784c5cdb06363',
 };
 
 /**
@@ -947,6 +951,9 @@ function listDatabases() {
     { id: DB.TECH_SPEC_LIBRARY, name: 'Spec Library', icon: '📄', description: 'Technical specification pipeline' },
     { id: DB.TECH_DECISION_LOG, name: 'Tech Decision Log', icon: '⚖️', description: 'Technical decision records' },
     { id: DB.TECH_SPRINT_ARCHIVE, name: 'Sprint Archive', icon: '📊', description: 'Sprint velocity and history' },
+    { id: DB.AI_TEAM, name: 'AI Team', icon: '🤖', description: 'AI agent roster — function, status, tools, and scope' },
+    { id: DB.MARKETING_TASKS, name: 'Marketing Tasks', icon: '✅', description: 'Marketing action items with assignments and deadlines' },
+    { id: DB.TECH_BACKLOG, name: 'Tech Backlog', icon: '🛠️', description: 'Technical backlog items waiting to be pulled into sprints' },
   ];
 }
 
@@ -1760,6 +1767,43 @@ async function getCampaigns() {
 /**
  * Fetch content calendar with resolved Campaign relation.
  */
+/**
+ * Resolve campaign relation IDs to campaign names for an array of content items.
+ * Fetches each unique campaign page once in parallel, then maps names back.
+ * @param {Array} items - content items with optional Campaign property (array of IDs)
+ * @returns {Promise<Array>} items with campaignName added
+ */
+async function resolveCampaignNames(items) {
+  // Collect unique campaign IDs
+  const uniqueIds = [...new Set(
+    items.flatMap(item => (Array.isArray(item.Campaign) ? item.Campaign : []))
+  )];
+
+  // Fetch all unique campaign pages in parallel
+  const pages = await Promise.all(uniqueIds.map(async (id) => {
+    try {
+      const page = await getPageRaw(id);
+      const props = page ? simplify(page.properties) : null;
+      return { id, name: props ? (props.Name || props.Title || 'Untitled') : null };
+    } catch {
+      return { id, name: null };
+    }
+  }));
+
+  // Build lookup map
+  const nameById = {};
+  for (const { id, name } of pages) {
+    nameById[id] = name;
+  }
+
+  // Map items with resolved campaignName
+  return items.map(item => {
+    const campaignIds = Array.isArray(item.Campaign) ? item.Campaign : [];
+    const campaignName = campaignIds.length > 0 ? (nameById[campaignIds[0]] || null) : null;
+    return { ...item, campaignName };
+  });
+}
+
 async function getContentCalendar() {
   return deduplicatedFetch('mktops_content', async () => {
     const notion = getClient();
@@ -1779,26 +1823,234 @@ async function getContentCalendar() {
       cursor = response.has_more ? response.next_cursor : null;
     } while (cursor);
 
-    // Resolve Campaign relation to campaignName
-    const resolved = await Promise.all(content.map(async (item) => {
-      const campaignIds = Array.isArray(item.Campaign) ? item.Campaign : [];
-      if (campaignIds.length === 0) return { ...item, campaignName: null };
-
-      try {
-        const page = await getPageRaw(campaignIds[0]);
-        const campaignName = page
-          ? (page.properties.Name || page.properties.Title || page.properties.name || 'Untitled')
-          : null;
-        return { ...item, campaignName };
-      } catch {
-        return { ...item, campaignName: null };
-      }
-    }));
-
-    return resolved;
+    return resolveCampaignNames(content);
   }).catch(err => {
     console.error('Failed to fetch content calendar:', err.message);
     return [];
+  });
+}
+
+/**
+ * Fetch content calendar filtered to a specific month range.
+ * startDate and endDate are YYYY-MM-DD strings.
+ */
+async function getContentCalendarByMonth(startDate, endDate) {
+  const month = startDate.slice(0, 7); // 'YYYY-MM'
+  const cacheKey = `mktops_content_calendar_${month}`;
+  return deduplicatedFetch(cacheKey, async () => {
+    const notion = getClient();
+    const content = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.CONTENT_CALENDAR,
+        filter: {
+          and: [
+            { property: 'Publish Date', date: { on_or_after: startDate } },
+            { property: 'Publish Date', date: { on_or_before: endDate } },
+          ],
+        },
+        sorts: [{ property: 'Publish Date', direction: 'ascending' }],
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      content.push(...response.results.map(page => ({
+        id: page.id,
+        url: page.url,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    return resolveCampaignNames(content);
+  }).catch(err => {
+    console.error('Failed to fetch content calendar by month:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Fetch content calendar items that have no Publish Date set.
+ */
+async function getUnscheduledContent() {
+  return deduplicatedFetch('mktops_content_unscheduled', async () => {
+    const notion = getClient();
+    const content = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.CONTENT_CALENDAR,
+        filter: { property: 'Publish Date', date: { is_empty: true } },
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      content.push(...response.results.map(page => ({
+        id: page.id,
+        url: page.url,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    return resolveCampaignNames(content);
+  }).catch(err => {
+    console.error('Failed to fetch unscheduled content:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Create a new content calendar item in CONTENT_CALENDAR.
+ */
+async function createContentCalendarItem({ name, status, contentType, channels, publishDate, owner, campaignId, notes, contentPillar, hook, audienceSegment, productFocus, caption, visualBrief }) {
+  return enqueueWrite(async () => {
+    const notion = getClient();
+    const properties = {
+      Name: { title: [{ text: { content: name } }] },
+    };
+
+    if (status) {
+      properties['Status'] = { select: { name: status } };
+    }
+
+    if (contentType) {
+      properties['Content Type'] = { select: { name: contentType } };
+    }
+
+    if (Array.isArray(channels) && channels.length > 0) {
+      properties['Channel'] = { multi_select: channels.map(c => ({ name: c })) };
+    }
+
+    if (publishDate) {
+      properties['Publish Date'] = { date: { start: publishDate } };
+    }
+
+    if (owner) {
+      properties['Owner'] = { select: { name: owner } };
+    }
+
+    if (campaignId) {
+      const cleanId = campaignId.replace(/-/g, '');
+      const formattedId = [
+        cleanId.slice(0, 8), cleanId.slice(8, 12), cleanId.slice(12, 16),
+        cleanId.slice(16, 20), cleanId.slice(20),
+      ].join('-');
+      properties['Campaign'] = { relation: [{ id: formattedId }] };
+    }
+
+    if (notes) {
+      properties['Notes'] = { rich_text: [{ text: { content: notes } }] };
+    }
+
+    if (contentPillar) {
+      properties['Content Pillar'] = { select: { name: contentPillar } };
+    }
+
+    if (hook) {
+      properties['Hook'] = { rich_text: [{ text: { content: hook } }] };
+    }
+
+    if (Array.isArray(audienceSegment) && audienceSegment.length > 0) {
+      properties['Audience Segment'] = { multi_select: audienceSegment.map(s => ({ name: s })) };
+    }
+
+    if (Array.isArray(productFocus) && productFocus.length > 0) {
+      properties['Product Focus'] = { multi_select: productFocus.map(p => ({ name: p })) };
+    }
+
+    if (caption) {
+      properties['Caption / Copy'] = { rich_text: [{ text: { content: caption } }] };
+    }
+
+    if (visualBrief) {
+      properties['Visual Brief'] = { rich_text: [{ text: { content: visualBrief } }] };
+    }
+
+    const result = await withRetry(() => notion.pages.create({
+      parent: { database_id: DB.CONTENT_CALENDAR },
+      properties,
+    }));
+
+    // Invalidate relevant cache keys
+    for (const [key] of cache) {
+      if (key.startsWith('mktops_content') || key === 'mktops_summary') cache.delete(key);
+    }
+
+    return { id: result.id, url: result.url };
+  });
+}
+
+/**
+ * Update properties on an existing content calendar item.
+ */
+async function updateContentCalendarItem(pageId, { name, status, contentType, channels, publishDate, notes, owner, contentPillar, hook, audienceSegment, productFocus, caption, visualBrief }) {
+  return enqueueWrite(async () => {
+    const notion = getClient();
+    const properties = {};
+
+    if (name !== undefined) {
+      properties['Name'] = { title: [{ text: { content: name } }] };
+    }
+
+    if (status !== undefined) {
+      properties['Status'] = { select: { name: status } };
+    }
+
+    if (contentType !== undefined) {
+      properties['Content Type'] = { select: { name: contentType } };
+    }
+
+    if (channels !== undefined) {
+      properties['Channel'] = { multi_select: (channels || []).map(c => ({ name: c })) };
+    }
+
+    if (publishDate !== undefined) {
+      properties['Publish Date'] = { date: { start: publishDate } };
+    }
+
+    if (notes !== undefined) {
+      properties['Notes'] = { rich_text: [{ text: { content: notes } }] };
+    }
+
+    if (owner !== undefined) {
+      properties['Owner'] = { select: { name: owner } };
+    }
+
+    if (contentPillar !== undefined) {
+      properties['Content Pillar'] = { select: { name: contentPillar } };
+    }
+
+    if (hook !== undefined) {
+      properties['Hook'] = { rich_text: [{ text: { content: hook } }] };
+    }
+
+    if (audienceSegment !== undefined) {
+      properties['Audience Segment'] = { multi_select: (audienceSegment || []).map(s => ({ name: s })) };
+    }
+
+    if (productFocus !== undefined) {
+      properties['Product Focus'] = { multi_select: (productFocus || []).map(p => ({ name: p })) };
+    }
+
+    if (caption !== undefined) {
+      properties['Caption / Copy'] = { rich_text: [{ text: { content: caption } }] };
+    }
+
+    if (visualBrief !== undefined) {
+      properties['Visual Brief'] = { rich_text: [{ text: { content: visualBrief } }] };
+    }
+
+    const result = await withRetry(() => notion.pages.update({
+      page_id: pageId,
+      properties,
+    }));
+
+    // Invalidate relevant cache keys
+    for (const [key] of cache) {
+      if (key.startsWith('mktops_content') || key === 'mktops_summary') cache.delete(key);
+    }
+
+    return { id: result.id, url: result.url };
   });
 }
 
@@ -2227,6 +2479,187 @@ async function updateSprintItemProperty(pageId, property, value) {
   });
 }
 
+/**
+ * Fetch all AI team members with resolved relations (Focus Areas, Human Counterpart, Platforms, Audiences).
+ */
+async function getAITeam() {
+  return deduplicatedFetch('ai_team', async () => {
+    const notion = getClient();
+    const items = [];
+    let cursor;
+    do {
+      const response = await withRetry(() => notion.databases.query({
+        database_id: DB.AI_TEAM,
+        page_size: 100,
+        start_cursor: cursor,
+      }));
+      items.push(...response.results.map(page => ({
+        id: page.id,
+        url: page.url,
+        lastEdited: page.last_edited_time,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    // Resolve relations to names
+    const allRelationIds = [...new Set(
+      items.flatMap(item => [
+        ...(Array.isArray(item['Focus Areas']) ? item['Focus Areas'] : []),
+        ...(Array.isArray(item['Human Counterpart']) ? item['Human Counterpart'] : []),
+        ...(Array.isArray(item.Platforms) ? item.Platforms : []),
+        ...(Array.isArray(item.Audiences) ? item.Audiences : []),
+      ])
+    )];
+
+    const pageMap = {};
+    await Promise.all(allRelationIds.map(async (id) => {
+      try {
+        const page = await getPageRaw(id);
+        if (page) {
+          const props = simplify(page.properties);
+          pageMap[id] = props.Name || props.Title || props.name || 'Untitled';
+        }
+      } catch { /* skip unresolvable */ }
+    }));
+
+    return items.map(item => ({
+      ...item,
+      focusAreaNames: (Array.isArray(item['Focus Areas']) ? item['Focus Areas'] : []).map(id => pageMap[id] || id.slice(0, 8)),
+      humanCounterpartNames: (Array.isArray(item['Human Counterpart']) ? item['Human Counterpart'] : []).map(id => pageMap[id] || id.slice(0, 8)),
+      platformNames: (Array.isArray(item.Platforms) ? item.Platforms : []).map(id => pageMap[id] || id.slice(0, 8)),
+      audienceNames: (Array.isArray(item.Audiences) ? item.Audiences : []).map(id => pageMap[id] || id.slice(0, 8)),
+    }));
+  }).catch(err => {
+    console.error('Failed to fetch AI team:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Fetch marketing tasks with optional Status, Priority, and Channel filters.
+ * Results are sorted by Due Date ascending (earliest first), nulls last.
+ */
+async function getMarketingTasks(filters = {}) {
+  const cacheKey = 'marketing_tasks_' + stableStringify(filters);
+  return deduplicatedFetch(cacheKey, async () => {
+    const notion = getClient();
+    const items = [];
+    let cursor;
+
+    const filterClauses = [];
+    if (filters.status) {
+      filterClauses.push({ property: 'Status', select: { equals: filters.status } });
+    }
+    if (filters.priority) {
+      filterClauses.push({ property: 'Priority', select: { equals: filters.priority } });
+    }
+    if (filters.channel) {
+      filterClauses.push({ property: 'Channel', select: { equals: filters.channel } });
+    }
+
+    const params = {
+      database_id: DB.MARKETING_TASKS,
+      page_size: 100,
+    };
+    if (filterClauses.length === 1) {
+      params.filter = filterClauses[0];
+    } else if (filterClauses.length > 1) {
+      params.filter = { and: filterClauses };
+    }
+
+    do {
+      params.start_cursor = cursor;
+      const response = await withRetry(() => notion.databases.query(params));
+      items.push(...response.results.map(page => ({
+        id: page.id,
+        url: page.url,
+        created: page.created_time,
+        lastEdited: page.last_edited_time,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    // Sort by Due Date ascending, nulls last
+    items.sort((a, b) => {
+      const da = a['Due Date'] && a['Due Date'].start ? a['Due Date'].start : null;
+      const db = b['Due Date'] && b['Due Date'].start ? b['Due Date'].start : null;
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da < db ? -1 : da > db ? 1 : 0;
+    });
+
+    return items;
+  }).catch(err => {
+    console.error('Failed to fetch marketing tasks:', err.message);
+    return [];
+  });
+}
+
+/**
+ * Fetch tech backlog items with optional Status and Priority filters.
+ * Results sorted by Priority ascending (P0 first).
+ */
+async function getTechBacklog(filters = {}) {
+  const cacheKey = 'tech_backlog_' + stableStringify(filters);
+  return deduplicatedFetch(cacheKey, async () => {
+    const notion = getClient();
+    const items = [];
+    let cursor;
+
+    const filterClauses = [];
+    if (filters.status) {
+      filterClauses.push({ property: 'Status', select: { equals: filters.status } });
+    }
+    if (filters.priority) {
+      filterClauses.push({ property: 'Priority', select: { equals: filters.priority } });
+    }
+    if (filters.area) {
+      filterClauses.push({ property: 'Area', select: { equals: filters.area } });
+    }
+    if (filters.type) {
+      filterClauses.push({ property: 'Type', select: { equals: filters.type } });
+    }
+
+    const params = {
+      database_id: DB.TECH_BACKLOG,
+      page_size: 100,
+    };
+    if (filterClauses.length === 1) {
+      params.filter = filterClauses[0];
+    } else if (filterClauses.length > 1) {
+      params.filter = { and: filterClauses };
+    }
+
+    do {
+      params.start_cursor = cursor;
+      const response = await withRetry(() => notion.databases.query(params));
+      items.push(...response.results.map(page => ({
+        id: page.id,
+        url: page.url,
+        lastEdited: page.last_edited_time,
+        ...simplify(page.properties),
+      })));
+      cursor = response.has_more ? response.next_cursor : null;
+    } while (cursor);
+
+    // Sort by Priority ascending (P0 first)
+    const PRIORITY_ORDER = { 'P0 - Critical': 0, 'P1 - High': 1, 'P2 - Medium': 2, 'P3 - Low': 3 };
+    items.sort((a, b) => {
+      const pa = PRIORITY_ORDER[a.Priority] ?? 99;
+      const pb = PRIORITY_ORDER[b.Priority] ?? 99;
+      return pa - pb;
+    });
+
+    return items;
+  }).catch(err => {
+    console.error('Failed to fetch tech backlog:', err.message);
+    return [];
+  });
+}
+
 module.exports = {
   DB,
   getClient,
@@ -2263,6 +2696,11 @@ module.exports = {
   appendCommitmentNote,
   getCampaigns,
   getContentCalendar,
+  getContentCalendarByMonth,
+  getUnscheduledContent,
+  resolveCampaignNames,
+  createContentCalendarItem,
+  updateContentCalendarItem,
   getSequences,
   getSessionsLog,
   getMarketingOpsSummary,
@@ -2274,6 +2712,9 @@ module.exports = {
   getSprintArchive,
   getTechTeamSummary,
   updateSprintItemProperty,
+  getAITeam,
+  getMarketingTasks,
+  getTechBacklog,
   // Cache internals — exported for testing only
   setCachedWithTime,
   deduplicatedFetch,

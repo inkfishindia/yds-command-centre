@@ -117,6 +117,11 @@ async function updateSprintItemProperty(pageId, property, value) {
   return notionService.updateSprintItemProperty(pageId, property, value);
 }
 
+async function getTechBacklog(filters = {}) {
+  const items = await notionService.getTechBacklog(filters);
+  return { items };
+}
+
 module.exports = {
   getSummary,
   getSprintItems,
@@ -128,4 +133,5 @@ module.exports = {
   getStrategy,
   getGithubActivity,
   updateSprintItemProperty,
+  getTechBacklog,
 };

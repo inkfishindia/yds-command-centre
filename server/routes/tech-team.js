@@ -97,6 +97,21 @@ router.get('/github', async (req, res) => {
   }
 });
 
+// GET /api/tech-team/backlog — Tech backlog with optional ?status=&priority=&area=&type= filters
+router.get('/backlog', async (req, res) => {
+  try {
+    const filters = {};
+    if (req.query.status) filters.status = req.query.status;
+    if (req.query.priority) filters.priority = req.query.priority;
+    if (req.query.area) filters.area = req.query.area;
+    if (req.query.type) filters.type = req.query.type;
+    res.json(await techTeamService.getTechBacklog(filters));
+  } catch (err) {
+    console.error('Tech backlog error:', err);
+    res.status(500).json({ error: 'Failed to load tech backlog' });
+  }
+});
+
 // PATCH /api/tech-team/sprint/:id — Update sprint item property (direct user write)
 router.patch('/sprint/:id', async (req, res) => {
   try {
