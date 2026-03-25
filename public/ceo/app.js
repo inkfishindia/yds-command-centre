@@ -10,6 +10,7 @@
     lastUpdated: document.getElementById('ceoLastUpdated'),
     hero: document.getElementById('ceoHero'),
     heroStatus: document.getElementById('ceoHeroStatus'),
+    summaryStrip: document.getElementById('ceoSummaryStrip'),
     pulseGrid: document.getElementById('ceoPulseGrid'),
     todayContent: document.getElementById('ceoTodayContent'),
     todayMeta: document.getElementById('ceoTodayMeta'),
@@ -116,6 +117,20 @@
       return `<div class="ceo-empty">${escapeHtml(emptyLabel)}</div>`;
     }
     return items.map(renderItem).join('');
+  }
+
+  function renderSummary(payload) {
+    els.summaryStrip.innerHTML = renderList(
+      payload.heroMetrics,
+      (item) => `
+        <article class="metric-card ceo-summary-card">
+          <div class="metric-card-label">${escapeHtml(item.label)}</div>
+          <div class="metric-card-value">${escapeHtml(String(item.value))}</div>
+          <span class="pill ${toneClass(item.tone)}">${escapeHtml(toneLabel(item.tone))}</span>
+        </article>
+      `,
+      'No executive summary metrics available.',
+    );
   }
 
   function renderPulse(payload) {
@@ -248,6 +263,23 @@
             </article>
           `,
           'No pending outputs in `outputs/` yet.',
+        )}
+      </section>
+
+      <section class="ceo-subsection">
+        <div class="ceo-subhead-row">
+          <h3>Brain Dump Inbox</h3>
+          <span class="pill pill-purple">${escapeHtml(String(today.brainDumpInbox?.length || 0))}</span>
+        </div>
+        ${renderList(
+          today.brainDumpInbox,
+          (item) => `
+            <article class="ceo-item-card">
+              <div>${escapeHtml(item.text)}</div>
+              ${renderJumpLink(item, 'Triage')}
+            </article>
+          `,
+          'No parked inputs in the inbox right now.',
         )}
       </section>
 
@@ -436,11 +468,37 @@
           </ul>
         </div>
         <div class="ceo-subcard">
+          <div class="ceo-subhead">Key Decisions</div>
+          <ul class="ceo-list">
+            ${(workspace.sessionHandoff?.keyDecisions || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+          </ul>
+        </div>
+        <div class="ceo-subcard">
           <div class="ceo-subhead">Next Steps</div>
           <ul class="ceo-list">
             ${(workspace.sessionHandoff?.nextSteps || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
           </ul>
         </div>
+      </section>
+
+      <section class="ceo-subsection">
+        <div class="ceo-subhead-row">
+          <h3>Pending Outputs</h3>
+          <span class="pill">${escapeHtml(String(workspace.pendingOutputs?.length || 0))}</span>
+        </div>
+        ${renderList(
+          workspace.pendingOutputs,
+          (item) => `
+            <article class="ceo-item-card">
+              <div>
+                <strong>${escapeHtml(item.title)}</strong>
+                <div class="ceo-muted">${escapeHtml(item.type)} · ${escapeHtml(item.path)}</div>
+              </div>
+              <a class="btn-ghost btn-sm" href="/?view=docs">Open</a>
+            </article>
+          `,
+          'No pending outputs found.',
+        )}
       </section>
 
       <section class="ceo-subsection">
@@ -473,6 +531,18 @@
           (item) => `<div class="ceo-subcard">${escapeHtml(item.text)}</div>`,
           'No MEMORY.md changes captured yet.',
         )}
+      </section>
+
+      <section class="ceo-subsection">
+        <div class="ceo-subhead-row">
+          <h3>About Colin</h3>
+          <span class="pill pill-blue">Operating Rules</span>
+        </div>
+        <div class="ceo-subcard">
+          <ul class="ceo-list">
+            ${(workspace.aboutColin?.bullets || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+          </ul>
+        </div>
       </section>
     `;
   }
@@ -607,6 +677,7 @@
     els.lastUpdated.textContent = `Updated ${formatRelativeTime(payload.timestamp)}`;
 
     renderPulse(payload);
+    renderSummary(payload);
     renderToday(payload);
     renderSystemMap(payload);
     renderWorkspace(payload);

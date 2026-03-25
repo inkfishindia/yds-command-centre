@@ -663,7 +663,7 @@ async function getCeoDashboardPayload() {
     notionService.getProjects().catch(() => []),
     marketingOpsService.getSummary().catch(() => null),
     techTeamService.getSummary().catch(() => null),
-    opsService.getSummary().catch(() => null),
+    opsService.getOverview().catch(() => null),
     crmService.getOverview().catch(() => null),
     calendarService.getTodaysEvents().catch(() => ({ available: false, items: [] })),
     readTextFile(activityPath),
@@ -697,6 +697,8 @@ async function getCeoDashboardPayload() {
   });
   const strategicSections = await getStrategicDocs(outputsSummary);
   const marketingSummary = marketingSummaryResult || {};
+  const handoffNextSteps = parseSectionBullets(handoffText, 'Next Steps');
+  const handoffKeyDecisions = parseSectionBullets(handoffText, 'Key Decisions');
   const fallbackCalendarItems = [
     ...((marketingSummary.sessions || []).slice(0, 4).map((item) => ({
       id: item.id,
@@ -724,6 +726,12 @@ async function getCeoDashboardPayload() {
       availableOnSubdomain: true,
       preferredHostHint: 'ceo.<your-domain>',
     },
+    heroMetrics: [
+      { id: 'waiting', label: 'Waiting on Dan', value: actionQueue.dansQueueCount || 0, tone: (actionQueue.dansQueueCount || 0) > 0 ? 'warning' : 'healthy' },
+      { id: 'review', label: 'Review Queue', value: outputsSummary.reviewQueue.length, tone: outputsSummary.reviewQueue.length > 0 ? 'warning' : 'healthy' },
+      { id: 'decisions', label: 'Decisions Pending', value: decisionsNeedingRationale.length, tone: decisionsNeedingRationale.length > 0 ? 'warning' : 'healthy' },
+      { id: 'focus', label: 'Focus Areas', value: focusAreas.length, tone: 'healthy' },
+    ],
     pulseBar: {
       focusAreaHealth: focusAreas.slice(0, 7).map((item) => ({
         id: item.id,
@@ -764,7 +772,11 @@ async function getCeoDashboardPayload() {
     today: {
       morningBrief: summarizeMorningBrief(morningBriefResult || dashboard.morningBrief),
       reviewQueue: outputsSummary.reviewQueue,
-      brainDumpInbox: [],
+      brainDumpInbox: handoffNextSteps.slice(0, 4).map((item, index) => ({
+        id: `brain-dump-${index}`,
+        text: item,
+        targetView: 'dashboard',
+      })),
       decisionsToValidate: decisionsNeedingRationale.slice(0, 6).map((item) => ({
         ...item,
         targetView: 'decisions',
@@ -808,7 +820,7 @@ async function getCeoDashboardPayload() {
       sessionHandoff: {
         lastSession: parseSectionValue(handoffText, 'Last Session'),
         currentState: parseSectionBullets(handoffText, 'Current State'),
-        keyDecisions: parseSectionBullets(handoffText, 'Key Decisions'),
+        keyDecisions: handoffKeyDecisions,
         nextSteps: parseSectionBullets(handoffText, 'Next Steps'),
       },
       knowledgeStaleness,
