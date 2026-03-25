@@ -14,4 +14,19 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.post('/forge', async (req, res) => {
+  try {
+    const { toolId, title, topic, notes } = req.body || {};
+    if (!toolId) {
+      return res.status(400).json({ error: 'toolId is required' });
+    }
+
+    const result = await ceoDashboardService.createForgeDraft({ toolId, title, topic, notes });
+    return res.status(201).json(result);
+  } catch (err) {
+    console.error('CEO forge error:', err);
+    return res.status(500).json({ error: 'Failed to create CEO draft' });
+  }
+});
+
 module.exports = router;

@@ -10,7 +10,10 @@
   <a href="#ceo-main" class="skip-link">Skip to CEO dashboard</a>
 
   <header class="header">
-    <div class="logo">YDS CEO <span class="logo-accent">7-Panel Dashboard</span></div>
+    <div class="header-left">
+      <div class="logo">YDS CEO <span class="logo-accent">7-Panel Dashboard</span></div>
+      <a class="header-surface-link" href="/" title="Open Command Centre">Main Command Centre</a>
+    </div>
     <div class="header-right">
       <span id="ceoLastUpdated">Loading…</span>
       <button class="btn-secondary btn-sm" id="ceoRefreshBtn" type="button">Refresh</button>
@@ -96,6 +99,29 @@
       <button class="btn-ghost btn-sm" id="ceoForgeClose" type="button">Close</button>
     </div>
     <p class="ceo-forge-copy">The forge is staged as a dedicated executive tool surface. The action cards below are wired as the next execution layer on top of the new subdomain page.</p>
+    <form class="ceo-forge-form" id="ceoForgeForm">
+      <label class="ceo-forge-field">
+        <span>Tool</span>
+        <select id="ceoForgeTool" class="filter-select">
+          <option value="write-6-pager">Write 6-Pager</option>
+          <option value="write-pr-faq">Write PR/FAQ</option>
+          <option value="brain-dump">Brain Dump</option>
+          <option value="decision-capture">Decision Capture</option>
+        </select>
+      </label>
+      <label class="ceo-forge-field">
+        <span>Title</span>
+        <input id="ceoForgeTitle" class="ceo-forge-input" type="text" placeholder="Launch memo, pricing review, idea capture..." />
+      </label>
+      <label class="ceo-forge-field">
+        <span>Notes</span>
+        <textarea id="ceoForgeNotes" class="ceo-forge-textarea" rows="5" placeholder="Add context, raw thoughts, or the draft prompt here."></textarea>
+      </label>
+      <div class="ceo-forge-actions">
+        <button class="btn-primary btn-sm" id="ceoForgeSubmit" type="submit">Create Draft</button>
+        <span class="ceo-muted" id="ceoForgeStatus">Writes to `outputs/`.</span>
+      </div>
+    </form>
     <div id="ceoForgeTools" class="ceo-forge-grid"></div>
   </aside>
   <div class="ceo-overlay" id="ceoForgeOverlay" hidden></div>

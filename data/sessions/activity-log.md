@@ -18,18 +18,11 @@
 | 2026-03-22 13:42 | frontend-builder | UX polish | Scroll fixes for CRM + Action Queue, remove inline styles | — |
 | 2026-03-22 13:49 | frontend-builder | Design system cleanup | Replace hardcoded hex colors with CSS variables | — |
 | 2026-03-22 14:27 | design-planner | Organisation dashboard page spec | Design spec for new org dashboard | — |
-| 2026-03-25 00:00 | lead | Wave 1 CC optimization | Enriched Stop hook, seeded decisions.md, cleaned activity log, fixed MCP config | Wave 2: worktree isolation test |
-| 2026-03-25 08:41 | file-write | unknown | — |
-| 2026-03-26 02:01 | file-write | unknown | — |
-| 2026-03-26 02:03 | file-write | unknown | — |
-| 2026-03-26 02:04 | file-write | unknown | — |
-| 2026-03-26 02:04 | file-write | unknown | — |
-| 2026-03-26 02:04 | file-write | unknown | — |
-| 2026-03-26 02:04 | file-write | unknown | — |
-| 2026-03-26 02:05 | file-write | unknown | — |
-| 2026-03-26 02:26 | file-write | unknown | — |
-| 2026-03-26 02:26 | file-write | unknown | — |
-| 2026-03-26 02:26 | file-write | unknown | — |
-| 2026-03-26 02:51 | file-write | unknown | — |
-| 2026-03-26 02:54 | file-write | unknown | — |
-| 2026-03-26 03:06 | file-write | unknown | — |
+| 2026-03-25 00:00 | lead | Wave 1 CC optimization | Enriched Stop hook, seeded decisions.md, cleaned activity log, fixed MCP config | — |
+| 2026-03-26 02:54 | lead | Vercel deployment setup | Auth gate, vercel.json, CORS fixes, inline Sheets JSON auth, pushed to GitHub | — |
+| 2026-03-26 02:54 | backend-builder | CEO dashboard feature | New route, service, test, dedicated /ceo page | — |
+| 2026-03-26 03:06 | lead | 7-panel dashboard spec saved | Full architecture spec committed as build roadmap | — |
+| 2026-03-26 03:36 | file-write | unknown | — |
+| 2026-03-26 03:37 | file-write | unknown | — |
+| 2026-03-26 03:37 | file-write | unknown | — |
+| 2026-03-26 03:37 | file-write | unknown | — |

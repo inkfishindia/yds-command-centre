@@ -1,32 +1,44 @@
 # Session Handoff — Command Centre
 
 ## Last Session
-- 2026-03-21 00:29 IST
+- 2026-03-26 03:06 IST
 
 ## Current State
-- Server status: local dev server restarted during session; port `3000` confirmed listening
-- Active features:
-  - Google Sheets env wired locally for confirmed workbooks
-  - Business Model Canvas redesigned into a hybrid executive canvas
-- Open bugs:
-  - `STRATEGY_SPREADSHEET_ID` intentionally left pending final verification
-  - Legacy CRM pipeline parser likely still mismatches current `LEAD_FLOWS` value conventions
+- **Deployed live** at yds-command-centre.vercel.app (private, password-gated)
+- GitHub repo: inkfishindia/yds-command-centre (private)
+- Vercel auto-deploys on every push to main
+- Server status: local dev working on port 3000
+- All 690 tests passing, lint clean
+
+## What Was Built This Session
+- Auth gate middleware (ACCESS_PASSWORD env var, cookie-based)
+- Vercel deployment config (vercel.json, module.exports for serverless)
+- CORS simplified — password gate handles access control
+- Google Sheets auth supports inline JSON (for Vercel, no file path)
+- CEO dashboard — new route, service, test, dedicated /ceo page
+- 7-panel dashboard architecture spec saved as roadmap
 
 ## Key Decisions
-- Only map spreadsheet IDs when evidence is exact; do not guess strategy wiring.
-- Keep Google Sheets as the short-term source of truth instead of migrating immediately.
-- Use service-account auth for Sheets; current backend does not actively use browser Google OAuth for sheet access.
-- Redesign BMC as a hybrid executive canvas: classic BMC structure + modern dashboard hierarchy + edit-ready detail drawer.
+- Deploy to Vercel free tier (serverless); may migrate to Render for better perf
+- No Claude chat on live site — dashboard only, notes/lists for Colin to pick up
+- Password gate is the primary access control (no CORS whitelist needed)
+- Simplified CORS to `cors()` since auth gate protects all routes
+- Keep Google Sheets as short-term source of truth
+- Use service-account auth for Sheets, not browser OAuth
 
-## Confirmed Local Sheets Wiring
-- `GOOGLE_SERVICE_ACCOUNT_KEY` points at `Zreference/gen-lang-client-0910892311-9c5f454b53f7.json`
-- `GOOGLE_SHEETS_ID` → legacy CRM pipeline workbook (`CRM - Core`, `LEAD_FLOWS`)
-- `EXECUTION_SPREADSHEET_ID` → execution workbook
-- `APP_LOGGING_SPREADSHEET_ID` → `YD - App`
-- `BMC_SPREADSHEET_ID` → `YDC - Business model canvas`
+## Open Issues
+- Vercel cold starts make the app slow (~2-5s per request)
+- `STRATEGY_SPREADSHEET_ID` still pending verification
+- Legacy CRM pipeline parser may mismatch current LEAD_FLOWS values
+- GitHub repo is PUBLIC — should be switched to private
+
+## Env Vars on Vercel
+- ACCESS_PASSWORD, NOTION_TOKEN, NODE_ENV=production
+- All SPREADSHEET_IDs, GOOGLE_SERVICE_ACCOUNT_KEY (inline JSON)
+- No ANTHROPIC_API_KEY (chat disabled on live site)
 
 ## Next Steps
-- Share the confirmed Google Sheets with service account `155749101771-compute@developer.gserviceaccount.com` if not already shared.
-- Final-verify `STRATEGY_SPREADSHEET_ID` only when exact tab-name alignment is proven.
-- Refresh and visually review the BMC page in-browser; latest code includes hero summary, richer section cards, and improved page-level scrolling.
-- If CRM pipeline data loads but looks wrong, update `server/services/sheets.js#getPipelineData()` to match current `LEAD_FLOWS` schema and values.
+- Consider migrating from Vercel to Render for always-on server (no cold starts)
+- Build Panel 1 (Pulse Bar) and Panel 5 (Strategic Layer) from 7-panel spec
+- Verify all Google Sheets are shared with service account email
+- Revoke exposed tokens (GitHub PATs, Notion, Google SA key, Vercel token)

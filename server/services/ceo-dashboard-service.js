@@ -3,12 +3,14 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
+const config = require('../config');
 const dashboardService = require('./dashboard-service');
 const marketingOpsService = require('./marketing-ops-service');
 const techTeamService = require('./tech-team-service');
 const opsService = require('./ops-service');
 const crmService = require('./crm-service');
 const notionService = require('./notion');
+const calendarService = require('./google-calendar');
 
 const CACHE_TTL_MS = 2 * 60 * 1000;
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
@@ -328,6 +330,60 @@ async function getOutputsSummary() {
   };
 }
 
+function sanitizeFilenamePart(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'untitled';
+}
+
+function buildForgeDraftContent({ toolId, title, topic, notes }) {
+  const now = new Date().toISOString();
+  const heading = title || topic || 'Untitled Draft';
+
+  if (toolId === 'brain-dump') {
+    return `# Brain Dump\n\n## Captured\n${notes || topic || 'Add raw notes here.'}\n\n## Next Step\n- Triage into commitment, decision, or brief.\n\n## Metadata\n- Created: ${now}\n- Surface: CEO Dashboard\n`;
+  }
+
+  if (toolId === 'decision-capture') {
+    return `# Decision Draft\n\n## Decision\n${heading}\n\n## Why Now\n${notes || 'Add the rationale and decision pressure.'}\n\n## Alternatives\n- Option A\n- Option B\n\n## Risks\n- Risk 1\n- Risk 2\n\n## Metadata\n- Created: ${now}\n- Surface: CEO Dashboard\n`;
+  }
+
+  if (toolId === 'write-pr-faq') {
+    return `# PR/FAQ Draft\n\n## Topic\n${heading}\n\n## Press Release\n${notes || 'Draft the announcement narrative here.'}\n\n## FAQs\n1. Question\n   Answer\n\n## Metadata\n- Created: ${now}\n- Surface: CEO Dashboard\n`;
+  }
+
+  return `# 6-Pager Draft\n\n## Topic\n${heading}\n\n## Context\n${notes || topic || 'Add executive context here.'}\n\n## Problem\n- Define the current issue\n\n## Proposal\n- Outline the proposed move\n\n## Open Questions\n- Question 1\n- Question 2\n\n## Metadata\n- Created: ${now}\n- Surface: CEO Dashboard\n`;
+}
+
+async function createForgeDraft({ toolId, title, topic, notes }) {
+  await fs.mkdir(OUTPUTS_DIR, { recursive: true });
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const slug = sanitizeFilenamePart(title || topic || toolId);
+  const baseName = toolId === 'decision-capture'
+    ? `${timestamp}-${slug}-decision.md`
+    : toolId === 'brain-dump'
+      ? `${timestamp}-${slug}-brain-dump.md`
+      : toolId === 'write-pr-faq'
+        ? `${timestamp}-${slug}-pr-faq.md`
+        : `${timestamp}-${slug}-6-pager.md`;
+  const filePath = path.join(OUTPUTS_DIR, baseName);
+  const content = buildForgeDraftContent({ toolId, title, topic, notes });
+
+  await fs.writeFile(filePath, content, 'utf8');
+  clearCache();
+
+  return {
+    ok: true,
+    path: path.relative(ROOT_DIR, filePath),
+    title: title || topic || titleFromFilename(filePath),
+    toolId,
+  };
+}
+
 async function getKnowledgeFiles() {
   const exists = await fileExists(KNOWLEDGE_DIR);
   if (exists) {
@@ -437,6 +493,8 @@ function buildSystemMap({ dashboard, teamWorkload, marketingSummary, techSummary
       metric: `${danLoad?.activeCount || 0} open`,
       note: `${danLoad?.overdueCount || 0} overdue`,
       tone: capacityTone(danLoad?.capacity),
+      targetView: 'team',
+      owner: 'Dan',
     },
     {
       id: 'colin',
@@ -445,6 +503,8 @@ function buildSystemMap({ dashboard, teamWorkload, marketingSummary, techSummary
       metric: `${colinLoad?.activeCount || 0} active loops`,
       note: `${focusAreas.length} focus areas tracked`,
       tone: capacityTone(colinLoad?.capacity),
+      targetView: 'team',
+      owner: 'Colin',
     },
     {
       id: 'marketing',
@@ -453,6 +513,7 @@ function buildSystemMap({ dashboard, teamWorkload, marketingSummary, techSummary
       metric: `${marketingStats.activeCampaigns || 0} active campaigns`,
       note: `${marketingStats.contentInPipeline || 0} content items`,
       tone: marketingStats.blockedCampaigns?.length ? 'warning' : 'healthy',
+      targetView: 'marketingOps',
     },
     {
       id: 'crm',
@@ -461,6 +522,7 @@ function buildSystemMap({ dashboard, teamWorkload, marketingSummary, techSummary
       metric: `${pipeline.totalLeads || crmOverview?.leadStats?.totalLeads || 0} leads`,
       note: `${crmOverview?.pipeline?.stalledCount || 0} stalled`,
       tone: (crmOverview?.pipeline?.stalledCount || 0) > 0 ? 'warning' : 'healthy',
+      targetView: 'crm',
     },
     {
       id: 'tech',
@@ -469,6 +531,7 @@ function buildSystemMap({ dashboard, teamWorkload, marketingSummary, techSummary
       metric: `${techStats.inProgress || 0} in progress`,
       note: `${techStats.blocked || 0} blocked`,
       tone: (techStats.p0Bugs || 0) > 0 ? 'critical' : (techStats.blocked || 0) > 0 ? 'warning' : 'healthy',
+      targetView: 'techTeam',
     },
     {
       id: 'factory',
@@ -477,6 +540,7 @@ function buildSystemMap({ dashboard, teamWorkload, marketingSummary, techSummary
       metric: `${stockSummary.lowStockCount || 0} low-stock alerts`,
       note: `${stockSummary.pendingPoCount || 0} pending POs`,
       tone: (stockSummary.criticalStockCount || 0) > 0 ? 'critical' : 'warning',
+      targetView: 'ops',
     },
   ];
 
@@ -496,6 +560,8 @@ function buildSystemMap({ dashboard, teamWorkload, marketingSummary, techSummary
       name: item.Name,
       health: item.Health || item.Status || 'Unknown',
       tone: normalizeHealthTone(item.Health || item.Status),
+      targetView: 'projects',
+      focusArea: item.Name,
     })),
     routingNotes: [
       'Marketing escalations route through the growth operating layer first.',
@@ -575,6 +641,7 @@ async function getCeoDashboardPayload() {
     techSummaryResult,
     opsSummaryResult,
     crmOverviewResult,
+    calendarResult,
     activityText,
     handoffText,
     decisionsText,
@@ -598,6 +665,7 @@ async function getCeoDashboardPayload() {
     techTeamService.getSummary().catch(() => null),
     opsService.getSummary().catch(() => null),
     crmService.getOverview().catch(() => null),
+    calendarService.getTodaysEvents().catch(() => ({ available: false, items: [] })),
     readTextFile(activityPath),
     readTextFile(handoffPath),
     readTextFile(decisionsPath),
@@ -628,6 +696,26 @@ async function getCeoDashboardPayload() {
     overdueCount: Array.isArray(dashboard.overdue) ? dashboard.overdue.length : 0,
   });
   const strategicSections = await getStrategicDocs(outputsSummary);
+  const marketingSummary = marketingSummaryResult || {};
+  const fallbackCalendarItems = [
+    ...((marketingSummary.sessions || []).slice(0, 4).map((item) => ({
+      id: item.id,
+      title: item.Name || item.Title || 'Session',
+      start: item.Date && typeof item.Date === 'object' ? item.Date.start : item.Date,
+      end: item.Date && typeof item.Date === 'object' ? item.Date.end : '',
+      source: 'sessions',
+    }))),
+    ...((marketingSummary.content || []).filter((item) => item['Publish Date']).slice(0, 4).map((item) => ({
+      id: item.id,
+      title: item.Name || 'Content slot',
+      start: item['Publish Date'] && typeof item['Publish Date'] === 'object' ? item['Publish Date'].start : item['Publish Date'],
+      end: '',
+      source: 'content-calendar',
+    }))),
+  ];
+  const calendarItems = calendarResult?.available
+    ? calendarResult.items
+    : fallbackCalendarItems;
 
   const payload = {
     timestamp: new Date().toISOString(),
@@ -650,11 +738,15 @@ async function getCeoDashboardPayload() {
           title: item.Name,
           dueDate: item['Due Date'] && typeof item['Due Date'] === 'object' ? item['Due Date'].start : item['Due Date'],
           owner: Array.isArray(item.assignedNames) ? item.assignedNames.join(', ') : '',
+          targetView: 'commitments',
         })),
       },
       decisionsPendingRationale: {
         count: decisionsNeedingRationale.length,
-        items: decisionsNeedingRationale.slice(0, 5),
+        items: decisionsNeedingRationale.slice(0, 5).map((item) => ({
+          ...item,
+          targetView: 'decisions',
+        })),
       },
       teamLoad: {
         people: teamWorkload.slice(0, 8).map((person) => ({
@@ -673,17 +765,28 @@ async function getCeoDashboardPayload() {
       morningBrief: summarizeMorningBrief(morningBriefResult || dashboard.morningBrief),
       reviewQueue: outputsSummary.reviewQueue,
       brainDumpInbox: [],
-      decisionsToValidate: decisionsNeedingRationale.slice(0, 6),
+      decisionsToValidate: decisionsNeedingRationale.slice(0, 6).map((item) => ({
+        ...item,
+        targetView: 'decisions',
+      })),
       calendar: {
-        available: false,
-        message: 'Google Calendar is not wired into this separate CEO surface yet.',
-        items: [],
+        available: !!calendarResult?.available || calendarItems.length > 0,
+        message: calendarResult?.available
+          ? `Live from Google Calendar${config.GOOGLE_CALENDAR_ID ? '' : ' (default calendar)'}.`
+          : calendarItems.length
+            ? 'Using fallback operating timeline from sessions and content calendar.'
+            : 'Calendar is not configured yet for this surface.',
+        items: calendarItems.slice(0, 8).map((item) => ({
+          ...item,
+          targetView: item.source === 'content-calendar' || item.source === 'sessions' ? 'marketingOps' : 'dashboard',
+        })),
       },
       delegationAlerts: actionQueue.dansQueue.slice(0, 5).map((item) => ({
         id: item.id,
         title: item.name,
         reason: item.status === 'Blocked' ? 'Blocked item waiting on Dan' : 'Executive queue item',
         suggestedOwner: item.assignedNames?.[0] || 'Dan',
+        targetView: 'actionQueue',
       })),
     },
     workspace: {
@@ -695,6 +798,7 @@ async function getCeoDashboardPayload() {
         action: row.Action || 'Update',
         details: row.Details || '',
         pending: row.Pending || '',
+        targetView: 'dashboard',
       })),
       pendingOutputs: outputsSummary.pendingOutputs,
       memoryUpdates: chunkTextToBullets(memoryText, 6).map((item, index) => ({
@@ -747,26 +851,26 @@ async function getCeoDashboardPayload() {
         {
           id: 'write-6-pager',
           title: 'Write 6-Pager',
-          description: 'Generate a strategic memo into outputs when the forge backend is connected.',
-          status: 'planned',
+          description: 'Create a local 6-pager draft in outputs/ and push it into the review queue.',
+          status: 'live',
         },
         {
           id: 'write-pr-faq',
           title: 'Write PR/FAQ',
-          description: 'Draft a launch-ready PR/FAQ using the shared output flow.',
-          status: 'planned',
+          description: 'Generate a PR/FAQ markdown draft in outputs/ for CEO review.',
+          status: 'live',
         },
         {
           id: 'brain-dump',
           title: 'Brain Dump',
-          description: 'Capture raw inputs, then route them into decisions, commitments, or briefs.',
-          status: 'next',
+          description: 'Capture raw input as a structured local draft so it enters the review queue immediately.',
+          status: 'live',
         },
         {
           id: 'decision-capture',
           title: 'Decision Capture',
-          description: 'Record what changed, why it changed, and what risks stay open.',
-          status: 'next',
+          description: 'Create a decision draft with rationale, alternatives, and risks.',
+          status: 'live',
         },
       ],
       outputsAvailable: outputsSummary.available,
@@ -784,5 +888,6 @@ function clearCache() {
 
 module.exports = {
   getCeoDashboardPayload,
+  createForgeDraft,
   clearCache,
 };

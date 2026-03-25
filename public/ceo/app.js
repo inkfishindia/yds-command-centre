@@ -24,6 +24,12 @@
     refreshBtn: document.getElementById('ceoRefreshBtn'),
     forgeBtn: document.getElementById('ceoForgeBtn'),
     forgeClose: document.getElementById('ceoForgeClose'),
+    forgeForm: document.getElementById('ceoForgeForm'),
+    forgeTool: document.getElementById('ceoForgeTool'),
+    forgeTitle: document.getElementById('ceoForgeTitle'),
+    forgeNotes: document.getElementById('ceoForgeNotes'),
+    forgeSubmit: document.getElementById('ceoForgeSubmit'),
+    forgeStatus: document.getElementById('ceoForgeStatus'),
   };
 
   function escapeHtml(value) {
@@ -79,6 +85,32 @@
     });
   }
 
+  function buildMainAppUrl(item = {}) {
+    const params = new URLSearchParams();
+    if (item.targetView) params.set('view', item.targetView);
+    if (item.owner) params.set('owner', item.owner);
+    if (item.focusArea) params.set('focusArea', item.focusArea);
+    if (item.mode) params.set('mode', item.mode);
+    const query = params.toString();
+    return query ? `/?${query}` : '/';
+  }
+
+  function renderJumpLink(item, label = 'Open in Main App') {
+    if (!item || !item.targetView) return '';
+    return `<a class="btn-ghost btn-sm" href="${escapeHtml(buildMainAppUrl(item))}">${escapeHtml(label)}</a>`;
+  }
+
+  function formatCalendarTimeRange(item) {
+    if (!item || !item.start) return 'No time';
+    const start = new Date(item.start);
+    if (Number.isNaN(start.getTime())) return item.start;
+    const startLabel = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (!item.end) return startLabel;
+    const end = new Date(item.end);
+    if (Number.isNaN(end.getTime())) return startLabel;
+    return `${startLabel} - ${end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  }
+
   function renderList(items, renderItem, emptyLabel) {
     if (!Array.isArray(items) || !items.length) {
       return `<div class="ceo-empty">${escapeHtml(emptyLabel)}</div>`;
@@ -127,7 +159,7 @@
         <div class="ceo-mini-list">
           ${renderList(
             pulse.overdueBadge && pulse.overdueBadge.items,
-            (item) => `<div class="ceo-mini-line"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.owner || 'Unassigned')}</span></div>`,
+            (item) => `<div class="ceo-mini-line"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.owner || 'Unassigned')}</span>${renderJumpLink(item, 'Open')}</div>`,
             'No overdue items.',
           )}
         </div>
@@ -138,7 +170,7 @@
         <div class="ceo-mini-list">
           ${renderList(
             pulse.decisionsPendingRationale && pulse.decisionsPendingRationale.items,
-            (item) => `<div class="ceo-mini-line"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.date || 'No date')}</span></div>`,
+            (item) => `<div class="ceo-mini-line"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.date || 'No date')}</span>${renderJumpLink(item, 'Open')}</div>`,
             'No rationale gaps right now.',
           )}
         </div>
@@ -209,6 +241,7 @@
                 <div class="ceo-muted">${escapeHtml(item.type)} · ${escapeHtml(formatDate(item.createdAt))}</div>
               </div>
               <div class="ceo-chip-row">
+                <a class="btn-ghost btn-sm" href="/?view=docs">Open</a>
                 <span class="pill pill-blue">Approve</span>
                 <span class="pill">Edit</span>
               </div>
@@ -231,7 +264,10 @@
                 <strong>${escapeHtml(item.title)}</strong>
                 <div class="ceo-muted">${escapeHtml(item.date || 'No date')} · rationale ${escapeHtml(item.rationale || 'TBD')}</div>
               </div>
-              <span class="pill pill-amber">Confirm</span>
+              <div class="ceo-chip-row">
+                ${renderJumpLink(item, 'Open')}
+                <span class="pill pill-amber">Confirm</span>
+              </div>
             </article>
           `,
           'No decisions are waiting for rationale right now.',
@@ -244,6 +280,22 @@
           <span class="pill ${today.calendar?.available ? 'pill-green' : 'pill-amber'}">${today.calendar?.available ? 'Connected' : 'Pending'}</span>
         </div>
         <p class="ceo-card-copy">${escapeHtml(today.calendar?.message || 'No calendar data available.')}</p>
+        ${renderList(
+          today.calendar && today.calendar.items,
+          (item) => `
+            <article class="ceo-item-card">
+              <div>
+                <strong>${escapeHtml(item.title)}</strong>
+                <div class="ceo-muted">${escapeHtml(formatCalendarTimeRange(item))}</div>
+              </div>
+              <div class="ceo-chip-row">
+                <span class="pill">${escapeHtml(item.source || 'calendar')}</span>
+                ${renderJumpLink(item, 'Open')}
+              </div>
+            </article>
+          `,
+          'No calendar blocks for today.',
+        )}
       </section>
 
       <section class="ceo-subsection">
@@ -259,7 +311,10 @@
                 <strong>${escapeHtml(item.title)}</strong>
                 <div class="ceo-muted">${escapeHtml(item.reason)}</div>
               </div>
-              <span class="pill">${escapeHtml(item.suggestedOwner || 'Route')}</span>
+              <div class="ceo-chip-row">
+                <span class="pill">${escapeHtml(item.suggestedOwner || 'Route')}</span>
+                ${renderJumpLink(item, 'Open')}
+              </div>
             </article>
           `,
           'No delegation alerts right now.',
@@ -273,18 +328,21 @@
     const nodes = renderList(
       systemMap.nodes,
       (node) => `
-        <article class="ceo-node-card">
-          <div class="ceo-node-top">
-            <div>
-              <strong>${escapeHtml(node.label)}</strong>
-              <div class="ceo-muted">${escapeHtml(node.domain)}</div>
-            </div>
-            <span class="pill ${toneClass(node.tone)}">${escapeHtml(toneLabel(node.tone))}</span>
-          </div>
-          <div class="ceo-node-metric">${escapeHtml(node.metric || '')}</div>
-          <div class="ceo-muted">${escapeHtml(node.note || '')}</div>
-        </article>
-      `,
+            <article class="ceo-node-card">
+              <div class="ceo-node-top">
+                <div>
+                  <strong>${escapeHtml(node.label)}</strong>
+                  <div class="ceo-muted">${escapeHtml(node.domain)}</div>
+                </div>
+                <span class="pill ${toneClass(node.tone)}">${escapeHtml(toneLabel(node.tone))}</span>
+              </div>
+              <div class="ceo-node-metric">${escapeHtml(node.metric || '')}</div>
+              <div class="ceo-muted">${escapeHtml(node.note || '')}</div>
+              <div class="ceo-node-actions">
+                ${renderJumpLink(node, 'Open')}
+              </div>
+            </article>
+          `,
       'No system map nodes available yet.',
     );
 
@@ -296,7 +354,7 @@
 
     const focusAreas = renderList(
       systemMap.focusAreas,
-      (item) => `<span class="pill ${toneClass(item.tone)}">${escapeHtml(item.name)}</span>`,
+      (item) => `<a class="pill ${toneClass(item.tone)} ceo-chip-link" href="${escapeHtml(buildMainAppUrl(item))}">${escapeHtml(item.name)}</a>`,
       'No focus areas available.',
     );
 
@@ -359,6 +417,7 @@
                 <div class="ceo-muted">${escapeHtml(item.agent)} · ${escapeHtml(item.timestamp)}</div>
               </div>
               <div class="ceo-muted">${escapeHtml(item.details || item.pending || '')}</div>
+              ${renderJumpLink(item, 'Open')}
             </article>
           `,
           'No recent actions logged.',
@@ -580,6 +639,41 @@
     }
   }
 
+  async function submitForgeDraft(event) {
+    event.preventDefault();
+    const toolId = els.forgeTool.value;
+    const title = els.forgeTitle.value.trim();
+    const notes = els.forgeNotes.value.trim();
+
+    els.forgeSubmit.disabled = true;
+    els.forgeStatus.textContent = 'Creating draft…';
+
+    try {
+      const response = await fetch('/api/ceo-dashboard/forge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          toolId,
+          title,
+          topic: title,
+          notes,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+
+      els.forgeStatus.textContent = `Saved to ${payload.path}`;
+      els.forgeNotes.value = '';
+      els.forgeTitle.value = '';
+      await loadDashboard();
+    } catch (err) {
+      console.error('CEO forge create failed:', err);
+      els.forgeStatus.textContent = `Failed: ${err.message}`;
+    } finally {
+      els.forgeSubmit.disabled = false;
+    }
+  }
+
   function openForge() {
     els.forgeDrawer.classList.add('is-open');
     els.forgeDrawer.setAttribute('aria-hidden', 'false');
@@ -604,6 +698,7 @@
   els.forgeBtn.addEventListener('click', openForge);
   els.forgeClose.addEventListener('click', closeForge);
   els.forgeOverlay.addEventListener('click', closeForge);
+  els.forgeForm.addEventListener('submit', submitForgeDraft);
 
   loadDashboard();
 }());

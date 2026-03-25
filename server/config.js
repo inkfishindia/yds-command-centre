@@ -13,6 +13,7 @@ module.exports = {
   NOTION_TOKEN: process.env.NOTION_TOKEN,
   MODEL: 'claude-opus-4-20250514',
   GOOGLE_SERVICE_ACCOUNT_KEY: process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '',
+  GOOGLE_CALENDAR_ID: process.env.GOOGLE_CALENDAR_ID || '',
   GOOGLE_SHEETS_ID: process.env.GOOGLE_SHEETS_ID || '',
   GITHUB_TOKEN: process.env.GITHUB_TOKEN || '',
   GITHUB_REPO_OWNER: process.env.GITHUB_REPO_OWNER || 'inkfishindia',

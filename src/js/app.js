@@ -227,6 +227,7 @@ function app() {
 
     // Initialization
     async init() {
+      this.applyInitialRouteFromUrl();
       this.loadNotificationSettings();
       this.syncNotificationPermission();
 
@@ -285,7 +286,18 @@ function app() {
       // available globally (many views call openDetailPanel on click).
       this._ensureModule('notion');
       this._ensureModule('overview');
-      this.loadOverview();
+      this.loadOverview().then(async () => {
+        if (this.view && this.view !== 'overview' && typeof this.openNavigationTarget === 'function') {
+          await this.openNavigationTarget(this.view);
+        }
+        if (this.globalContext.owner) {
+          this.applyGlobalOwnerFilter(this.globalContext.owner);
+        } else if (this.globalContext.focusArea) {
+          this.applyGlobalFocusAreaFilter(this.globalContext.focusArea);
+        } else if (this.globalContext.mode) {
+          this.applyGlobalMode(this.globalContext.mode);
+        }
+      });
 
       // Auto-refresh active view every 5 minutes
       this.refreshIntervalId = setInterval(() => {
@@ -311,6 +323,23 @@ function app() {
         clearInterval(this._aqIntervalId);
         clearInterval(this._notificationIntervalId);
       });
+    },
+
+    applyInitialRouteFromUrl() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const view = params.get('view');
+        const owner = params.get('owner');
+        const focusArea = params.get('focusArea');
+        const mode = params.get('mode');
+
+        if (view) this.view = view;
+        if (owner) this.globalContext.owner = owner;
+        if (focusArea) this.globalContext.focusArea = focusArea;
+        if (mode) this.globalContext.mode = mode;
+      } catch (err) {
+        console.warn('Initial route parsing failed:', err);
+      }
     },
 
     beginRequest(key) {
