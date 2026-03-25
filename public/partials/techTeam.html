@@ -1,0 +1,626 @@
+
+      <!-- Loading -->
+      <template x-if="techTeamLoading && !techTeam">
+        <div class="skeleton-stack">
+          <div class="loading-skeleton skeleton-stat-card"></div>
+          <div class="loading-skeleton skeleton-card"></div>
+        </div>
+      </template>
+
+      <!-- View header -->
+      <div class="view-header-bar">
+        <div class="view-header-left">
+          <span class="view-header-emoji">⚙️</span>
+          <div class="view-header-text">
+            <h2 class="view-header-title">Tech Team</h2>
+            <span class="view-header-subtitle" x-text="techTeam ? (techTeam.stats?.totalItems || 0) + ' items · ' + (techTeam.stats?.inProgress || 0) + ' in progress · ' + (techTeam.stats?.blocked || 0) + ' blocked' : 'Sprint, specs, and decisions'"></span>
+          </div>
+        </div>
+        <div class="view-header-actions">
+          <span class="view-refresh-label" x-show="techTeamLastRefresh" x-text="getTechRefreshLabel()"></span>
+          <button class="btn btn-small btn-icon" @click="loadTechTeam()">
+            <span class="refresh-icon">&#x21bb;</span> Refresh
+          </button>
+        </div>
+      </div>
+
+      <div class="mktops-overview-shell" x-show="techTeam">
+        <section class="mktops-hero" :class="'mktops-hero--' + getTechAreaStatus().tone">
+          <div class="mktops-hero-copy">
+            <div class="mktops-hero-kicker">Area Dashboard</div>
+            <h3 class="mktops-hero-title">Tech operating system</h3>
+            <p class="mktops-hero-text">Track sprint health, bug pressure, review bottlenecks, and immediate execution risk before dropping into the full sprint board.</p>
+          </div>
+          <div class="mktops-hero-status">
+            <span class="mktops-hero-status-label">Status</span>
+            <span class="mktops-hero-status-value" x-text="getTechAreaStatus().label"></span>
+            <button class="overview-link-btn" @click="techTeamSection = 'sprint'">Open Sprint</button>
+          </div>
+        </section>
+
+        <div class="mktops-area-metrics">
+          <template x-for="metric in getTechHeroMetrics()" :key="metric.id">
+            <button class="mktops-area-metric-card area-card-button" @click="getTechMetricAction(metric.id)()">
+              <span class="mktops-area-metric-label" x-text="metric.label"></span>
+              <div class="mktops-area-metric-value" x-text="metric.value"></div>
+              <span class="mktops-area-metric-note" x-text="metric.note"></span>
+            </button>
+          </template>
+        </div>
+
+        <section class="org-col-panel">
+          <div class="org-section-title-row">
+            <h3 class="org-section-title">Saved Views</h3>
+            <span class="org-section-badge" x-text="getTechSavedViewItems().length"></span>
+          </div>
+          <div class="saved-view-pills">
+            <template x-for="view in getTechSavedViews()" :key="view.id">
+              <button class="filter-pill" :class="techSavedView === view.id && 'filter-pill-active'" @click="applyTechSavedView(view.id)" x-text="view.label"></button>
+            </template>
+          </div>
+          <div class="overview-feed">
+            <template x-for="item in getTechSavedViewItems()" :key="item.title + item.detail">
+              <button class="overview-feed-item overview-feed-item--warning" @click="item.action()">
+                <span class="overview-feed-type" x-text="techSavedView"></span>
+                <div class="overview-feed-main">
+                  <span class="overview-feed-title" x-text="item.title"></span>
+                  <span class="overview-feed-detail" x-text="item.detail"></span>
+                  <div class="table-inline-actions" x-show="techSavedView === 'waiting' || techSavedView === 'specs'">
+                    <button type="button" class="mini-action-btn" x-show="techSavedView === 'waiting'" @click.stop="openTechWaitingContext()">Queue</button>
+                    <button type="button" class="mini-action-btn" x-show="techSavedView === 'specs'" @click.stop="openTechDecisionContext()">Decisions</button>
+                  </div>
+                </div>
+              </button>
+            </template>
+            <div class="empty-state compact-empty-state" x-show="getTechSavedViewItems().length === 0">
+              <p x-text="getTechSavedViewEmptyState()"></p>
+            </div>
+          </div>
+        </section>
+
+        <div class="mktops-overview-grid">
+          <template x-for="card in getTechPriorityCards()" :key="card.id">
+            <section class="mktops-priority-card" :class="'mktops-priority-card--' + card.tone">
+              <div class="mktops-priority-head">
+                <div>
+                  <h3 class="mktops-priority-title" x-text="card.title"></h3>
+                  <p class="mktops-priority-copy" x-text="card.label"></p>
+                </div>
+                <span class="mktops-priority-value" x-text="card.value"></span>
+              </div>
+              <div class="mktops-priority-list">
+                <template x-for="item in card.items" :key="item.name + item.meta">
+                  <div class="mktops-priority-item">
+                    <span class="mktops-priority-item-name" x-text="item.name"></span>
+                    <span class="mktops-priority-item-meta" x-text="item.meta"></span>
+                  </div>
+                </template>
+              </div>
+            </section>
+          </template>
+        </div>
+
+        <div class="org-two-col">
+          <section class="org-col-panel">
+            <div class="org-section-title-row">
+              <h3 class="org-section-title">Top Focus</h3>
+              <span class="org-section-badge" x-text="getTechFocusList().length"></span>
+            </div>
+            <div class="overview-feed">
+              <template x-for="item in getTechFocusList()" :key="item.title">
+                <button class="overview-feed-item overview-feed-item--warning" @click="techTeamSection = item.target">
+                  <span class="overview-feed-type">focus</span>
+                  <div class="overview-feed-main">
+                    <span class="overview-feed-title" x-text="item.title"></span>
+                    <span class="overview-feed-detail" x-text="item.detail"></span>
+                  </div>
+                </button>
+              </template>
+            </div>
+          </section>
+
+          <section class="org-col-panel">
+            <div class="org-section-title-row">
+              <h3 class="org-section-title">Next Actions</h3>
+            </div>
+            <div class="overview-links">
+              <button class="overview-link-card" @click="techTeamSection = 'sprint'">
+                <span class="overview-link-card-label">Unblock sprint work</span>
+                <span class="overview-link-card-copy">Review blocked sprint items and move active work forward.</span>
+              </button>
+              <button class="overview-link-card" @click="techTeamSection = 'bugs'">
+                <span class="overview-link-card-label">Check bug pressure</span>
+                <span class="overview-link-card-copy">See whether bugs are creating delivery risk across systems.</span>
+              </button>
+              <button class="overview-link-card" @click="techTeamSection = 'specs'">
+                <span class="overview-link-card-label">Clear review queue</span>
+                <span class="overview-link-card-copy">Push specs through review so delivery stays unblocked.</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- Stats strip -->
+      <div class="data-card-grid" x-show="techTeam">
+        <button class="data-card info data-card-button" @click="applyTechSavedView('in-progress')">
+          <span class="data-card-label">In Progress</span>
+          <span class="data-card-value" x-text="techTeam?.stats?.inProgress || 0"></span>
+        </button>
+        <button class="data-card data-card-button" :class="techTeam?.stats?.blocked > 0 ? 'danger' : ''" @click="applyTechSavedView('blocked')">
+          <span class="data-card-label">Blocked</span>
+          <span class="data-card-value" x-text="techTeam?.stats?.blocked || 0"></span>
+        </button>
+        <button class="data-card data-card-button" :class="techTeam?.stats?.openBugs > 0 ? 'warning' : ''" @click="applyTechSavedView('bugs')">
+          <span class="data-card-label">Open Bugs</span>
+          <span class="data-card-value" x-text="techTeam?.stats?.openBugs || 0"></span>
+        </button>
+        <button class="data-card data-card-button" @click="applyTechSavedView('specs')">
+          <span class="data-card-label">Specs in Review</span>
+          <span class="data-card-value" x-text="techTeam?.stats?.specsInReview || 0"></span>
+        </button>
+      </div>
+
+      <div class="empty-state" x-show="techTeam && techTeam.stats.totalItems === 0 && !techTeamLoading" style="margin: 1.5rem 0">
+        <p><strong>Notion databases not connected.</strong></p>
+        <p>Share the Tech Sprint Board, Spec Library, Decision Log, and Sprint Archive databases with your Notion integration to see data here.</p>
+      </div>
+
+      <!-- Tab bar -->
+      <div class="tech-tabs" x-show="techTeam">
+        <button class="filter-pill" :class="techTeamSection === 'command' && 'filter-pill-active'" @click="techTeamSection = 'command'">Command Center</button>
+        <button class="filter-pill" :class="techTeamSection === 'sprint' && 'filter-pill-active'" @click="techTeamSection = 'sprint'">Sprint Board</button>
+        <button class="filter-pill" :class="techTeamSection === 'bugs' && 'filter-pill-active'" @click="techTeamSection = 'bugs'">Bugs</button>
+        <button class="filter-pill" :class="techTeamSection === 'specs' && 'filter-pill-active'" @click="techTeamSection = 'specs'">Specs</button>
+        <button class="filter-pill" :class="techTeamSection === 'decisions' && 'filter-pill-active'" @click="techTeamSection = 'decisions'">Decisions</button>
+        <button class="filter-pill" :class="techTeamSection === 'velocity' && 'filter-pill-active'" @click="techTeamSection = 'velocity'">Velocity</button>
+        <button class="filter-pill" :class="techTeamSection === 'roadmap' && 'filter-pill-active'" @click="techTeamSection = 'roadmap'">Roadmap</button>
+        <button class="filter-pill" :class="techTeamSection === 'crm' && 'filter-pill-active'" @click="techTeamSection = 'crm'">CRM</button>
+        <button class="filter-pill" :class="techTeamSection === 'agents' && 'filter-pill-active'" @click="techTeamSection = 'agents'">Agents</button>
+        <button class="filter-pill" :class="techTeamSection === 'strategy' && 'filter-pill-active'" @click="techTeamSection = 'strategy'">Strategy</button>
+      </div>
+
+      <!-- Tab 1: Command Center -->
+      <div x-show="techTeamSection === 'command' && techTeam">
+        <div class="tech-command-grid">
+          <!-- Sprint Progress -->
+          <div class="tech-widget">
+            <h3>Sprint Progress</h3>
+            <div class="tech-bar" style="height:12px;margin-bottom:0.5rem">
+              <div class="tech-bar-fill tech-bar-system"
+                :style="'width:' + (techTeam?.stats?.totalItems ? Math.round((techTeam.stats.doneItems / techTeam.stats.totalItems) * 100) : 0) + '%'">
+              </div>
+            </div>
+            <div style="font-size:13px;color:var(--text-secondary)">
+              <span x-text="techTeam?.stats?.doneItems || 0"></span> / <span x-text="techTeam?.stats?.totalItems || 0"></span> items done
+            </div>
+          </div>
+
+          <!-- Blocked Items -->
+          <div class="tech-widget">
+            <h3>Blocked</h3>
+            <template x-if="getSprintItemsByStatus('Blocked').length === 0">
+              <div style="font-size:13px;color:var(--text-muted)">No blocked items</div>
+            </template>
+            <ul class="tech-widget-list">
+              <template x-for="item in getSprintItemsByStatus('Blocked').slice(0, 5)" :key="item.id">
+                <li>
+                  <span x-text="item.Name"></span>
+                  <button type="button" class="tech-system-tag tech-system-tag-btn" x-text="item.System" x-show="item.System" @click="openTechSystemContext(item.System)"></button>
+                </li>
+              </template>
+            </ul>
+          </div>
+
+          <!-- P0/P1 Bugs -->
+          <div class="tech-widget">
+            <h3>Critical Bugs</h3>
+            <template x-if="getTechBugs().filter(b => b.Priority && (b.Priority.startsWith('P0') || b.Priority.startsWith('P1')) && b.Status !== 'Done').length === 0">
+              <div style="font-size:13px;color:var(--text-muted)">No critical bugs</div>
+            </template>
+            <ul class="tech-widget-list">
+              <template x-for="bug in getTechBugs().filter(b => b.Priority && (b.Priority.startsWith('P0') || b.Priority.startsWith('P1')) && b.Status !== 'Done').slice(0, 5)" :key="bug.id">
+                <li>
+                  <span x-text="bug.Name"></span>
+                  <span class="tech-priority-pill" :class="getTechPriorityClass(bug.Priority)" x-text="bug.Priority?.split(' - ')[0]"></span>
+                  <button type="button" class="tech-system-tag tech-system-tag-btn" x-text="bug.System" x-show="bug.System" @click="openTechSystemContext(bug.System)"></button>
+                </li>
+              </template>
+            </ul>
+          </div>
+
+          <!-- Waiting on Dan -->
+          <div class="tech-widget">
+            <h3>Waiting on Dan</h3>
+            <template x-if="!(techTeam?.stats?.waitingOnDan?.length > 0)">
+              <div style="font-size:13px;color:var(--text-muted)">Nothing waiting</div>
+            </template>
+            <ul class="tech-widget-list">
+              <template x-for="item in (techTeam?.stats?.waitingOnDan || []).slice(0, 5)" :key="item.id || item.Name">
+                <li>
+                  <span x-text="item.Name || item"></span>
+                  <button type="button" class="mini-action-btn" @click="openTechWaitingContext()">Queue</button>
+                </li>
+              </template>
+            </ul>
+          </div>
+
+          <!-- Specs Pending Review -->
+          <div class="tech-widget">
+            <h3>Specs Pending Review</h3>
+            <div class="tech-widget-value" x-text="techTeam?.stats?.specsInReview || 0"></div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-top:0.25rem">specs awaiting approval</div>
+          </div>
+
+          <!-- Recent Decisions -->
+          <div class="tech-widget">
+            <h3>Recent Decisions</h3>
+            <template x-if="!(techTeam?.stats?.recentDecisions?.length > 0)">
+              <div style="font-size:13px;color:var(--text-muted)">No recent decisions</div>
+            </template>
+            <ul class="tech-widget-list">
+              <template x-for="d in (techTeam?.stats?.recentDecisions || []).slice(0, 5)" :key="d.id || d.Decision">
+                <li>
+                  <span x-text="d.Decision || d.name || d"></span>
+                  <button type="button" class="mini-action-btn" @click="openTechDecisionContext()">Open</button>
+                </li>
+              </template>
+            </ul>
+          </div>
+
+          <!-- GitHub Summary -->
+          <div class="tech-widget" x-show="techGithub?.available">
+            <h3>GitHub</h3>
+            <ul class="tech-widget-list">
+              <li>
+                <span>Recent commits</span>
+                <span x-text="techGithub?.stats?.recentCommits || 0"></span>
+              </li>
+              <li>
+                <span>Open PRs</span>
+                <span x-text="techGithub?.stats?.openPRCount || 0"></span>
+              </li>
+              <li>
+                <span>Open issues</span>
+                <span x-text="techGithub?.stats?.openIssueCount || 0"></span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Quick Actions (placeholder) -->
+          <div class="tech-widget">
+            <h3>Quick Actions</h3>
+            <div style="display:flex;flex-direction:column;gap:0.5rem">
+              <button class="action-btn" disabled title="Coming soon">New Sprint Item</button>
+              <button class="action-btn" disabled title="Coming soon">File Bug Report</button>
+              <button class="action-btn" disabled title="Coming soon">Request Review</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Sprint Board -->
+      <div x-show="techTeamSection === 'sprint' && techTeam">
+        <div class="tech-filters">
+          <select x-model="techSystemFilter" class="filter-select" aria-label="Filter by system">
+            <option value="">All Systems</option>
+            <template x-for="s in getTechSystems()" :key="s"><option :value="s" x-text="s"></option></template>
+          </select>
+          <select x-model="techPriorityFilter" class="filter-select" aria-label="Filter by priority">
+            <option value="">All Priorities</option>
+            <option value="P0 - Critical">P0 Critical</option>
+            <option value="P1 - High">P1 High</option>
+            <option value="P2 - Medium">P2 Medium</option>
+            <option value="P3 - Low">P3 Low</option>
+          </select>
+          <select x-model="techTypeFilter" class="filter-select" aria-label="Filter by type">
+            <option value="">All Types</option>
+            <option value="Bug">Bug</option>
+            <option value="Feature">Feature</option>
+            <option value="Task">Task</option>
+            <option value="Spike">Spike</option>
+            <option value="Chore">Chore</option>
+          </select>
+          <input type="text" x-model="techSprintSearch" placeholder="Search items..." class="filter-search">
+        </div>
+        <div class="kanban-board tech-sprint-board">
+          <template x-for="status in ['Backlog', 'This Sprint', 'In Progress', 'In Review', 'Blocked', 'Done']" :key="status">
+            <div class="kanban-column" :class="status === 'Blocked' && 'tech-blocked-col'">
+              <div class="kanban-column-header">
+                <span x-text="status"></span>
+                <span class="kanban-count" x-text="getSprintItemsByStatus(status).length"></span>
+              </div>
+              <template x-for="item in getSprintItemsByStatus(status)" :key="item.id">
+                <div class="kanban-card" :class="item.Status === 'Blocked' && 'tech-card-blocked'" :data-priority="item.Priority?.toLowerCase().replace(/ - /g, '-')">
+                  <div class="kanban-card-top">
+                    <span class="tech-type-badge" :class="getTechTypeClass(item.Type)" x-text="item.Type"></span>
+                    <span class="tech-priority-pill" :class="getTechPriorityClass(item.Priority)" x-text="item.Priority?.split(' - ')[0]"></span>
+                  </div>
+                  <div class="kanban-title" x-text="item.Name"></div>
+                  <div class="kanban-meta">
+                    <span class="tech-system-tag" x-text="item.System" x-show="item.System"></span>
+                    <span class="tech-person" x-show="item['Assigned To']" x-text="Array.isArray(item['Assigned To']) ? item['Assigned To'].join(', ') : item['Assigned To']"></span>
+                  </div>
+                  <div class="kanban-meta" x-show="item['Blocked By'] || item['Waiting On']">
+                    <span class="tech-blocked-text" x-show="item['Blocked By']" x-text="'Blocked: ' + item['Blocked By']"></span>
+                    <span class="tech-waiting-text" x-show="item['Waiting On']" x-text="'Waiting: ' + item['Waiting On']"></span>
+                  </div>
+                  <div class="kanban-card-actions" x-show="item.Status !== 'Done'">
+                    <template x-if="item.Status !== 'In Progress'">
+                      <button class="action-btn" @click="techSprintAction(item.id, 'Status', 'In Progress')" :disabled="techActionLoading === item.id">Start</button>
+                    </template>
+                    <template x-if="item.Status === 'In Progress'">
+                      <button class="action-btn" @click="techSprintAction(item.id, 'Status', 'In Review')" :disabled="techActionLoading === item.id">Review</button>
+                    </template>
+                    <template x-if="item.Status === 'In Review'">
+                      <button class="action-btn" @click="techSprintAction(item.id, 'Status', 'Done')" :disabled="techActionLoading === item.id">Done</button>
+                    </template>
+                    <template x-if="item.Status !== 'Blocked'">
+                      <button class="action-btn action-btn-danger" @click="techSprintAction(item.id, 'Status', 'Blocked')" :disabled="techActionLoading === item.id">Block</button>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Tab 3: Bugs -->
+      <div x-show="techTeamSection === 'bugs' && techTeam">
+        <div class="tech-bug-metrics">
+          <div class="data-card danger"><span class="data-card-label">Open Bugs</span><span class="data-card-value" x-text="getTechBugStats().total"></span></div>
+          <div class="tech-bug-breakdown">
+            <h4>By Priority</h4>
+            <template x-for="[p, count] in Object.entries(getTechBugStats().byPriority)" :key="p">
+              <div class="tech-bar-row">
+                <span class="tech-bar-label" x-text="p"></span>
+                <div class="tech-bar"><div class="tech-bar-fill" :class="getTechPriorityClass(p)" :style="'width:' + Math.min(100, count * 20) + '%'"></div></div>
+                <span class="tech-bar-count" x-text="count"></span>
+              </div>
+            </template>
+          </div>
+          <div class="tech-bug-breakdown">
+            <h4>By System</h4>
+            <template x-for="[s, count] in Object.entries(getTechBugStats().bySystem)" :key="s">
+              <div class="tech-bar-row">
+                <span class="tech-bar-label" x-text="s"></span>
+                <div class="tech-bar"><div class="tech-bar-fill tech-bar-system" :style="'width:' + Math.min(100, count * 20) + '%'"></div></div>
+                <span class="tech-bar-count" x-text="count"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead><tr>
+            <th>ID</th><th>Name</th><th>Priority</th><th>System</th><th>Status</th><th>Assigned</th>
+          </tr></thead>
+          <tbody>
+            <template x-for="bug in getTechBugs()" :key="bug.id">
+              <tr :class="bug.Status === 'Blocked' && 'row-blocked'">
+                <td x-text="bug['Bug ID'] || '—'"></td>
+                <td x-text="bug.Name"></td>
+                <td><span class="tech-priority-pill" :class="getTechPriorityClass(bug.Priority)" x-text="bug.Priority?.split(' - ')[0]"></span></td>
+                <td><span class="tech-system-tag" x-text="bug.System"></span></td>
+                <td><span class="status-badge small" :class="{'success': bug.Status === 'Done', 'info': bug.Status === 'In Progress', 'danger': bug.Status === 'Blocked', 'warning': bug.Status === 'In Review', 'neutral': bug.Status === 'Backlog'}" x-text="bug.Status"></span></td>
+                <td x-text="Array.isArray(bug['Assigned To']) ? bug['Assigned To'].join(', ') : (bug['Assigned To'] || '—')"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Tab 4: Specs -->
+      <div x-show="techTeamSection === 'specs' && techTeam">
+        <div class="kanban-board tech-spec-board">
+          <template x-for="status in ['Draft', 'In Review', 'Approved']" :key="status">
+            <div class="kanban-column">
+              <div class="kanban-column-header">
+                <span x-text="status"></span>
+                <span class="kanban-count" x-text="getSpecsByStatus(status).length"></span>
+              </div>
+              <template x-for="spec in getSpecsByStatus(status)" :key="spec.id">
+                <div class="kanban-card">
+                  <div class="kanban-card-top">
+                    <span class="badge" x-text="spec['Spec Type']"></span>
+                  </div>
+                  <div class="kanban-title" x-text="spec.Name"></div>
+                  <div class="kanban-meta">
+                    <span class="tech-system-tag" x-text="spec.System" x-show="spec.System"></span>
+                    <span x-text="spec.Author" x-show="spec.Author" style="font-size:12px;color:var(--text-secondary)"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Tab 5: Decisions -->
+      <div x-show="techTeamSection === 'decisions' && techTeam">
+        <div class="tech-decision-timeline">
+          <template x-for="d in techTeam?.techDecisions || []" :key="d.id">
+            <div class="tech-decision-card" @click="techExpandedItem === d.id ? techExpandedItem = null : techExpandedItem = d.id">
+              <div class="tech-decision-header">
+                <span class="tech-decision-date" x-text="d.Date?.start ? new Date(d.Date.start).toLocaleDateString() : '—'"></span>
+                <span class="tech-decision-title" x-text="d.Decision"></span>
+                <span class="status-badge small neutral" x-text="d.Category" x-show="d.Category"></span>
+                <span class="status-badge small" :class="{'danger': d.Impact === 'High', 'warning': d.Impact === 'Medium', 'info': d.Impact === 'Low'}" x-text="d.Impact" x-show="d.Impact"></span>
+              </div>
+              <div class="tech-decision-meta">
+                <span x-text="'Made by: ' + (d['Made By'] || '—')"></span>
+                <span x-text="d.Reversibility" x-show="d.Reversibility" style="margin-left:1rem"></span>
+                <span class="status-badge small" :class="{'success': d.Status === 'Active', 'neutral': d.Status === 'Superseded' || d.Status === 'Archived'}" x-text="d.Status" x-show="d.Status" style="margin-left:auto"></span>
+              </div>
+              <div class="tech-decision-details" x-show="techExpandedItem === d.id" x-cloak>
+                <div class="tech-detail-section" x-show="d.Context"><h4>Context</h4><p x-text="d.Context"></p></div>
+                <div class="tech-detail-section" x-show="d.Rationale"><h4>Rationale</h4><p x-text="d.Rationale"></p></div>
+                <div class="tech-detail-section" x-show="d['Alternatives Considered']"><h4>Alternatives</h4><p x-text="d['Alternatives Considered']"></p></div>
+                <div class="tech-detail-section" x-show="d.Consequences"><h4>Consequences</h4><p x-text="d.Consequences"></p></div>
+              </div>
+            </div>
+          </template>
+          <div x-show="!techTeam?.techDecisions?.length" class="empty-state">No tech decisions recorded yet.</div>
+        </div>
+      </div>
+
+      <!-- Tab 6: Velocity -->
+      <div x-show="techTeamSection === 'velocity' && techTeam">
+        <div class="data-card-grid" x-show="getVelocityData().length">
+          <div class="data-card">
+            <span class="data-card-label">Sprints</span>
+            <span class="data-card-value" x-text="getVelocityData().length"></span>
+          </div>
+          <div class="data-card">
+            <span class="data-card-label">Avg Velocity</span>
+            <span class="data-card-value" x-text="Math.round(getVelocityData().reduce((s, v) => s + v.completed, 0) / Math.max(1, getVelocityData().length))"></span>
+          </div>
+          <div class="data-card">
+            <span class="data-card-label">Avg Completion</span>
+            <span class="data-card-value" x-text="Math.round(getVelocityData().reduce((s, v) => s + v.pct, 0) / Math.max(1, getVelocityData().length)) + '%'"></span>
+          </div>
+        </div>
+        <div class="tech-velocity-chart">
+          <template x-for="sprint in getVelocityData()" :key="sprint.name">
+            <div class="tech-velocity-row">
+              <div class="tech-velocity-label" x-text="sprint.name"></div>
+              <div class="tech-velocity-bars">
+                <div class="tech-velocity-bar">
+                  <div class="tech-velocity-bar-planned" :style="'width: 100%'" :title="'Planned: ' + sprint.planned"></div>
+                  <div class="tech-velocity-bar-completed" :style="'width: ' + sprint.pct + '%'" :title="'Completed: ' + sprint.completed"></div>
+                </div>
+              </div>
+              <div class="tech-velocity-numbers">
+                <span x-text="sprint.completed + '/' + sprint.planned"></span>
+                <span class="tech-velocity-pct" x-text="sprint.pct + '%'"></span>
+              </div>
+            </div>
+          </template>
+          <div x-show="!getVelocityData().length" class="empty-state">No sprint archive data yet.</div>
+        </div>
+      </div>
+
+      <!-- Tab 7: Roadmap -->
+      <div x-show="techTeamSection === 'roadmap' && techTeam">
+        <div class="tech-roadmap">
+          <template x-for="hz in [{ key: 'H1 - Now', label: 'Now (H1)' }, { key: 'H2 - Next', label: 'Next (H2)' }, { key: 'H3 - Later', label: 'Later (H3)' }]" :key="hz.key">
+            <div class="kanban-column">
+              <div class="kanban-column-header">
+                <span x-text="hz.label"></span>
+                <span class="kanban-count" x-text="getRoadmapByHorizon(hz.key).length"></span>
+              </div>
+              <template x-for="item in getRoadmapByHorizon(hz.key)" :key="item.id">
+                <div class="kanban-card">
+                  <div class="kanban-card-top">
+                    <span class="tech-type-badge" :class="getTechTypeClass(item.Type)" x-text="item.Type"></span>
+                    <span class="tech-priority-pill" :class="getTechPriorityClass(item.Priority)" x-text="item.Priority?.split(' - ')[0]"></span>
+                  </div>
+                  <div class="kanban-title" x-text="item.Name"></div>
+                  <div class="kanban-meta">
+                    <span class="tech-system-tag" x-text="item.System" x-show="item.System"></span>
+                    <span class="status-badge small" :class="{'success': item.Status === 'Done' || item.Status === 'Live', 'info': item.Status === 'In Progress', 'danger': item.Status === 'Blocked', 'warning': item.Status === 'At Risk', 'neutral': item.Status === 'Backlog' || !item.Status}" x-text="item.Status"></span>
+                  </div>
+                </div>
+              </template>
+              <div x-show="!getRoadmapByHorizon(hz.key).length" class="empty-state" style="padding:1rem;font-size:12px">No items</div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Tab 8: CRM -->
+      <div x-show="techTeamSection === 'crm' && techTeam">
+        <div x-show="!pipeline" class="empty-state">
+          <p>CRM pipeline data not configured. Set GOOGLE_SERVICE_ACCOUNT_KEY and GOOGLE_SHEETS_ID to enable.</p>
+        </div>
+        <div x-show="pipeline?.available">
+          <div class="tech-crm-section" x-show="pipeline?.b2b">
+            <h3>B2B Pipeline</h3>
+            <div class="tech-crm-funnel">
+              <template x-for="stage in (pipeline?.b2b?.stages || [])" :key="stage.name">
+                <div class="tech-funnel-row">
+                  <span class="tech-funnel-label" x-text="stage.name"></span>
+                  <div class="tech-bar"><div class="tech-bar-fill tech-bar-crm" :style="'width:' + Math.min(100, (stage.count / Math.max(1, pipeline?.b2b?.metrics?.total)) * 100) + '%'"></div></div>
+                  <span class="tech-bar-count" x-text="stage.count"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div class="tech-crm-section" x-show="pipeline?.dropship">
+            <h3>Dropship Pipeline</h3>
+            <div class="tech-crm-funnel">
+              <template x-for="stage in (pipeline?.dropship?.stages || [])" :key="stage.name">
+                <div class="tech-funnel-row">
+                  <span class="tech-funnel-label" x-text="stage.name"></span>
+                  <div class="tech-bar"><div class="tech-bar-fill tech-bar-crm" :style="'width:' + Math.min(100, (stage.count / Math.max(1, pipeline?.dropship?.metrics?.total)) * 100) + '%'"></div></div>
+                  <span class="tech-bar-count" x-text="stage.count"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div class="tech-crm-breaches" x-show="pipeline?.breaches?.length > 0">
+            <h3 style="color:var(--red)">SLA Breaches</h3>
+            <template x-for="b in (pipeline?.breaches || [])" :key="b.name">
+              <div class="mktops-alert mktops-alert-danger" x-text="b.name + ': ' + b.reason"></div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 9: Agents -->
+      <div x-show="techTeamSection === 'agents' && techTeam">
+        <div x-show="!techAgents" class="empty-state">Loading agent data...</div>
+        <div x-show="techAgents">
+          <h3>Agent Registry</h3>
+          <table class="data-table">
+            <thead><tr><th>Agent</th><th>Model</th><th>Description</th></tr></thead>
+            <tbody>
+              <template x-for="agent in (techAgents?.agents || [])" :key="agent.id">
+                <tr>
+                  <td><strong x-text="agent.name"></strong></td>
+                  <td><span class="status-badge small info" x-text="agent.model"></span></td>
+                  <td x-text="agent.description"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <h3 style="margin-top:1.5rem">Skill Catalog</h3>
+          <table class="data-table">
+            <thead><tr><th>Skill</th><th>Description</th></tr></thead>
+            <tbody>
+              <template x-for="skill in (techAgents?.skills || [])" :key="skill.id">
+                <tr>
+                  <td><strong x-text="skill.name"></strong></td>
+                  <td x-text="skill.description"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab 10: Strategy -->
+      <div x-show="techTeamSection === 'strategy' && techTeam">
+        <div x-show="!techStrategy?.available" class="empty-state">
+          <p>Strategy Cascade not configured. Set STRATEGY_SHEETS_ID to enable.</p>
+        </div>
+        <div x-show="techStrategy?.available" class="tech-strategy-tree">
+          <template x-for="level in (techStrategy?.levels || [])" :key="level.name">
+            <div class="tech-strategy-level">
+              <h3 class="tech-strategy-level-header" x-text="level.name"></h3>
+              <div class="tech-strategy-items">
+                <template x-for="item in level.items" :key="item.name">
+                  <div class="tech-strategy-node">
+                    <div class="tech-strategy-node-name" x-text="item.name"></div>
+                    <div class="tech-strategy-node-meta">
+                      <span class="status-badge small" :class="{'success': item.status === 'On Track' || item.status === 'Complete', 'warning': item.status === 'At Risk', 'danger': item.status === 'Off Track', 'neutral': !item.status}" x-text="item.status" x-show="item.status"></span>
+                      <span x-text="item.owner" x-show="item.owner" style="font-size:12px;color:var(--text-secondary)"></span>
+                    </div>
+                    <div class="tech-strategy-node-desc" x-text="item.description" x-show="item.description"></div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>

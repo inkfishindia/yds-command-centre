@@ -1,0 +1,1554 @@
+      <!-- Header -->
+      <div class="view-header-bar">
+        <div class="view-header-left">
+          <span class="view-header-emoji">📣</span>
+          <div class="view-header-text">
+            <h2 class="view-header-title">Marketing Ops</h2>
+            <span class="view-header-subtitle" x-text="mktops ? (mktops.stats?.activeCampaigns || 0) + ' campaigns · ' + (mktops.stats?.contentInPipeline || 0) + ' in pipeline' : 'Campaigns, content, and sequences'"></span>
+          </div>
+        </div>
+        <div class="view-header-actions">
+          <span class="view-refresh-label" x-show="mktopsLastRefresh" x-text="getMktopsRefreshLabel()"></span>
+          <button class="btn btn-small btn-icon" @click="loadMarketingOps()" title="Refresh">
+            <span class="refresh-icon">&#x21bb;</span> Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <template x-if="mktopsLoading && !mktops">
+        <div class="skeleton-stack">
+          <div class="loading-skeleton skeleton-stat-card"></div>
+          <div class="loading-skeleton skeleton-card"></div>
+        </div>
+      </template>
+
+      <template x-if="mktops">
+        <div>
+          <div class="mktops-overview-shell">
+            <section class="mktops-hero" :class="'mktops-hero--' + getMarketingAreaStatus().tone">
+              <div class="mktops-hero-copy">
+                <div class="mktops-hero-kicker">Area Dashboard</div>
+                <h3 class="mktops-hero-title">Marketing operating system</h3>
+                <p class="mktops-hero-text">Track campaign health, content flow, review bottlenecks, and the next actions needed to keep launches moving.</p>
+              </div>
+              <div class="mktops-hero-status">
+                <span class="mktops-hero-status-label">Status</span>
+                <span class="mktops-hero-status-value" x-text="getMarketingAreaStatus().label"></span>
+                <button class="overview-link-btn" @click="openMarketingSection('tasks')">Open Tasks</button>
+              </div>
+            </section>
+
+            <div class="mktops-area-metrics">
+              <template x-for="metric in getMarketingHeroMetrics()" :key="metric.id">
+                <button class="mktops-area-metric-card area-card-button" @click="getMarketingMetricAction(metric.id)()">
+                  <span class="mktops-area-metric-label" x-text="metric.label"></span>
+                  <div class="mktops-area-metric-value" x-text="metric.value"></div>
+                  <span class="mktops-area-metric-note" x-text="metric.note"></span>
+                </button>
+              </template>
+            </div>
+
+            <section class="org-col-panel">
+              <div class="org-section-title-row">
+                <h3 class="org-section-title">Saved Views</h3>
+                <span class="org-section-badge" x-text="getMarketingSavedViewItems().length"></span>
+              </div>
+              <div class="saved-view-pills">
+                <template x-for="view in getMarketingSavedViews()" :key="view.id">
+                  <button class="filter-pill" :class="mktopsSavedView === view.id && 'filter-pill-active'" @click="applyMarketingSavedView(view.id)" x-text="view.label"></button>
+                </template>
+              </div>
+              <div class="overview-feed">
+                <template x-for="item in getMarketingSavedViewItems()" :key="item.title + item.detail">
+                  <button class="overview-feed-item overview-feed-item--warning" @click="item.action()">
+                    <span class="overview-feed-type" x-text="mktopsSavedView"></span>
+                    <div class="overview-feed-main">
+                      <span class="overview-feed-title" x-text="item.title"></span>
+                      <span class="overview-feed-detail" x-text="item.detail"></span>
+                    </div>
+                  </button>
+                </template>
+                <div class="empty-state compact-empty-state" x-show="getMarketingSavedViewItems().length === 0">
+                  <p x-text="getMarketingSavedViewEmptyState()"></p>
+                </div>
+              </div>
+            </section>
+
+            <div class="mktops-overview-grid">
+              <template x-for="card in getMarketingPriorityCards()" :key="card.id">
+                <section class="mktops-priority-card" :class="'mktops-priority-card--' + card.tone">
+                  <div class="mktops-priority-head">
+                    <div>
+                      <h3 class="mktops-priority-title" x-text="card.title"></h3>
+                      <p class="mktops-priority-copy" x-text="card.label"></p>
+                    </div>
+                    <span class="mktops-priority-value" x-text="card.value"></span>
+                  </div>
+                  <div class="mktops-priority-list">
+                    <template x-for="item in card.items" :key="item.name + item.meta">
+                      <div class="mktops-priority-item">
+                        <span class="mktops-priority-item-name" x-text="item.name"></span>
+                        <span class="mktops-priority-item-meta" x-text="item.meta"></span>
+                      </div>
+                    </template>
+                  </div>
+                </section>
+              </template>
+            </div>
+
+            <div class="org-two-col">
+              <section class="org-col-panel">
+                <div class="org-section-title-row">
+                  <h3 class="org-section-title">Top Focus</h3>
+                  <span class="org-section-badge" x-text="getMarketingFocusList().length"></span>
+                </div>
+                <div class="overview-feed">
+                  <template x-for="item in getMarketingFocusList()" :key="item.title">
+                    <button class="overview-feed-item overview-feed-item--warning" @click="openMarketingSection(item.target)">
+                      <span class="overview-feed-type">focus</span>
+                      <div class="overview-feed-main">
+                        <span class="overview-feed-title" x-text="item.title"></span>
+                        <span class="overview-feed-detail" x-text="item.detail"></span>
+                      </div>
+                    </button>
+                  </template>
+                </div>
+              </section>
+
+              <section class="org-col-panel">
+                <div class="org-section-title-row">
+                  <h3 class="org-section-title">Next Actions</h3>
+                </div>
+                <div class="overview-links">
+                  <button class="overview-link-card" @click="openMarketingSection('campaigns')">
+                    <span class="overview-link-card-label">Review campaigns</span>
+                    <span class="overview-link-card-copy">Move blocked and needs-Dan campaigns forward.</span>
+                  </button>
+                  <button class="overview-link-card" @click="openMarketingSection('content')">
+                    <span class="overview-link-card-label">Clear brand review</span>
+                    <span class="overview-link-card-copy">Reduce the content queue waiting on review and approval.</span>
+                  </button>
+                  <button class="overview-link-card" @click="openMarketingSection('calendar')">
+                    <span class="overview-link-card-label">Check launch calendar</span>
+                    <span class="overview-link-card-copy">Validate what is scheduled this week and spot gaps early.</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <div class="data-card-grid">
+            <button class="data-card accent data-card-button" @click="applyMarketingSavedView('blockers')">
+              <span class="data-card-label">Active Campaigns</span>
+              <span class="data-card-value" x-text="mktops.stats.activeCampaigns"></span>
+            </button>
+            <button class="data-card data-card-button" @click="applyMarketingSavedView('review')">
+              <span class="data-card-label">Content in Pipeline</span>
+              <span class="data-card-value" x-text="mktops.stats.contentInPipeline"></span>
+            </button>
+            <button class="data-card success data-card-button" @click="applyMarketingSavedView('sequences')">
+              <span class="data-card-label">Live Sequences</span>
+              <span class="data-card-value" x-text="mktops.stats.liveSequences"></span>
+            </button>
+            <button class="data-card data-card-button" @click="applyMarketingSavedView('sessions')">
+              <span class="data-card-label">Sessions This Week</span>
+              <span class="data-card-value" x-text="mktops.stats.sessionsThisWeek"></span>
+            </button>
+          </div>
+
+          <div class="empty-state" x-show="mktops && mktops.stats.activeCampaigns === 0 && mktops.stats.contentInPipeline === 0 && !mktopsLoading" style="margin: 1.5rem 0">
+            <p><strong>Notion databases not connected.</strong></p>
+            <p>Share the Campaigns, Content Calendar, Sequences, and Sessions Log databases with your Notion integration to see data here.</p>
+          </div>
+
+          <!-- Section tabs -->
+          <div class="mktops-tabs">
+            <button class="filter-pill" :class="mktopsSection === 'campaigns' && 'filter-pill-active'" @click="openMarketingSection('campaigns')">Campaigns</button>
+            <button class="filter-pill" :class="mktopsSection === 'content' && 'filter-pill-active'" @click="openMarketingSection('content')">Content Studio</button>
+            <button class="filter-pill" :class="mktopsSection === 'calendar' && 'filter-pill-active'" @click="openMarketingSection('calendar')">Calendar</button>
+            <button class="filter-pill" :class="mktopsSection === 'sequences' && 'filter-pill-active'" @click="openMarketingSection('sequences')">Sequences</button>
+            <button class="filter-pill" :class="mktopsSection === 'sessions' && 'filter-pill-active'" @click="openMarketingSection('sessions')">Sessions</button>
+            <button class="filter-pill" :class="mktopsSection === 'aitools' && 'filter-pill-active'" @click="openMarketingSection('aitools')">AI Tools</button>
+            <button class="filter-pill" :class="mktopsSection === 'tasks' && 'filter-pill-active'" @click="openMarketingSection('tasks')">Tasks</button>
+            <button class="filter-pill" :class="mktopsSection === 'competitors' && 'filter-pill-active'" @click="openMarketingSection('competitors')">
+              Competitors
+              <span class="filter-pill-count" x-show="ciData" x-text="ciData?.competitorCount || ''" x-cloak></span>
+            </button>
+          </div>
+
+          <!-- CAMPAIGNS SECTION -->
+          <div x-show="mktopsSection === 'campaigns'">
+            <!-- Blocked alert -->
+            <template x-if="mktops.stats.blockedCampaigns.length > 0">
+              <div class="mktops-alert mktops-alert-danger">
+                <strong x-text="mktops.stats.blockedCampaigns.length + ' campaign(s) blocked or need attention'"></strong>
+                <div class="mktops-alert-items">
+                  <template x-for="c in mktops.stats.blockedCampaigns" :key="c.id">
+                    <span class="mktops-alert-item" x-text="c.Name"></span>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- Campaign filters -->
+            <div class="mktops-filters">
+              <input type="text" class="filter-search" placeholder="Search campaigns..." x-model="mktopsCampaignSearch" />
+              <button class="filter-pill" :class="!mktopsStatusFilter && 'filter-pill-active'" @click="mktopsStatusFilter = ''">All</button>
+              <button class="filter-pill" :class="mktopsStatusFilter === 'On Track' && 'filter-pill-active'" @click="mktopsStatusFilter = 'On Track'">On Track</button>
+              <button class="filter-pill" :class="mktopsStatusFilter === 'At Risk' && 'filter-pill-active'" @click="mktopsStatusFilter = 'At Risk'">At Risk</button>
+              <button class="filter-pill" :class="mktopsStatusFilter === 'Blocked' && 'filter-pill-active'" @click="mktopsStatusFilter = 'Blocked'">Blocked</button>
+              <button class="filter-pill" :class="mktopsStatusFilter === 'Needs Dan' && 'filter-pill-active'" @click="mktopsStatusFilter = 'Needs Dan'">Needs Dan</button>
+            </div>
+
+            <!-- Kanban: 5 columns by Stage -->
+            <div class="kanban-board mktops-campaign-board">
+              <template x-for="stage in ['Briefing','In Progress','Review','Live','Complete']" :key="stage">
+                <div class="kanban-column">
+                  <div class="kanban-column-header">
+                    <span x-text="stage"></span>
+                    <span class="kanban-count" x-text="getCampaignsByStage(stage).length"></span>
+                  </div>
+                  <template x-for="c in getCampaignsByStage(stage)" :key="c.id">
+                    <div class="kanban-card" :class="(c.Status === 'Blocked' || c.Status === 'Needs Dan') && 'kanban-card-blocked'" @click="openDetailPanel(c.id, c.Name); loadCampaignCommitments(c.id)">
+                      <div class="kanban-card-title" x-text="c.Name"></div>
+                      <div class="kanban-card-meta">
+                        <span class="status-badge small" :class="{'success': c.Status === 'On Track' || c.Status === 'Live', 'warning': c.Status === 'At Risk' || c.Status === 'Needs Dan', 'danger': c.Status === 'Blocked', 'info': c.Status === 'In Progress', 'neutral': !c.Status}" x-text="c.Status"></span>
+                      </div>
+                      <div class="kanban-card-meta" x-show="c.ownerNames?.length">
+                        <div class="table-inline-actions">
+                          <template x-for="owner in (c.ownerNames || [])" :key="c.id + '-' + owner">
+                            <button
+                              type="button"
+                              class="mini-action-btn"
+                              @click.stop="openMarketingOwnerContext(owner)"
+                              x-text="owner">
+                            </button>
+                          </template>
+                        </div>
+                      </div>
+                      <div class="kanban-card-footer">
+                        <span class="text-muted" x-show="c['Target Launch']" x-text="formatMktDate(c['Target Launch'])"></span>
+                        <span class="text-muted" x-show="c.Budget" x-text="'₹' + c.Budget"></span>
+                      </div>
+                      <!-- Inline actions (hover) -->
+                      <div class="kanban-card-actions">
+                        <template x-if="mktopsActionLoading === c.id">
+                          <div class="action-btn-spinner"></div>
+                        </template>
+                        <template x-if="mktopsActionLoading !== c.id">
+                          <template x-for="action in getCampaignActions(c)" :key="action.label">
+                            <button class="action-btn" :class="action.danger && 'action-btn-danger'" @click.stop="action.handler()" x-text="action.label"></button>
+                          </template>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                  <div class="kanban-empty" x-show="getCampaignsByStage(stage).length === 0">No campaigns</div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- CONTENT SECTION -->
+          <div x-show="mktopsSection === 'content'">
+            <!-- Needs review alert -->
+            <template x-if="mktops.stats.needsReviewContent.length > 0">
+              <div class="mktops-alert mktops-alert-warning">
+                <strong x-text="mktops.stats.needsReviewContent.length + ' item(s) awaiting brand review'"></strong>
+              </div>
+            </template>
+
+            <!-- Kanban: 8 columns by Status -->
+            <div class="kanban-board mktops-content-board">
+              <template x-for="status in ['Idea','Briefed','Drafted','In Design','Brand Review','Approved','Scheduled','Published']" :key="status">
+                <div class="kanban-column">
+                  <div class="kanban-column-header">
+                    <span x-text="status"></span>
+                    <span class="kanban-count" x-text="getContentByStatus(status).length"></span>
+                  </div>
+                  <template x-for="c in getContentByStatus(status)" :key="c.id">
+                    <div class="kanban-card" @click="openDetailPanel(c.id, c.Name)">
+                      <div class="kanban-card-title" x-text="c.Name"></div>
+                      <div class="kanban-card-meta">
+                        <span class="badge" x-show="c.Type" x-text="c.Type"></span>
+                        <span class="badge" x-show="c.Platform" x-text="c.Platform" data-status="info"></span>
+                      </div>
+                      <div class="kanban-card-footer">
+                        <span class="text-muted" x-show="c['Publish Date']" x-text="formatMktDate(c['Publish Date'])"></span>
+                        <span class="text-muted" x-show="c.campaignName" x-text="c.campaignName"></span>
+                      </div>
+                    </div>
+                  </template>
+                  <div class="kanban-empty" x-show="getContentByStatus(status).length === 0">Empty</div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- CALENDAR SECTION -->
+          <div x-show="mktopsSection === 'calendar'">
+
+            <!-- Loading skeleton -->
+            <template x-if="calendarLoading">
+              <div class="calendar-wrapper">
+                <div class="calendar-skeleton-grid">
+                  <template x-for="i in 42" :key="i">
+                    <div class="calendar-skeleton-day" :style="'animation-delay:' + (i * 20) + 'ms'"></div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- Calendar UI -->
+            <template x-if="!calendarLoading">
+              <div class="calendar-wrapper">
+
+                <!-- Month/Week navigation -->
+                <div class="calendar-header">
+                  <button class="btn-ghost" @click="calendarViewMode === 'week' ? navigateWeek(-1) : navigateMonth(-1)" aria-label="Previous">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    Prev
+                  </button>
+                  <h2 x-text="getCalendarMonthLabel()"></h2>
+                  <button class="btn-ghost" @click="goToToday()" x-show="!isCurrentCalendarMonth()">Today</button>
+                  <button class="btn-ghost" @click="calendarViewMode === 'week' ? navigateWeek(1) : navigateMonth(1)" aria-label="Next">
+                    Next
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                  </button>
+                  <div class="calendar-view-toggle" role="group" aria-label="Calendar view">
+                    <button class="view-toggle-btn" :class="calendarViewMode === 'month' && 'view-toggle-active'" @click="calendarViewMode = 'month'; _rebuildCalendarView()" aria-pressed="calendarViewMode === 'month'">Month</button>
+                    <button class="view-toggle-btn" :class="calendarViewMode === 'week' && 'view-toggle-active'" @click="calendarViewMode = 'week'; _rebuildCalendarView()" aria-pressed="calendarViewMode === 'week'">Week</button>
+                  </div>
+                </div>
+
+                <!-- Filter bar -->
+                <div class="calendar-filter-bar">
+                  <div class="calendar-filter-group">
+                    <label>Type</label>
+                    <div class="calendar-filter-chips">
+                      <template x-for="ct in ['Carousel','Reel','Feed Post','Story','Email','WhatsApp','Blog']" :key="ct">
+                        <button
+                          class="calendar-filter-chip"
+                          :class="['type-' + ct.toLowerCase().replace(/\s+/g,'-'), calendarFilters.contentTypes.includes(ct) && 'active']"
+                          @click="toggleContentTypeFilter(ct)"
+                          :aria-pressed="calendarFilters.contentTypes.includes(ct)"
+                          x-text="ct"
+                        ></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="calendar-filter-group">
+                    <label for="cal-status-filter">Status</label>
+                    <select id="cal-status-filter" class="calendar-filter-select" x-model="calendarFilters.status" @change="_rebuildCalendarView()">
+                      <option value="all">All</option>
+                      <option value="Idea">Idea</option>
+                      <option value="Briefed">Briefed</option>
+                      <option value="Drafted">Drafted</option>
+                      <option value="In Design">In Design</option>
+                      <option value="Brand Review">Brand Review</option>
+                      <option value="Approved">Approved</option>
+                      <option value="Scheduled">Scheduled</option>
+                      <option value="Published">Published</option>
+                    </select>
+                  </div>
+                  <div class="calendar-filter-group">
+                    <label for="cal-pillar-filter">Pillar</label>
+                    <select id="cal-pillar-filter" class="calendar-filter-select" x-model="calendarFilters.pillar" @change="_rebuildCalendarView()">
+                      <option value="all">All</option>
+                      <option value="Education">Education</option>
+                      <option value="Social Proof">Social Proof</option>
+                      <option value="Product">Product</option>
+                      <option value="Behind the Scenes">Behind the Scenes</option>
+                      <option value="Community">Community</option>
+                      <option value="Promotional">Promotional</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Month View -->
+                <div x-show="calendarViewMode === 'month'">
+                  <!-- Weekday headers -->
+                  <div class="calendar-weekdays" role="row">
+                    <template x-for="day in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']" :key="day">
+                      <div class="calendar-weekday" role="columnheader" x-text="day"></div>
+                    </template>
+                  </div>
+
+                  <!-- Calendar grid -->
+                  <div class="calendar-grid" role="grid">
+                    <template x-for="cell in _renderedCalendarDays" :key="cell.date">
+                      <div
+                        class="calendar-day"
+                        :class="{ today: cell.isToday, 'other-month': !cell.isCurrentMonth }"
+                        role="gridcell"
+                        tabindex="0"
+                        :aria-label="'Add content for ' + cell.date"
+                        @click="openContentModal('create', cell.date, null)"
+                        @keydown.enter="openContentModal('create', cell.date, null)"
+                        @keydown.space.prevent="openContentModal('create', cell.date, null)"
+                        @dragover.prevent
+                        @dragenter.prevent="$event.currentTarget.classList.add('drag-over')"
+                        @dragleave="$event.currentTarget.classList.remove('drag-over')"
+                        @drop="handleCalendarDrop($event, cell.date)"
+                      >
+                        <span class="calendar-day-number" x-text="cell.dayNum"></span>
+                        <div class="day-content">
+                          <template x-for="(item, idx) in cell.filtered.slice(0, 4)" :key="item.id || idx">
+                            <button
+                              class="calendar-chip"
+                              :data-type="getChipType(item)"
+                              :title="item.name + (item.contentPillar ? '\n' + item.contentPillar : '') + (item.hook ? '\n' + item.hook.slice(0, 80) : '') + (item.owner ? '\nOwner: ' + item.owner : '')"
+                              @click.stop="openContentModal('edit', cell.date, item)"
+                              draggable="true"
+                              @dragstart="$event.dataTransfer.setData('text/plain', JSON.stringify({id: item.id, name: item.name, fromDate: cell.date}))"
+                            >
+                              <span class="chip-icon" x-html="getContentTypeIcon(item.contentType)" aria-hidden="true"></span>
+                              <span class="chip-name" x-text="item.name && item.name.length > 22 ? item.name.slice(0, 20) + '…' : item.name"></span>
+                              <span class="chip-pillar" x-text="item.contentPillar" x-show="item.contentPillar"></span>
+                              <span class="chip-owner" x-show="item.owner" x-text="item.owner ? item.owner.charAt(0) : ''" :title="item.owner || ''"></span>
+                            </button>
+                          </template>
+                          <span
+                            class="chip-overflow"
+                            x-show="cell.filtered.length > 4"
+                            x-text="'+' + (cell.filtered.length - 4) + ' more'"
+                          ></span>
+                          <button
+                            class="day-add-btn"
+                            x-show="cell.isCurrentMonth"
+                            @click.stop="openContentModal('create', cell.date, null)"
+                            aria-label="Add content for this date"
+                          >+ Add</button>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Week View -->
+                <div class="calendar-week-view" x-show="calendarViewMode === 'week'">
+                  <div class="week-grid">
+                    <template x-for="day in _renderedWeekDays" :key="day.date">
+                      <div class="week-day-column" :class="{ today: day.isToday, 'drag-over': false }"
+                        @dragover.prevent
+                        @dragenter.prevent="$event.currentTarget.classList.add('drag-over')"
+                        @dragleave="$event.currentTarget.classList.remove('drag-over')"
+                        @drop="handleCalendarDrop($event, day.date)">
+                        <div class="week-day-header">
+                          <span class="week-day-name" x-text="day.dayName"></span>
+                          <span class="week-day-num" x-text="day.dayNum"></span>
+                        </div>
+                        <div class="week-day-items">
+                          <template x-for="item in day.filtered" :key="item.id">
+                            <div class="week-item-card"
+                              draggable="true"
+                              @dragstart="$event.dataTransfer.setData('text/plain', JSON.stringify({id: item.id, name: item.name, fromDate: day.date}))"
+                              @click="openContentModal('edit', day.date, item)">
+                              <span class="week-item-icon" x-html="getContentTypeIcon(item.contentType)" aria-hidden="true"></span>
+                              <div class="week-item-body">
+                                <p class="week-item-name" x-text="item.name"></p>
+                                <div class="week-item-meta">
+                                  <span class="status-badge small" :class="{'success': item.status === 'Published' || item.status === 'Approved' || item.status === 'Scheduled', 'info': item.status === 'In Design' || item.status === 'Drafted' || item.status === 'Briefed', 'warning': item.status === 'Brand Review', 'neutral': item.status === 'Idea' || !item.status}" x-text="item.status"></span>
+                                  <span class="week-item-pillar" x-text="item.contentPillar" x-show="item.contentPillar"></span>
+                                  <span class="week-item-owner" x-text="item.owner" x-show="item.owner"></span>
+                                </div>
+                                <p class="week-item-hook" x-text="item.hook" x-show="item.hook"></p>
+                              </div>
+                            </div>
+                          </template>
+                          <button class="day-add-btn" @click="openContentModal('create', day.date, null)" aria-label="Add content for this date">+ Add</button>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Upcoming this week -->
+                <template x-if="getUpcomingThisWeek().length > 0">
+                  <div class="calendar-upcoming">
+                    <h3 class="calendar-upcoming-header">Upcoming This Week</h3>
+                    <ul class="calendar-content-list">
+                      <template x-for="item in getUpcomingThisWeek()" :key="item.id">
+                        <li class="calendar-content-item" tabindex="0" role="button" @click="openContentModal('edit', item.publishDate, item)" @keydown.enter="openContentModal('edit', item.publishDate, item)" @keydown.space.prevent="openContentModal('edit', item.publishDate, item)">
+                          <span class="cal-item-date" x-text="formatCalDate(item.publishDate)"></span>
+                          <div class="cal-item-body">
+                            <div class="cal-item-title-row">
+                              <span class="cal-item-type-icon" x-html="getContentTypeIcon(item.contentType)" aria-hidden="true"></span>
+                              <p class="cal-item-name" x-text="item.name"></p>
+                              <span class="cal-item-owner-tag" x-show="item.owner" x-text="item.owner"></span>
+                            </div>
+                            <p class="cal-item-hook" x-show="item.hook" x-text="item.hook"></p>
+                            <div class="cal-item-meta">
+                              <span class="status-badge small" :class="{'success': item.status === 'Published' || item.status === 'Approved' || item.status === 'Scheduled', 'info': item.status === 'In Design' || item.status === 'Drafted' || item.status === 'Briefed', 'warning': item.status === 'Brand Review', 'neutral': item.status === 'Idea' || !item.status}" x-text="item.status"></span>
+                              <span class="cal-item-channel-tag" x-show="item.contentType" x-text="item.contentType"></span>
+                              <span class="cal-item-pillar-tag" x-show="item.contentPillar" x-text="item.contentPillar"></span>
+                              <template x-for="seg in (item.audienceSegment || [])" :key="seg">
+                                <span class="cal-item-segment-tag" x-text="seg"></span>
+                              </template>
+                            </div>
+                          </div>
+                        </li>
+                      </template>
+                    </ul>
+                  </div>
+                </template>
+
+                <!-- Unscheduled items -->
+                <template x-if="getUnscheduledItems().length > 0">
+                  <div class="calendar-unscheduled">
+                    <h3 class="calendar-unscheduled-header">Unscheduled (<span x-text="getUnscheduledItems().length"></span>)</h3>
+                    <ul class="calendar-content-list">
+                      <template x-for="item in getUnscheduledItems()" :key="item.id">
+                        <li class="calendar-content-item" tabindex="0" role="button" @click="openContentModal('edit', '', item)" @keydown.enter="openContentModal('edit', '', item)" @keydown.space.prevent="openContentModal('edit', '', item)">
+                          <span class="cal-item-date" style="color: var(--text-muted)">—</span>
+                          <div class="cal-item-body">
+                            <div class="cal-item-title-row">
+                              <span class="cal-item-type-icon" x-html="getContentTypeIcon(item.contentType)" aria-hidden="true"></span>
+                              <p class="cal-item-name" x-text="item.name"></p>
+                              <span class="cal-item-owner-tag" x-show="item.owner" x-text="item.owner"></span>
+                            </div>
+                            <p class="cal-item-hook" x-show="item.hook" x-text="item.hook"></p>
+                            <div class="cal-item-meta">
+                              <span class="status-badge small" :class="{'success': item.status === 'Published' || item.status === 'Approved' || item.status === 'Scheduled', 'info': item.status === 'In Design' || item.status === 'Drafted' || item.status === 'Briefed', 'warning': item.status === 'Brand Review', 'neutral': item.status === 'Idea' || !item.status}" x-text="item.status"></span>
+                              <span class="cal-item-channel-tag" x-show="item.contentType" x-text="item.contentType"></span>
+                              <span class="cal-item-pillar-tag" x-show="item.contentPillar" x-text="item.contentPillar"></span>
+                              <template x-for="seg in (item.audienceSegment || [])" :key="seg">
+                                <span class="cal-item-segment-tag" x-text="seg"></span>
+                              </template>
+                            </div>
+                          </div>
+                        </li>
+                      </template>
+                    </ul>
+                  </div>
+                </template>
+
+                <!-- Empty state -->
+                <template x-if="!calendarLoading && calendarData && calendarData.items && calendarData.items.length === 0">
+                  <div class="empty-state" style="margin: 1.5rem 0">
+                    <p>No content scheduled for this month.</p>
+                    <p>Click any day cell to add a content item.</p>
+                  </div>
+                </template>
+
+                <!-- No data state (API not connected) -->
+                <template x-if="!calendarLoading && !calendarData">
+                  <div class="empty-state" style="margin: 1.5rem 0">
+                    <p><strong>Content calendar not connected.</strong></p>
+                    <p>The calendar endpoint returned no data. Check that the Content Calendar Notion database is shared with your integration.</p>
+                  </div>
+                </template>
+
+              </div>
+            </template>
+
+            <!-- Content Create/Edit Modal -->
+            <div
+              class="content-modal-overlay"
+              x-show="contentModalOpen"
+              x-cloak
+              @click.self="closeContentModal()"
+              role="dialog"
+              :aria-label="contentModalMode === 'create' ? 'Create content item' : 'Edit content item'"
+              aria-modal="true"
+            >
+              <div class="content-modal-panel" @keydown.escape.window="closeContentModal()">
+                <div class="content-modal-header">
+                  <h3 x-text="contentModalMode === 'create' ? 'Add Content Item' : 'Edit Content Item'"></h3>
+                  <button class="content-modal-close" @click="closeContentModal()" aria-label="Close">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  </button>
+                </div>
+
+                <!-- Approval pending notice -->
+                <div class="content-pending-notice" x-show="contentPendingApproval">
+                  <strong>Pending approval</strong> — this change has been submitted and is awaiting Dan's approval via the chat.
+                </div>
+
+                <form class="content-form" @submit.prevent="saveContent()" x-show="!contentPendingApproval">
+                  <!-- Name -->
+                  <div class="content-form-group">
+                    <label for="cf-name">Name *</label>
+                    <input
+                      id="cf-name"
+                      type="text"
+                      placeholder="Content title"
+                      x-model="contentForm.name"
+                      required
+                      autocomplete="off"
+                    />
+                  </div>
+
+                  <!-- Content Type + Content Pillar -->
+                  <div class="content-form-row">
+                    <div class="content-form-group">
+                      <label for="cf-type">Content Type</label>
+                      <select id="cf-type" x-model="contentForm.contentType">
+                        <option>Feed Post</option>
+                        <option>Carousel</option>
+                        <option>Reel</option>
+                        <option>Story</option>
+                        <option>Email</option>
+                        <option>WhatsApp</option>
+                        <option>Blog</option>
+                      </select>
+                    </div>
+                    <div class="content-form-group">
+                      <label for="cf-pillar">Content Pillar</label>
+                      <select id="cf-pillar" x-model="contentForm.contentPillar">
+                        <option value="">None</option>
+                        <option>Education</option>
+                        <option>Social Proof</option>
+                        <option>Product</option>
+                        <option>Behind the Scenes</option>
+                        <option>Community</option>
+                        <option>Promotional</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Status + Publish Date -->
+                  <div class="content-form-row">
+                    <div class="content-form-group">
+                      <label for="cf-status">Status</label>
+                      <select id="cf-status" x-model="contentForm.status">
+                        <option>Idea</option>
+                        <option>Briefed</option>
+                        <option>Drafted</option>
+                        <option>In Design</option>
+                        <option>Brand Review</option>
+                        <option>Approved</option>
+                        <option>Scheduled</option>
+                        <option>Published</option>
+                      </select>
+                    </div>
+                    <div class="content-form-group">
+                      <label for="cf-date">Publish Date</label>
+                      <input id="cf-date" type="date" x-model="contentForm.publishDate" />
+                    </div>
+                  </div>
+
+                  <!-- Owner -->
+                  <div class="content-form-group">
+                    <label for="cf-owner">Owner</label>
+                    <select id="cf-owner" x-model="contentForm.owner">
+                      <option value="">Unassigned</option>
+                      <option>Corey</option>
+                      <option>Dickie</option>
+                      <option>Jessica</option>
+                      <option>Pixel</option>
+                      <option>Studio</option>
+                      <option>Harry</option>
+                      <option>Bimal</option>
+                    </select>
+                  </div>
+
+                  <!-- Hook -->
+                  <div class="content-form-group">
+                    <label for="cf-hook">Hook / Headline</label>
+                    <input id="cf-hook" type="text" placeholder="The attention-grabbing opening line…" x-model="contentForm.hook" autocomplete="off" />
+                  </div>
+
+                  <!-- Audience Segment -->
+                  <div class="content-form-group">
+                    <label>Audience Segment</label>
+                    <div class="content-checkbox-group">
+                      <template x-for="seg in ['Creative Professionals','AI Artists','Founders &amp; Small Businesses','Curious Creators','Corporate / Bulk','Dropship Partners']" :key="seg">
+                        <label class="content-checkbox-label">
+                          <input
+                            type="checkbox"
+                            :value="seg"
+                            :checked="contentForm.audienceSegment.includes(seg)"
+                            @change="contentForm.audienceSegment.includes(seg) ? contentForm.audienceSegment = contentForm.audienceSegment.filter(s => s !== seg) : contentForm.audienceSegment.push(seg)"
+                          />
+                          <span x-text="seg"></span>
+                        </label>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- Product Focus -->
+                  <div class="content-form-group">
+                    <label>Product Focus</label>
+                    <div class="content-checkbox-group">
+                      <template x-for="pf in ['T-shirts','Hoodies','Sweatshirts','Polo','Totes','Mugs','Phone Cases','Caps']" :key="pf">
+                        <label class="content-checkbox-label">
+                          <input
+                            type="checkbox"
+                            :value="pf"
+                            :checked="contentForm.productFocus.includes(pf)"
+                            @change="contentForm.productFocus.includes(pf) ? contentForm.productFocus = contentForm.productFocus.filter(p => p !== pf) : contentForm.productFocus.push(pf)"
+                          />
+                          <span x-text="pf"></span>
+                        </label>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- Caption -->
+                  <div class="content-form-group">
+                    <label for="cf-caption">Caption / Copy</label>
+                    <textarea id="cf-caption" placeholder="Social media caption…" x-model="contentForm.caption" rows="3"></textarea>
+                  </div>
+
+                  <!-- Visual Brief -->
+                  <div class="content-form-group">
+                    <label for="cf-visual">Visual Brief</label>
+                    <textarea id="cf-visual" placeholder="Design and asset notes for the visual team…" x-model="contentForm.visualBrief" rows="2"></textarea>
+                  </div>
+
+                  <!-- Campaign + Notes -->
+                  <div class="content-form-row">
+                    <div class="content-form-group">
+                      <label for="cf-campaign">Campaign</label>
+                      <select id="cf-campaign" x-model="contentForm.campaignId">
+                        <option value="">None</option>
+                        <template x-for="c in (mktops && mktops.campaigns ? mktops.campaigns : [])" :key="c.id">
+                          <option :value="c.id" x-text="c.Name"></option>
+                        </template>
+                      </select>
+                    </div>
+                    <div class="content-form-group">
+                      <label for="cf-notes">Notes</label>
+                      <input id="cf-notes" type="text" placeholder="Optional notes…" x-model="contentForm.notes" autocomplete="off" />
+                    </div>
+                  </div>
+
+                  <!-- Save error feedback -->
+                  <p x-show="contentSaveError" class="form-error" x-text="contentSaveError"></p>
+
+                  <!-- Actions -->
+                  <div class="content-form-actions">
+                    <button type="button" class="btn-ghost" @click="closeContentModal()" :disabled="contentSaving">Cancel</button>
+                    <button type="submit" class="btn-primary" :disabled="contentSaving || !contentForm.name.trim()">
+                      <span x-show="!contentSaving" x-text="contentModalMode === 'create' ? 'Create' : 'Save'"></span>
+                      <span x-show="contentSaving">Saving…</span>
+                    </button>
+                  </div>
+                </form>
+
+                <!-- Post-approval close button -->
+                <div class="content-form-actions" x-show="contentPendingApproval">
+                  <button type="button" class="btn-ghost" @click="closeContentModal()">Close</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- SEQUENCES SECTION -->
+          <div x-show="mktopsSection === 'sequences'">
+            <!-- View toggle + filters -->
+            <div class="mktops-filters">
+              <div class="view-toggle-group">
+                <button class="view-toggle-btn" :class="mktopsSequenceView === 'table' && 'view-toggle-active'" @click="mktopsSequenceView = 'table'">Table</button>
+                <button class="view-toggle-btn" :class="mktopsSequenceView === 'journey' && 'view-toggle-active'" @click="mktopsSequenceView = 'journey'">Journey Map</button>
+              </div>
+              <button class="filter-pill" :class="!mktopsJourneyFilter && 'filter-pill-active'" @click="mktopsJourneyFilter = ''">All Stages</button>
+              <template x-for="stage in ['Awareness','Consideration','Purchase','Post-Purchase','Win-Back']" :key="stage">
+                <button class="filter-pill" :class="mktopsJourneyFilter === stage && 'filter-pill-active'" @click="mktopsJourneyFilter = stage" x-text="stage"></button>
+              </template>
+            </div>
+
+            <!-- Table view -->
+            <template x-if="mktopsSequenceView === 'table'">
+              <div>
+                <template x-if="getFilteredSequences().length === 0">
+                  <div class="empty-state">No sequences found.</div>
+                </template>
+                <template x-if="getFilteredSequences().length > 0">
+                  <div class="table-wrap">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Channel</th>
+                          <th>Journey Stage</th>
+                          <th>Status</th>
+                          <th>Open %</th>
+                          <th>Click %</th>
+                          <th>Unsub %</th>
+                          <th>Health</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="s in getFilteredSequences()" :key="s.id">
+                          <tr :class="getSequenceHealth(s) === 'critical' && 'row-critical'">
+                            <td class="clickable-cell" @click="openDetailPanel(s.id, s.Name)" x-text="s.Name"></td>
+                            <td><span class="badge" x-text="s.Channel"></span></td>
+                            <td x-text="s['Journey Stage']"></td>
+                            <td><span class="status-badge small" :class="{'success': s.Status === 'Live' || s.Status === 'Active', 'info': s.Status === 'In Progress', 'danger': s.Status === 'Blocked', 'warning': s.Status === 'Paused', 'neutral': !s.Status || s.Status === 'Draft'}" x-text="s.Status"></span></td>
+                            <td x-text="s['Open Rate'] != null ? s['Open Rate'] + '%' : '—'"></td>
+                            <td x-text="s['Click Rate'] != null ? s['Click Rate'] + '%' : '—'"></td>
+                            <td x-text="s['Unsub Rate'] != null ? s['Unsub Rate'] + '%' : '—'"></td>
+                            <td>
+                              <span class="seq-health" :class="'seq-health-' + getSequenceHealth(s)" x-text="getSequenceHealth(s) === 'healthy' ? '●' : getSequenceHealth(s) === 'warning' ? '▲' : '✕'"></span>
+                            </td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <!-- Journey Map kanban view -->
+            <template x-if="mktopsSequenceView === 'journey'">
+              <div class="kanban-board mktops-sequence-board">
+                <template x-for="stage in ['Awareness','Consideration','Purchase','Post-Purchase','Win-Back']" :key="stage">
+                  <div class="kanban-column">
+                    <div class="kanban-column-header">
+                      <span x-text="stage"></span>
+                      <span class="kanban-count" x-text="getSequencesByJourneyStage(stage).length"></span>
+                    </div>
+                    <template x-for="seq in getSequencesByJourneyStage(stage)" :key="seq.id">
+                      <div class="kanban-card" @click="openDetailPanel(seq.id, seq.Name)">
+                        <div class="kanban-card-title" x-text="seq.Name"></div>
+                        <div class="kanban-card-meta">
+                          <span class="status-badge small neutral" x-show="seq.Type" x-text="seq.Type"></span>
+                          <span class="status-badge small" :class="{'success': seq.Status === 'Live' || seq.Status === 'Active', 'info': seq.Status === 'In Progress', 'danger': seq.Status === 'Blocked', 'warning': seq.Status === 'Paused', 'neutral': !seq.Status || seq.Status === 'Draft'}" x-text="seq.Status"></span>
+                        </div>
+                        <div class="kanban-card-footer">
+                          <span class="seq-health" :class="'seq-health-' + getSequenceHealth(seq)" x-text="getSequenceHealth(seq) === 'healthy' ? '●' : getSequenceHealth(seq) === 'warning' ? '▲' : '✕'"></span>
+                          <span class="text-muted" x-show="seq['Open Rate'] != null" x-text="seq['Open Rate'] + '% open'"></span>
+                          <span class="text-muted" x-show="seq['Click Rate'] != null" x-text="seq['Click Rate'] + '% click'"></span>
+                        </div>
+                      </div>
+                    </template>
+                    <div class="kanban-empty" x-show="getSequencesByJourneyStage(stage).length === 0">No sequences</div>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+
+          <!-- SESSIONS SECTION -->
+          <div x-show="mktopsSection === 'sessions'">
+            <template x-if="mktops.sessions.length === 0">
+              <div class="empty-state">No sessions found.</div>
+            </template>
+            <template x-if="mktops.sessions.length > 0">
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Session</th>
+                      <th>Participants</th>
+                      <th>Decisions</th>
+                      <th>Commitments</th>
+                      <th>Waiting On</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="s in mktops.sessions" :key="s.id">
+                      <tr>
+                        <td x-text="formatMktDate(s.Date)"></td>
+                        <td class="clickable-cell" @click="openDetailPanel(s.id, s.Name)" x-text="s.Name"></td>
+                        <td x-text="s.participantNames?.join(', ') || '—'"></td>
+                        <td x-text="s['Decisions Made'] ?? '—'"></td>
+                        <td x-text="s['Commitments Created'] ?? '—'"></td>
+                        <td x-text="s['Waiting On'] || '—'"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+          </div>
+
+          <!-- AI TOOLS SECTION -->
+          <div x-show="mktopsSection === 'aitools'" style="padding: 1rem 0;">
+            <div class="bmc-canvas" style="grid-template-columns: 1fr 1fr; grid-template-rows: auto auto;">
+              <!-- Customer Psychology -->
+              <div class="bmc-block bmc-block--static">
+                <div class="bmc-block-header">
+                  <span class="bmc-block-title">Customer Psychology</span>
+                </div>
+                <div style="padding: 0.75rem;">
+                  <input type="text" class="filter-search" placeholder="Segment (e.g., corporate gifting buyers)" x-model="mktopsAiInputs.segment" style="width: 100%; margin-bottom: 0.5rem;" />
+                  <input type="text" class="filter-search" placeholder="Context (optional)" x-model="mktopsAiInputs.context" style="width: 100%; margin-bottom: 0.75rem;" />
+                  <button class="filter-pill filter-pill-active" @click="runMarketingAiTool('customer_psychology_generator')" :disabled="!mktopsAiInputs.segment">Analyze</button>
+                </div>
+              </div>
+              <!-- Competitor Analysis -->
+              <div class="bmc-block bmc-block--static">
+                <div class="bmc-block-header">
+                  <span class="bmc-block-title">Competitor Analysis</span>
+                </div>
+                <div style="padding: 0.75rem;">
+                  <input type="text" class="filter-search" placeholder="Competitor name or URL" x-model="mktopsAiInputs.competitor" style="width: 100%; margin-bottom: 0.5rem;" />
+                  <input type="text" class="filter-search" placeholder="Focus: pricing, marketing, overall..." x-model="mktopsAiInputs.focus" style="width: 100%; margin-bottom: 0.75rem;" />
+                  <button class="filter-pill filter-pill-active" @click="runMarketingAiTool('competitor_analysis')" :disabled="!mktopsAiInputs.competitor">Analyze</button>
+                </div>
+              </div>
+              <!-- Content Strategy -->
+              <div class="bmc-block bmc-block--static">
+                <div class="bmc-block-header">
+                  <span class="bmc-block-title">Content Strategy</span>
+                </div>
+                <div style="padding: 0.75rem;">
+                  <input type="text" class="filter-search" placeholder="Topic or theme" x-model="mktopsAiInputs.topic" style="width: 100%; margin-bottom: 0.5rem;" />
+                  <input type="text" class="filter-search" placeholder="Audience (optional)" x-model="mktopsAiInputs.audience" style="width: 100%; margin-bottom: 0.5rem;" />
+                  <input type="text" class="filter-search" placeholder="Goal (optional)" x-model="mktopsAiInputs.goal" style="width: 100%; margin-bottom: 0.75rem;" />
+                  <button class="filter-pill filter-pill-active" @click="runMarketingAiTool('content_strategy_generator')" :disabled="!mktopsAiInputs.topic">Generate</button>
+                </div>
+              </div>
+              <!-- Campaign Ideator -->
+              <div class="bmc-block bmc-block--static">
+                <div class="bmc-block-header">
+                  <span class="bmc-block-title">Campaign Ideator</span>
+                </div>
+                <div style="padding: 0.75rem;">
+                  <input type="text" class="filter-search" placeholder="Product or service" x-model="mktopsAiInputs.product" style="width: 100%; margin-bottom: 0.5rem;" />
+                  <input type="text" class="filter-search" placeholder="Goal (optional)" x-model="mktopsAiInputs.goal" style="width: 100%; margin-bottom: 0.5rem;" />
+                  <input type="text" class="filter-search" placeholder="Budget range (optional)" x-model="mktopsAiInputs.budget" style="width: 100%; margin-bottom: 0.75rem;" />
+                  <button class="filter-pill filter-pill-active" @click="runMarketingAiTool('campaign_ideator')" :disabled="!mktopsAiInputs.product">Generate</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TASKS SECTION -->
+          <div x-show="mktopsSection === 'tasks'">
+
+            <!-- Loading skeleton -->
+            <template x-if="mktopsTasksLoading">
+              <div style="display:flex;flex-direction:column;gap:0.75rem;padding:1rem 0">
+                <div class="skeleton skeleton-card" style="height:80px"></div>
+                <div class="skeleton skeleton-card" style="height:340px"></div>
+              </div>
+            </template>
+
+            <template x-if="!mktopsTasksLoading && mktopsTasks !== null">
+              <div>
+                <!-- Summary strip -->
+                <div class="mktops-tasks-summary">
+                  <div class="mktops-task-stat">
+                    <div class="mktops-task-stat-number" x-text="mktopsTasksSummary?.total || 0"></div>
+                    <div class="mktops-task-stat-label">Total Tasks</div>
+                  </div>
+                  <div class="mktops-task-stat" :class="(mktopsTasksSummary?.overdue || 0) > 0 && 'mktops-task-stat--alert'">
+                    <div class="mktops-task-stat-number" x-text="mktopsTasksSummary?.overdue || 0"></div>
+                    <div class="mktops-task-stat-label">Overdue</div>
+                  </div>
+                  <div class="mktops-task-stat">
+                    <div class="mktops-task-stat-number" x-text="mktopsTasksSummary?.inProgress || 0"></div>
+                    <div class="mktops-task-stat-label">In Progress</div>
+                  </div>
+                  <div class="mktops-task-stat" :class="(mktopsTasksSummary?.blocked || 0) > 0 && 'mktops-task-stat--alert'">
+                    <div class="mktops-task-stat-number" x-text="mktopsTasksSummary?.blocked || 0"></div>
+                    <div class="mktops-task-stat-label">Blocked</div>
+                  </div>
+                </div>
+
+                <!-- Filter bar -->
+                <div class="mktops-filters" style="margin-bottom:1rem">
+                  <select class="filter-search" x-model="mktopsTasksFilter.priority" style="cursor:pointer">
+                    <option value="all">All Priorities</option>
+                    <option value="Urgent">Urgent</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                  <select class="filter-search" x-model="mktopsTasksFilter.channel" style="cursor:pointer">
+                    <option value="all">All Channels</option>
+                    <option value="Google Ads">Google Ads</option>
+                    <option value="Meta Ads">Meta Ads</option>
+                    <option value="Email">Email</option>
+                    <option value="WhatsApp">WhatsApp</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Website">Website</option>
+                    <option value="SEO">SEO</option>
+                    <option value="Cross-channel">Cross-channel</option>
+                  </select>
+                  <select class="filter-search" x-model="mktopsTasksFilter.type" style="cursor:pointer">
+                    <option value="all">All Types</option>
+                    <option value="Deliverable">Deliverable</option>
+                    <option value="Review">Review</option>
+                    <option value="Setup">Setup</option>
+                    <option value="Creative">Creative</option>
+                    <option value="Analysis">Analysis</option>
+                    <option value="Follow-up">Follow-up</option>
+                  </select>
+                </div>
+
+                <!-- Kanban board -->
+                <div class="mktops-tasks-board">
+
+                  <!-- Not Started -->
+                  <div class="kanban-column">
+                    <div class="kanban-column-header">
+                      <span>Not Started</span>
+                      <span class="kanban-count" x-text="getTasksByStatus('Not Started').length"></span>
+                    </div>
+                    <template x-if="getTasksByStatus('Not Started').length === 0">
+                      <div class="kanban-empty">No tasks</div>
+                    </template>
+                    <template x-for="task in getTasksByStatus('Not Started')" :key="task.id">
+                      <div class="mktops-task-card" :data-priority="(task.priority || '').toLowerCase()">
+                        <div class="kanban-card-name" x-text="task.title || task.task || 'Untitled'"></div>
+                        <div class="mktops-task-card-tags">
+                          <span class="task-priority-badge" :data-priority="(task.priority || '').toLowerCase()" x-text="task.priority || ''"></span>
+                          <span class="task-channel-tag" x-text="task.channel || ''"></span>
+                          <span class="task-channel-tag" x-text="task.type || ''"></span>
+                        </div>
+                        <div class="mktops-task-card-footer">
+                          <span class="kanban-due" :class="isTaskOverdue(task) && 'task-overdue'" x-text="formatTaskDue(task.dueDate)"></span>
+                          <span class="task-assignee" x-text="task.assignedTo || ''"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- In Progress -->
+                  <div class="kanban-column">
+                    <div class="kanban-column-header">
+                      <span>In Progress</span>
+                      <span class="kanban-count" x-text="getTasksByStatus('In Progress').length"></span>
+                    </div>
+                    <template x-if="getTasksByStatus('In Progress').length === 0">
+                      <div class="kanban-empty">No tasks</div>
+                    </template>
+                    <template x-for="task in getTasksByStatus('In Progress')" :key="task.id">
+                      <div class="mktops-task-card" :data-priority="(task.priority || '').toLowerCase()">
+                        <div class="kanban-card-name" x-text="task.title || task.task || 'Untitled'"></div>
+                        <div class="mktops-task-card-tags">
+                          <span class="task-priority-badge" :data-priority="(task.priority || '').toLowerCase()" x-text="task.priority || ''"></span>
+                          <span class="task-channel-tag" x-text="task.channel || ''"></span>
+                          <span class="task-channel-tag" x-text="task.type || ''"></span>
+                        </div>
+                        <div class="mktops-task-card-footer">
+                          <span class="kanban-due" :class="isTaskOverdue(task) && 'task-overdue'" x-text="formatTaskDue(task.dueDate)"></span>
+                          <span class="task-assignee" x-text="task.assignedTo || ''"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- Blocked -->
+                  <div class="kanban-column kanban-column--blocked">
+                    <div class="kanban-column-header">
+                      <span>Blocked</span>
+                      <span class="kanban-count" x-text="getTasksByStatus('Blocked').length"></span>
+                    </div>
+                    <template x-if="getTasksByStatus('Blocked').length === 0">
+                      <div class="kanban-empty">No tasks</div>
+                    </template>
+                    <template x-for="task in getTasksByStatus('Blocked')" :key="task.id">
+                      <div class="mktops-task-card mktops-task-card--blocked" :data-priority="(task.priority || '').toLowerCase()">
+                        <div class="kanban-card-name" x-text="task.title || task.task || 'Untitled'"></div>
+                        <div class="mktops-task-card-tags">
+                          <span class="task-priority-badge" :data-priority="(task.priority || '').toLowerCase()" x-text="task.priority || ''"></span>
+                          <span class="task-channel-tag" x-text="task.channel || ''"></span>
+                          <span class="task-channel-tag" x-text="task.type || ''"></span>
+                        </div>
+                        <div class="mktops-task-card-footer">
+                          <span class="kanban-due" :class="isTaskOverdue(task) && 'task-overdue'" x-text="formatTaskDue(task.dueDate)"></span>
+                          <span class="task-assignee" x-text="task.assignedTo || ''"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- Done -->
+                  <div class="kanban-column">
+                    <div class="kanban-column-header">
+                      <span>Done</span>
+                      <span class="kanban-count" x-text="getTasksByStatus('Done').length"></span>
+                    </div>
+                    <template x-if="getTasksByStatus('Done').length === 0">
+                      <div class="kanban-empty">No tasks</div>
+                    </template>
+                    <template x-for="task in getTasksByStatus('Done')" :key="task.id">
+                      <div class="mktops-task-card mktops-task-card--done" :data-priority="(task.priority || '').toLowerCase()">
+                        <div class="kanban-card-name" x-text="task.title || task.task || 'Untitled'"></div>
+                        <div class="mktops-task-card-tags">
+                          <span class="task-priority-badge" :data-priority="(task.priority || '').toLowerCase()" x-text="task.priority || ''"></span>
+                          <span class="task-channel-tag" x-text="task.channel || ''"></span>
+                          <span class="task-channel-tag" x-text="task.type || ''"></span>
+                        </div>
+                        <div class="mktops-task-card-footer">
+                          <span class="kanban-due" x-text="formatTaskDue(task.dueDate)"></span>
+                          <span class="task-assignee" x-text="task.assignedTo || ''"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+
+                </div>
+              </div>
+            </template>
+
+          </div>
+
+          <!-- COMPETITORS SECTION -->
+          <div x-show="mktopsSection === 'competitors'">
+
+            <!-- Loading skeleton -->
+            <template x-if="ciLoading && !ciData">
+              <div style="display:flex;flex-direction:column;gap:0.75rem;padding:1rem 0">
+                <div class="skeleton skeleton-card" style="height:48px;border-radius:6px"></div>
+                <div class="ci-card-grid">
+                  <template x-for="i in [1,2,3,4,5,6]" :key="i">
+                    <div class="skeleton skeleton-card" style="height:160px;border-radius:8px"></div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- Sub-nav: landscape / capabilities / swot / steal-adapt -->
+            <template x-if="ciData || ciLoading">
+              <div class="ci-subnav" x-show="!ciLoading || ciData">
+                <button class="ci-subnav-btn" :class="ciSection === 'landscape' && 'ci-subnav-btn-active'" @click="ciSection = 'landscape'">Landscape</button>
+                <button class="ci-subnav-btn" :class="(ciSection === 'capabilities') && 'ci-subnav-btn-active'" @click="ciSwitchSection('capabilities')">Capabilities</button>
+                <button class="ci-subnav-btn" :class="(ciSection === 'swot') && 'ci-subnav-btn-active'" @click="ciSwitchSection('swot')">SWOT</button>
+                <button class="ci-subnav-btn" :class="(ciSection === 'steal-adapt') && 'ci-subnav-btn-active'" @click="ciSwitchSection('steal-adapt')">Steal / Adapt</button>
+              </div>
+            </template>
+
+            <!-- ── LANDSCAPE ── -->
+            <div x-show="ciData && ciSection === 'landscape'">
+
+              <!-- Filter bar -->
+              <div class="ci-filter-bar">
+                <input class="ci-search-input" type="text" placeholder="Search competitors..." x-model="ciSearch" />
+                <select class="ci-select" x-model="ciTierFilter">
+                  <option value="">All Tiers</option>
+                  <template x-for="tier in getCiTiers()" :key="tier">
+                    <option :value="tier" x-text="tier"></option>
+                  </template>
+                </select>
+                <select class="ci-select" x-model="ciCategoryFilter">
+                  <option value="">All Categories</option>
+                  <template x-for="cat in getCiCategories()" :key="cat">
+                    <option :value="cat" x-text="cat"></option>
+                  </template>
+                </select>
+                <span class="ci-result-count" x-text="getFilteredCompetitors().length + ' competitors'"></span>
+              </div>
+
+              <!-- Stats strip -->
+              <div class="data-card-grid" style="margin-bottom:1rem">
+                <template x-for="tier in (ciData?.byTier || [])" :key="tier.name">
+                  <div class="data-card" style="cursor:pointer" @click="ciTierFilter = ciTierFilter === tier.name ? '' : tier.name">
+                    <span class="data-card-label" x-text="tier.name"></span>
+                    <span class="data-card-value" x-text="tier.count" :style="`color: ${getTierColor(tier.name)}`"></span>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Competitor cards grid -->
+              <div class="ci-card-grid">
+                <template x-for="comp in getFilteredCompetitors()" :key="comp.Brand">
+                  <div class="ci-card" @click="loadCiDetail(comp.Brand)" style="cursor:pointer">
+                    <div class="ci-card-header">
+                      <span class="ci-brand-name" x-text="comp.Brand"></span>
+                      <span class="ci-tier-badge" :style="`color:${getTierColor(comp.Tier)};background:${getTierBg(comp.Tier)}`" x-text="comp.Tier"></span>
+                    </div>
+                    <div class="ci-card-category" x-text="comp.Category"></div>
+                    <div class="ci-card-strengths" x-text="ciTruncate(comp['Core Strengths'], 110)"></div>
+                    <div class="ci-card-meta">
+                      <template x-if="getCiAvgScore(comp.Brand)">
+                        <span class="ci-avg-score" :style="`color:${getCapabilityColor(getCiAvgScore(comp.Brand))};background:${getCapabilityBg(getCiAvgScore(comp.Brand))}`"
+                          :title="'Avg capability: ' + getCiAvgScore(comp.Brand)"
+                          x-text="getCiAvgScore(comp.Brand) + ' avg'"></span>
+                      </template>
+                      <template x-if="comp.Website">
+                        <a class="ci-card-link" :href="comp.Website" target="_blank" rel="noopener" @click.stop x-text="comp.Website.replace(/^https?:\/\/(www\.)?/,'').split('/')[0]"></a>
+                      </template>
+                    </div>
+                    <div class="ci-tags" x-show="comp.Tags">
+                      <template x-for="tag in ciParseTags(comp.Tags)" :key="tag">
+                        <span class="ci-tag" x-text="tag"></span>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Empty state -->
+              <div class="empty-state" x-show="getFilteredCompetitors().length === 0 && ciData">
+                <p>No competitors match the current filters.</p>
+                <button class="btn btn-small" @click="ciTierFilter=''; ciCategoryFilter=''; ciSearch=''">Clear filters</button>
+              </div>
+            </div>
+
+            <!-- ── CAPABILITIES HEAT MAP ── -->
+            <div x-show="ciData && ciSection === 'capabilities'">
+              <template x-if="ciCapabilities && ciCapabilities.available">
+                <div class="ci-capabilities-wrap">
+                  <div class="ci-table-scroll">
+                    <table class="data-table ci-cap-table">
+                      <thead>
+                        <tr>
+                          <th class="ci-dim-col">Dimension</th>
+                          <template x-for="row in (ciCapabilities?.rows || [])" :key="row.Brand">
+                            <th x-text="row.Brand" style="font-size:11px;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;padding:0.4rem 0.5rem"></th>
+                          </template>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="dim in (ciCapabilities?.dimensions || [])" :key="dim">
+                          <tr>
+                            <td class="ci-dim-label" x-text="formatDimension(dim)"></td>
+                            <template x-for="row in (ciCapabilities?.rows || [])" :key="row.Brand">
+                              <td class="ci-score-cell"
+                                :style="`color:${getCapabilityColor(row[dim])};background:${getCapabilityBg(row[dim])};text-align:center;font-weight:600;font-size:12px`"
+                                :title="getScoreLabel(row[dim])"
+                                x-text="row[dim] || '—'"></td>
+                            </template>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="ci-cap-legend">
+                    <span class="ci-legend-item" style="color:var(--green)">4-5 Strong</span>
+                    <span class="ci-legend-item" style="color:var(--amber)">3 Average</span>
+                    <span class="ci-legend-item" style="color:var(--red)">1-2 Weak</span>
+                  </div>
+                </div>
+              </template>
+              <template x-if="!ciCapabilities">
+                <div class="ci-loading-msg">Loading capabilities...</div>
+              </template>
+            </div>
+
+            <!-- ── SWOT ── -->
+            <div x-show="ciData && ciSection === 'swot'">
+              <template x-if="ciSwot && ciSwot.available">
+                <div class="ci-swot-list">
+                  <template x-for="row in (ciSwot?.rows || [])" :key="row.Competitor_ID">
+                    <div class="ci-section-card">
+                      <div class="ci-section-card-title" x-text="row.Competitor_ID"></div>
+                      <div class="ci-swot-grid">
+                        <div class="ci-swot-quadrant ci-swot-strengths">
+                          <div class="ci-swot-quadrant-label">Strengths</div>
+                          <div class="ci-swot-quadrant-text" x-text="row.Strengths || '—'"></div>
+                        </div>
+                        <div class="ci-swot-quadrant ci-swot-weaknesses">
+                          <div class="ci-swot-quadrant-label">Weaknesses</div>
+                          <div class="ci-swot-quadrant-text" x-text="row.Weaknesses || '—'"></div>
+                        </div>
+                        <div class="ci-swot-quadrant ci-swot-opportunities">
+                          <div class="ci-swot-quadrant-label">Opportunities</div>
+                          <div class="ci-swot-quadrant-text" x-text="row.Opportunities || '—'"></div>
+                        </div>
+                        <div class="ci-swot-quadrant ci-swot-threats">
+                          <div class="ci-swot-quadrant-label">Threats</div>
+                          <div class="ci-swot-quadrant-text" x-text="row.Threats || '—'"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <template x-if="!ciSwot">
+                <div class="ci-loading-msg">Loading SWOT data...</div>
+              </template>
+            </div>
+
+            <!-- ── STEAL / ADAPT / AVOID ── -->
+            <div x-show="ciData && ciSection === 'steal-adapt'">
+              <template x-if="ciStealAdapt && ciStealAdapt.available">
+                <div class="ci-steal-adapt-grid">
+
+                  <!-- Steal column -->
+                  <div class="ci-sa-col">
+                    <div class="ci-sa-col-header ci-steal-header">Steal</div>
+                    <template x-for="item in (ciStealAdapt?.steal || [])" :key="item.Element + item.Rationale">
+                      <div class="ci-sa-item">
+                        <div class="ci-sa-element" x-text="item.Element"></div>
+                        <div class="ci-sa-category" x-text="item.Category"></div>
+                        <div class="ci-sa-rationale" x-text="item.Rationale"></div>
+                        <div class="ci-sa-footer">
+                          <span class="ci-priority-badge" :data-priority="(item.Priority || '').toLowerCase()" x-text="item.Priority"></span>
+                        </div>
+                      </div>
+                    </template>
+                    <div class="ci-sa-empty" x-show="(ciStealAdapt?.steal || []).length === 0">No items</div>
+                  </div>
+
+                  <!-- Adapt column -->
+                  <div class="ci-sa-col">
+                    <div class="ci-sa-col-header ci-adapt-header">Adapt</div>
+                    <template x-for="item in (ciStealAdapt?.adapt || [])" :key="item.Element + item.Rationale">
+                      <div class="ci-sa-item">
+                        <div class="ci-sa-element" x-text="item.Element"></div>
+                        <div class="ci-sa-category" x-text="item.Category"></div>
+                        <div class="ci-sa-rationale" x-text="item.Rationale"></div>
+                        <div class="ci-sa-footer">
+                          <span class="ci-priority-badge" :data-priority="(item.Priority || '').toLowerCase()" x-text="item.Priority"></span>
+                        </div>
+                      </div>
+                    </template>
+                    <div class="ci-sa-empty" x-show="(ciStealAdapt?.adapt || []).length === 0">No items</div>
+                  </div>
+
+                  <!-- Avoid column -->
+                  <div class="ci-sa-col">
+                    <div class="ci-sa-col-header ci-avoid-header">Avoid</div>
+                    <template x-for="item in (ciStealAdapt?.avoid || [])" :key="item.Element + item.Rationale">
+                      <div class="ci-sa-item">
+                        <div class="ci-sa-element" x-text="item.Element"></div>
+                        <div class="ci-sa-category" x-text="item.Category"></div>
+                        <div class="ci-sa-rationale" x-text="item.Rationale"></div>
+                        <div class="ci-sa-footer">
+                          <span class="ci-priority-badge" :data-priority="(item.Priority || '').toLowerCase()" x-text="item.Priority"></span>
+                        </div>
+                      </div>
+                    </template>
+                    <div class="ci-sa-empty" x-show="(ciStealAdapt?.avoid || []).length === 0">No items</div>
+                  </div>
+
+                </div>
+              </template>
+              <template x-if="!ciStealAdapt">
+                <div class="ci-loading-msg">Loading steal/adapt data...</div>
+              </template>
+            </div>
+
+            <!-- ── DETAIL VIEW ── -->
+            <div x-show="ciData && ciSection === 'detail'">
+
+              <!-- Loading -->
+              <template x-if="ciDetailLoading">
+                <div style="display:flex;flex-direction:column;gap:0.75rem;padding:1rem 0">
+                  <div class="skeleton skeleton-card" style="height:80px;border-radius:8px"></div>
+                  <div class="skeleton skeleton-card" style="height:200px;border-radius:8px"></div>
+                  <div class="skeleton skeleton-card" style="height:160px;border-radius:8px"></div>
+                </div>
+              </template>
+
+              <template x-if="ciDetail && !ciDetailLoading">
+                <div>
+                  <!-- Back button -->
+                  <button class="ci-back-btn" @click="closeCiDetail()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    Back to Landscape
+                  </button>
+
+                  <!-- Detail header -->
+                  <div class="ci-detail-header">
+                    <div class="ci-detail-title-row">
+                      <h3 class="ci-detail-brand" x-text="ciDetail.master?.Brand"></h3>
+                      <span class="ci-tier-badge ci-tier-badge-lg"
+                        :style="`color:${getTierColor(ciDetail.master?.Tier)};background:${getTierBg(ciDetail.master?.Tier)}`"
+                        x-text="ciDetail.master?.Tier"></span>
+                      <span class="ci-detail-category" x-text="ciDetail.master?.Category"></span>
+                    </div>
+                    <div class="ci-detail-links">
+                      <a x-show="ciDetail.master?.Website" :href="ciDetail.master?.Website" target="_blank" rel="noopener" class="ci-detail-link">Website</a>
+                      <a x-show="ciDetail.master?.Instagram" :href="'https://instagram.com/' + (ciDetail.master?.Instagram || '').replace('@','')" target="_blank" rel="noopener" class="ci-detail-link">Instagram</a>
+                    </div>
+                  </div>
+
+                  <!-- 1. Positioning -->
+                  <template x-if="ciDetail.positioning">
+                    <div class="ci-section-card">
+                      <div class="ci-section-card-title">Positioning</div>
+                      <div class="ci-kv-grid">
+                        <template x-for="[k, v] in Object.entries(ciDetail.positioning).filter(([k,v]) => v)" :key="k">
+                          <div class="ci-kv-row">
+                            <span class="ci-kv-label" x-text="k.replace(/_/g,' ')"></span>
+                            <span class="ci-kv-value" x-text="v"></span>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- 2. Analysis -->
+                  <template x-if="ciDetail.analysis">
+                    <div class="ci-section-card">
+                      <div class="ci-section-card-title">Analysis</div>
+                      <div class="ci-analysis-grid">
+                        <template x-for="[k, v] in Object.entries(ciDetail.analysis).filter(([k,v]) => v)" :key="k">
+                          <div class="ci-analysis-block">
+                            <div class="ci-analysis-label" x-text="k.replace(/_/g,' ')"></div>
+                            <div class="ci-analysis-text" x-text="v"></div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- 3. Capabilities -->
+                  <template x-if="ciDetail.capabilities">
+                    <div class="ci-section-card">
+                      <div class="ci-section-card-title">Capabilities</div>
+                      <div class="ci-cap-bars">
+                        <template x-for="[dim, score] in Object.entries(ciDetail.capabilities).filter(([k,v]) => typeof v === 'number')" :key="dim">
+                          <div class="ci-cap-bar-row">
+                            <span class="ci-cap-bar-label" x-text="dim.replace(/_/g,' ')"></span>
+                            <div class="ci-cap-bar-track">
+                              <div class="ci-cap-bar-fill"
+                                :style="`width:${(score/5)*100}%;background:${getCapabilityColor(score)}`"></div>
+                            </div>
+                            <span class="ci-cap-bar-score" :style="`color:${getCapabilityColor(score)}`" x-text="score"></span>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- 4. SWOT -->
+                  <template x-if="ciDetail.swot">
+                    <div class="ci-section-card">
+                      <div class="ci-section-card-title">SWOT</div>
+                      <div class="ci-swot-grid">
+                        <div class="ci-swot-quadrant ci-swot-strengths">
+                          <div class="ci-swot-quadrant-label">Strengths</div>
+                          <div class="ci-swot-quadrant-text" x-text="ciDetail.swot.Strengths || '—'"></div>
+                        </div>
+                        <div class="ci-swot-quadrant ci-swot-weaknesses">
+                          <div class="ci-swot-quadrant-label">Weaknesses</div>
+                          <div class="ci-swot-quadrant-text" x-text="ciDetail.swot.Weaknesses || '—'"></div>
+                        </div>
+                        <div class="ci-swot-quadrant ci-swot-opportunities">
+                          <div class="ci-swot-quadrant-label">Opportunities</div>
+                          <div class="ci-swot-quadrant-text" x-text="ciDetail.swot.Opportunities || '—'"></div>
+                        </div>
+                        <div class="ci-swot-quadrant ci-swot-threats">
+                          <div class="ci-swot-quadrant-label">Threats</div>
+                          <div class="ci-swot-quadrant-text" x-text="ciDetail.swot.Threats || '—'"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- 5. UX & Product -->
+                  <template x-if="ciDetail.uxProduct">
+                    <div class="ci-section-card">
+                      <div class="ci-section-card-title">UX &amp; Product</div>
+                      <div class="ci-kv-grid">
+                        <template x-for="[k, v] in Object.entries(ciDetail.uxProduct).filter(([k,v]) => v)" :key="k">
+                          <div class="ci-kv-row">
+                            <span class="ci-kv-label" x-text="k.replace(/_/g,' ')"></span>
+                            <span class="ci-kv-value" x-text="v"></span>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- 6. Messaging -->
+                  <template x-if="ciDetail.messaging">
+                    <div class="ci-section-card">
+                      <div class="ci-section-card-title">Messaging</div>
+                      <div class="ci-kv-grid">
+                        <template x-for="[k, v] in Object.entries(ciDetail.messaging).filter(([k,v]) => v)" :key="k">
+                          <div class="ci-kv-row">
+                            <span class="ci-kv-label" x-text="k.replace(/_/g,' ')"></span>
+                            <span class="ci-kv-value" x-text="v"></span>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- 7. Philosophy -->
+                  <template x-if="ciDetail.philosophy">
+                    <div class="ci-section-card">
+                      <div class="ci-section-card-title">Philosophy</div>
+                      <div class="ci-kv-grid">
+                        <template x-for="[k, v] in Object.entries(ciDetail.philosophy).filter(([k,v]) => v)" :key="k">
+                          <div class="ci-kv-row">
+                            <span class="ci-kv-label" x-text="k.replace(/_/g,' ')"></span>
+                            <span class="ci-kv-value" x-text="v"></span>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- 8. Moments of Truth -->
+                  <template x-if="ciDetail.moments">
+                    <div class="ci-section-card">
+                      <div class="ci-section-card-title">Moments of Truth</div>
+                      <div class="ci-moments-timeline">
+                        <template x-for="[k, v] in Object.entries(ciDetail.moments).filter(([k,v]) => v)" :key="k">
+                          <div class="ci-moment-step">
+                            <div class="ci-moment-dot"></div>
+                            <div class="ci-moment-body">
+                              <div class="ci-moment-label" x-text="k.replace(/_/g,' ')"></div>
+                              <div class="ci-moment-text" x-text="v"></div>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- 9. Steal / Adapt / Avoid (competitor-specific) -->
+                  <template x-if="ciDetail.stealAdapt && ciDetail.stealAdapt.length > 0">
+                    <div class="ci-section-card">
+                      <div class="ci-section-card-title">Steal / Adapt / Avoid</div>
+                      <table class="data-table" style="margin-top:0.5rem">
+                        <thead>
+                          <tr>
+                            <th>Element</th>
+                            <th>Category</th>
+                            <th>Action</th>
+                            <th>Rationale</th>
+                            <th>Priority</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <template x-for="item in ciDetail.stealAdapt" :key="item.Element + item.Action">
+                            <tr>
+                              <td x-text="item.Element"></td>
+                              <td x-text="item.Category" class="muted"></td>
+                              <td>
+                                <span class="ci-action-badge"
+                                  :data-action="(item.Action || '').toLowerCase()"
+                                  x-text="item.Action"></span>
+                              </td>
+                              <td x-text="item.Rationale" style="max-width:240px;white-space:normal"></td>
+                              <td>
+                                <span class="ci-priority-badge" :data-priority="(item.Priority || '').toLowerCase()" x-text="item.Priority"></span>
+                              </td>
+                            </tr>
+                          </template>
+                        </tbody>
+                      </table>
+                    </div>
+                  </template>
+
+                  <!-- 10. Notes & Watchlist -->
+                  <template x-if="(ciDetail.notes && ciDetail.notes.length > 0) || (ciDetail.watchlist && ciDetail.watchlist.length > 0)">
+                    <div class="ci-section-card">
+                      <div class="ci-section-card-title">Notes &amp; Watchlist</div>
+                      <template x-if="ciDetail.watchlist && ciDetail.watchlist.length > 0">
+                        <div style="margin-bottom:0.75rem">
+                          <div class="ci-kv-label" style="margin-bottom:0.25rem">Watchlist</div>
+                          <template x-for="w in ciDetail.watchlist" :key="w">
+                            <div class="ci-note-item" x-text="w"></div>
+                          </template>
+                        </div>
+                      </template>
+                      <template x-if="ciDetail.notes && ciDetail.notes.length > 0">
+                        <div>
+                          <div class="ci-kv-label" style="margin-bottom:0.25rem">Notes</div>
+                          <template x-for="n in ciDetail.notes" :key="n">
+                            <div class="ci-note-item" x-text="n"></div>
+                          </template>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+
+                </div>
+              </template>
+
+            </div>
+            <!-- /DETAIL VIEW -->
+
+          </div>
+          <!-- /COMPETITORS SECTION -->
+
+        </div>
+      </template>

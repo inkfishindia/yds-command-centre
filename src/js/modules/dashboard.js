@@ -10,6 +10,12 @@ export function createDashboardModule() {
     lastRefresh: null,
     refreshIntervalId: null,
 
+    // New zone state
+    teamWorkload: [],
+    recentActivity: null,
+    collapsedOverdueGroups: {},
+    dashboardSavedView: 'today',
+
     // Morning Brief
     morningBrief: null,
     briefLoading: false,
@@ -23,13 +29,34 @@ export function createDashboardModule() {
     personDetail: null,
     personLoading: false,
 
-    async loadDashboard() {
+    // Dashboard auto-refresh interval handle
+    _dashboardRefreshInterval: null,
+
+    startDashboardAutoRefresh() {
+      this.stopDashboardAutoRefresh();
+      this._dashboardRefreshInterval = setInterval(() => {
+        if (this.view === 'dashboard' && !this.dashboardLoading) {
+          this.loadDashboard(true); // silent — no loading skeleton
+        }
+      }, 5 * 60 * 1000);
+    },
+
+    stopDashboardAutoRefresh() {
+      if (this._dashboardRefreshInterval) {
+        clearInterval(this._dashboardRefreshInterval);
+        this._dashboardRefreshInterval = null;
+      }
+    },
+
+    async loadDashboard(silent = false) {
       const signal = this.beginRequest('dashboard');
       this.expandedDecision = null;
       this.expandedCommitmentRow = null;
       this.selectedOverdue = [];
-      this.dashboardLoading = true;
-      this.briefLoading = true;
+      if (!silent) {
+        this.dashboardLoading = true;
+        this.briefLoading = true;
+      }
       // Fire pipeline and action queue in parallel — morning brief is bundled with dashboard
       this.loadPipeline();
       this.loadActionQueue();
@@ -40,6 +67,10 @@ export function createDashboardModule() {
           this.upcomingCommitments = this.dashboard.upcoming || [];
           this.morningBrief = this.dashboard.morningBrief || null;
           this.lastRefresh = new Date();
+          // New zone state from enhanced endpoint
+          this.teamWorkload = this.dashboard.teamWorkload || [];
+          this.recentActivity = this.dashboard.recentActivity || null;
+          this.runNotificationChecks?.('dashboard');
         }
       } catch (err) {
         if (this.isAbortError(err)) return;
@@ -56,7 +87,10 @@ export function createDashboardModule() {
       if (!silent) this.actionQueueLoading = true;
       try {
         const res = await fetch('/api/notion/action-queue', { signal });
-        if (res.ok) this.actionQueue = await res.json();
+        if (res.ok) {
+          this.actionQueue = await res.json();
+          this.runNotificationChecks?.('action-queue');
+        }
       } catch (e) {
         if (this.isAbortError(e)) return;
         console.error('Action queue failed:', e);
@@ -170,6 +204,287 @@ export function createDashboardModule() {
         const bOrd = order[bKey] !== undefined ? order[bKey] : 3;
         return aOrd - bOrd;
       });
+    },
+
+    // Generate SVG sparkline path from an array of numbers
+    generateSparkline(data, width = 80, height = 20) {
+      if (!data || data.length < 2) return '';
+      const max = Math.max(...data);
+      const min = Math.min(...data);
+      const range = max - min || 1;
+      const step = width / (data.length - 1);
+      const points = data.map((val, i) => {
+        const x = i * step;
+        const y = height - ((val - min) / range) * height;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      });
+      return `<svg class="data-card-sparkline" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"><polyline fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="${points.join(' ')}" /></svg>`;
+    },
+
+    // --- New helpers for 3-zone dashboard ---
+
+    // Groups dashboard.overdue by focusAreaNames[0]
+    // Returns [{area: 'Name', items: [...]}]
+    getOverdueByFocusArea() {
+      const overdue = this.dashboard?.overdue || [];
+      const groups = {};
+      const order = [];
+      for (const item of overdue) {
+        const area = (item.focusAreaNames && item.focusAreaNames[0]) || 'Uncategorised';
+        if (!groups[area]) {
+          groups[area] = [];
+          order.push(area);
+        }
+        groups[area].push(item);
+      }
+      return order.map(area => ({ area, items: groups[area] }));
+    },
+
+    // Returns relative time string from ISO date string
+    getRelativeTime(isoString) {
+      if (!isoString) return '';
+      const then = new Date(isoString);
+      const now = new Date();
+      const diffMs = now - then;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffMins < 1) return 'just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays === 1) return 'yesterday';
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return then.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    },
+
+    getDashboardRefreshLabel() {
+      if (!this.lastRefresh) return '';
+      return `Updated ${this.formatRelativeTime(this.lastRefresh)}`;
+    },
+
+    getDashboardAreaStatus() {
+      const overdueCount = (this.dashboard?.overdue || []).length;
+      const queueCount = (this.actionQueue?.dansQueueCount || 0) + (this.actionQueue?.runnersQueueCount || 0);
+      const flagCount = (this.morningBrief?.flags || []).length;
+      if (overdueCount >= 5 || queueCount >= 10 || flagCount >= 3) {
+        return { tone: 'critical', label: 'Command Pressure High' };
+      }
+      if (overdueCount > 0 || queueCount > 0 || flagCount > 0) {
+        return { tone: 'warning', label: 'Needs Attention' };
+      }
+      return { tone: 'healthy', label: 'In Control' };
+    },
+
+    getDashboardHeroMetrics() {
+      const metrics = this.getGlobalMetrics() || {};
+      const queueCount = (this.actionQueue?.dansQueueCount || 0) + (this.actionQueue?.runnersQueueCount || 0);
+      const decisions = (this.dashboard?.recentDecisions || []).length;
+      return [
+        {
+          id: 'open',
+          label: 'Open Commitments',
+          value: String(metrics.openCommitments || 0),
+          note: `${metrics.overdueCount || 0} overdue right now`,
+        },
+        {
+          id: 'queue',
+          label: 'Action Queue',
+          value: String(queueCount),
+          note: `${this.actionQueue?.dansQueueCount || 0} for Dan, ${this.actionQueue?.runnersQueueCount || 0} for runners`,
+        },
+        {
+          id: 'projects',
+          label: 'Active Projects',
+          value: String(metrics.activeProjects || 0),
+          note: 'Cross-functional work in motion',
+        },
+        {
+          id: 'decisions',
+          label: 'Recent Decisions',
+          value: String(decisions),
+          note: `${metrics.decisionsThisMonth || 0} taken this month`,
+        },
+      ];
+    },
+
+    getDashboardMetricAction(metricId) {
+      const actions = {
+        open: () => this.openNavigationTarget('commitments'),
+        queue: () => this.openNavigationTarget('actionQueue'),
+        projects: () => this.openNavigationTarget('projects'),
+        decisions: () => this.openNavigationTarget('decisions'),
+      };
+      return actions[metricId] || (() => {});
+    },
+
+    getDashboardPriorityCards() {
+      const overdueItems = (this.dashboard?.overdue || []).slice(0, 3).map((item) => ({
+        name: item.name,
+        meta: this.formatRelativeDate(item['Due Date']) || `${item.daysOverdue || 0}d overdue`,
+      }));
+      const overloadedPeople = (this.teamWorkload || [])
+        .filter((person) => (person.metrics?.activeCount || 0) >= 5)
+        .sort((a, b) => (b.metrics?.activeCount || 0) - (a.metrics?.activeCount || 0))
+        .slice(0, 3)
+        .map((person) => ({
+          name: person.name,
+          meta: `${person.metrics?.activeCount || 0} active`,
+        }));
+      const activityItems = this.getActivityFeedItems().slice(0, 3).map((item) => ({
+        name: item.name,
+        meta: this.getRelativeTime(item.time),
+      }));
+
+      return [
+        {
+          id: 'overdue',
+          title: 'Overdue Pressure',
+          label: 'The commitments most likely to create drag today.',
+          value: String((this.dashboard?.overdue || []).length),
+          tone: (this.dashboard?.overdue || []).length > 0 ? 'critical' : 'healthy',
+          items: overdueItems.length ? overdueItems : [{ name: 'No overdue commitments', meta: 'The queue is currently clear.' }],
+        },
+        {
+          id: 'workload',
+          title: 'Workload Risk',
+          label: 'People carrying the heaviest active load.',
+          value: String(overloadedPeople.length),
+          tone: overloadedPeople.length >= 2 ? 'warning' : 'healthy',
+          items: overloadedPeople.length ? overloadedPeople : [{ name: 'No overloaded teammates', meta: 'Capacity looks balanced.' }],
+        },
+        {
+          id: 'movement',
+          title: 'Recent Movement',
+          label: 'What changed recently across the operating system.',
+          value: String(activityItems.length),
+          tone: 'healthy',
+          items: activityItems.length ? activityItems : [{ name: 'No recent activity captured', meta: 'Refresh to pull the latest movement.' }],
+        },
+      ];
+    },
+
+    getDashboardFocusList() {
+      const list = [];
+      for (const item of (this.morningBrief?.topThree || []).slice(0, 2)) {
+        list.push({
+          title: item.name,
+          detail: 'Top 3 priority for today',
+          action: () => this.openNavigationTarget('commitments'),
+          tone: 'healthy',
+        });
+      }
+      for (const flag of (this.morningBrief?.flags || []).slice(0, 2)) {
+        list.push({
+          title: flag.message,
+          detail: flag.type === 'overload' ? 'Check team capacity and overdue work.' : 'Review the related commitment or owner.',
+          action: () => this.openNavigationTarget(flag.type === 'overload' ? 'team' : 'actionQueue'),
+          tone: flag.type === 'overload' ? 'critical' : 'warning',
+        });
+      }
+      return list.slice(0, 4);
+    },
+
+    getDashboardSavedViews() {
+      return [
+        { id: 'today', label: 'Top 3 Today' },
+        { id: 'overdue', label: 'Overdue' },
+        { id: 'waiting', label: 'Waiting On' },
+        { id: 'overloaded', label: 'Overloaded' },
+      ];
+    },
+
+    applyDashboardSavedView(viewId) {
+      this.dashboardSavedView = viewId;
+    },
+
+    getDashboardSavedViewItems() {
+      if (this.dashboardSavedView === 'overdue') {
+        return (this.dashboard?.overdue || []).slice(0, 6).map((item) => ({
+          title: item.name,
+          detail: this.formatRelativeDate(item['Due Date']) || `${item.daysOverdue || 0}d overdue`,
+          action: () => this.openNavigationTarget('actionQueue'),
+        }));
+      }
+      if (this.dashboardSavedView === 'waiting') {
+        return (this.morningBrief?.waitingOn || []).slice(0, 6).map((item) => ({
+          title: item.name,
+          detail: item.blockerDetail || 'Waiting on a blocker to clear',
+          action: () => this.openNavigationTarget('actionQueue'),
+        }));
+      }
+      if (this.dashboardSavedView === 'overloaded') {
+        return (this.teamWorkload || [])
+          .filter((person) => person.capacity === 'overloaded' || person.capacity === 'moderate')
+          .sort((a, b) => b.activeCount - a.activeCount)
+          .slice(0, 6)
+          .map((person) => ({
+            title: person.name,
+            detail: `${person.activeCount} active, ${person.overdueCount} overdue`,
+            action: () => this.openPersonView(person),
+          }));
+      }
+      return (this.morningBrief?.topThree || []).slice(0, 6).map((item) => ({
+        title: item.name,
+        detail: 'Top priority for today',
+        action: () => this.openNavigationTarget('commitments'),
+      }));
+    },
+
+    getDashboardSavedViewEmptyState() {
+      const labels = {
+        today: 'No top priorities captured right now.',
+        overdue: 'No overdue items right now.',
+        waiting: 'Nothing is currently waiting on someone else.',
+        overloaded: 'No overloaded teammates right now.',
+      };
+      return labels[this.dashboardSavedView] || 'No items available.';
+    },
+
+    // Toggle collapse state for an overdue focus-area group
+    toggleOverdueGroup(area) {
+      this.collapsedOverdueGroups = {
+        ...this.collapsedOverdueGroups,
+        [area]: !this.collapsedOverdueGroups[area],
+      };
+    },
+
+    isOverdueGroupCollapsed(area) {
+      return !!this.collapsedOverdueGroups[area];
+    },
+
+    // Returns merged activity feed items from recentActivity, sorted recent-first
+    getActivityFeedItems() {
+      const activity = this.recentActivity;
+      if (!activity) return [];
+      const items = [];
+      for (const c of (activity.completions || []).slice(0, 5)) {
+        items.push({ type: 'success', name: c.name, time: c.lastEdited, id: c.id });
+      }
+      for (const b of (activity.newBlockers || []).slice(0, 3)) {
+        items.push({ type: 'alert', name: b.name, time: b.lastEdited, id: b.id });
+      }
+      for (const d of (activity.recentDecisions || []).slice(0, 3)) {
+        items.push({ type: 'decision', name: d.name, time: d.date, id: d.id });
+      }
+      // Sort by time, recent first
+      items.sort((a, b) => new Date(b.time) - new Date(a.time));
+      return items.slice(0, 10);
+    },
+
+    // Pipeline donut data from pipeline state
+    getPipelineDonutData() {
+      const breakdown = this.pipeline?.statusBreakdown || [];
+      const colors = {
+        'Active': 'var(--green)',
+        'Qualified': 'var(--accent)',
+        'Stalled': 'var(--amber)',
+        'New': 'var(--text-secondary)',
+      };
+      return breakdown.map(s => ({
+        label: s.name,
+        value: s.count,
+        color: colors[s.name] || 'var(--purple)',
+      }));
     },
   };
 }

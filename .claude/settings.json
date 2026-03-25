@@ -56,7 +56,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "Before stopping: 1) Update data/sessions/handoff.md with: what was built/fixed, key decisions, current state of server/frontend, what to do next. Keep under 80 lines. 2) Append one row to data/sessions/activity-log.md (format: | date | agent | action | details | pending |). 3) If any decisions were made, append to data/sessions/decisions.md.",
+            "prompt": "Before stopping: 1) Update data/sessions/handoff.md with: what was built/fixed, key decisions, current state of server/frontend, what to do next. Keep under 80 lines. 2) Append ONE summary row to data/sessions/activity-log.md. Format: | YYYY-MM-DD HH:MM | agent-name (e.g. backend-builder, frontend-builder, lead) | verb phrase (e.g. Added CRM endpoint, Fixed SSE streaming, Refactored dashboard service) | 1-line detail of what changed and why | next action or — |. NEVER write 'unknown' or 'file-write' — describe the actual work done this session. If multiple agents worked, write one row per agent. 3) If any architectural or product decisions were made, append to data/sessions/decisions.md with: | # | date | decision | rationale | active |.",
             "model": "claude-haiku-4-5-20251001"
           }
         ]
@@ -107,7 +107,7 @@
       "command": "npx",
       "args": ["-y", "@ycse/nanobanana-mcp"],
       "env": {
-        "GOOGLE_AI_API_KEY": ""
+        "GOOGLE_AI_API_KEY": "${GOOGLE_AI_API_KEY}"
       }
     }
   }

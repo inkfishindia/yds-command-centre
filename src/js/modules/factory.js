@@ -63,6 +63,8 @@ export function createFactoryModule() {
     factoryOperatingEdits: {},
     factoryEditingOperating: false,
     factoryError: null,
+    factoryLastRefresh: null,
+    factorySavedView: 'constraints',
 
     getFactoryData() {
       if (this.factoryConfig) {
@@ -386,6 +388,283 @@ export function createFactoryModule() {
       return this._factoryBaseCache;
     },
 
+    getFactoryRefreshLabel() {
+      if (!this.factoryLastRefresh) return '';
+      return `Updated ${this.formatRelativeTime(this.factoryLastRefresh)}`;
+    },
+
+    getFactoryAreaStatus() {
+      const cap = this.getFactoryCap();
+      const bindingLoad = Number(cap?.bindingZone?.load || 0);
+      const constrainedCount = (cap?.constraintCascade || []).filter(zone => zone.load >= 1).length;
+      const atRiskCount = (cap?.constraintCascade || []).filter(zone => zone.load >= 0.85).length;
+
+      if (bindingLoad >= 1 || constrainedCount > 0) {
+        return { tone: 'critical', label: 'Constrained' };
+      }
+      if (bindingLoad >= 0.85 || atRiskCount > 1) {
+        return { tone: 'warning', label: 'At Risk' };
+      }
+      return { tone: 'healthy', label: 'Stable' };
+    },
+
+    getFactoryHeroMetrics() {
+      const cap = this.getFactoryCap();
+      const totalCapacity = (cap?.zones || []).reduce((sum, zone) => sum + (Number(zone.capacity) || 0), 0);
+      const constrainedZones = (cap?.constraintCascade || []).filter(zone => zone.load >= 1).length;
+      const sharedHotspots = (cap?.sharedResources || []).filter(resource => resource.contention >= 0.85).length;
+      return [
+        {
+          id: 'throughput',
+          label: 'Factory Throughput',
+          value: `${Math.round(cap?.factoryThroughput || 0)} pcs/day`,
+          note: `${Math.round(cap?.total_daily_pieces || 0)} pcs/day current demand`,
+        },
+        {
+          id: 'constraint',
+          label: 'Binding Constraint',
+          value: cap?.bindingZone?.name || 'No constraint',
+          note: `${Math.round((Number(cap?.bindingZone?.load || 0)) * 100)}% loaded`,
+        },
+        {
+          id: 'zone-health',
+          label: 'Constrained Zones',
+          value: String(constrainedZones),
+          note: `${(cap?.constraintCascade || []).length} production zones in model`,
+        },
+        {
+          id: 'shared-resources',
+          label: 'Shared Hotspots',
+          value: String(sharedHotspots),
+          note: `${Math.round(totalCapacity)} pcs/day modeled zone capacity`,
+        },
+      ];
+    },
+
+    getFactoryMetricAction(metricId) {
+      const actions = {
+        throughput: () => this.applyFactorySavedView('constraints'),
+        constraint: () => this.applyFactorySavedView('constraints'),
+        'zone-health': () => this.applyFactorySavedView('shared'),
+        'shared-resources': () => this.applyFactorySavedView('shared'),
+      };
+      return actions[metricId] || (() => {});
+    },
+
+    getFactoryPriorityCards() {
+      const cap = this.getFactoryCap();
+      const constraintCascade = cap?.constraintCascade || [];
+      const sharedResources = cap?.sharedResources || [];
+      const assumptions = cap?.assumptions || {};
+      const topConstraints = constraintCascade.slice(0, 3);
+      const sharedHotspots = sharedResources.slice().sort((a, b) => b.contention - a.contention).slice(0, 3);
+      const operatorZones = (cap?.zones || []).filter(zone => zone.is_people_based || zone.id === 'QC_PACK');
+
+      return [
+        {
+          id: 'constraints',
+          title: 'Constraint Cascade',
+          label: 'Where the line is most likely to break first.',
+          value: topConstraints[0] ? `${Math.round(topConstraints[0].load * 100)}%` : '0%',
+          tone: topConstraints[0]?.load >= 1 ? 'critical' : topConstraints[0]?.load >= 0.85 ? 'warning' : 'healthy',
+          items: topConstraints.map(zone => ({
+            name: zone.name,
+            meta: `${Math.round(zone.capacity)} cap / ${Math.round(zone.demand)} demand`,
+          })),
+        },
+        {
+          id: 'shared',
+          title: 'Shared Resources',
+          label: 'Monitor contention across bottleneck equipment.',
+          value: sharedHotspots[0] ? `${Math.round(sharedHotspots[0].contention * 100)}%` : '0%',
+          tone: sharedHotspots[0]?.contention >= 1 ? 'critical' : sharedHotspots[0]?.contention >= 0.85 ? 'warning' : 'healthy',
+          items: sharedHotspots.map(resource => ({
+            name: resource.name,
+            meta: `${Math.round(resource.demand)} demand / ${Math.round(resource.capacity)} cap`,
+          })),
+        },
+        {
+          id: 'operating-model',
+          title: 'Operating Model',
+          label: 'Current assumptions driving the factory plan.',
+          value: `${assumptions.orders_per_day || 0} orders`,
+          tone: 'healthy',
+          items: [
+            { name: 'Avg pieces / order', meta: `${assumptions.avg_pieces_per_order || 0}` },
+            { name: 'Shift hours', meta: `${assumptions.shift_hours || 0} hrs` },
+            { name: 'People-based zones', meta: `${operatorZones.length} zones` },
+          ],
+        },
+      ];
+    },
+
+    getFactoryFocusList() {
+      const cap = this.getFactoryCap();
+      const topConstraint = cap?.constraintCascade?.[0];
+      const topShared = (cap?.sharedResources || []).slice().sort((a, b) => b.contention - a.contention)[0];
+      const qcZone = (cap?.zones || []).find(zone => zone.id === 'QC_PACK');
+
+      return [
+        topConstraint && {
+          title: `Relieve ${topConstraint.name}`,
+          detail: topConstraint.fix || `${Math.round(topConstraint.load * 100)}% loaded against demand.`,
+          action: () => {
+            this.factoryZoneDetail = topConstraint.id;
+            this.factorySimOpen = false;
+            this.factoryShowFormulas = false;
+          },
+          tone: topConstraint.load >= 1 ? 'critical' : 'warning',
+        },
+        topShared && {
+          title: `Inspect ${topShared.name}`,
+          detail: `${Math.round(topShared.contention * 100)}% contention. ${topShared.note}`,
+          action: () => {
+            this.factorySimOpen = false;
+            this.factoryShowFormulas = true;
+          },
+          tone: topShared.contention >= 1 ? 'critical' : 'warning',
+        },
+        qcZone && {
+          title: 'Stress test the next shift',
+          detail: `QC + Packing is ${Math.round(qcZone.load * 100)}% loaded. Run a quick scenario before changing staffing.`,
+          action: () => {
+            if (!this.factorySimConfig) this.initFactorySimConfig();
+            this.factorySimOpen = true;
+            this.factoryShowFormulas = false;
+          },
+          tone: qcZone.load >= 0.85 ? 'warning' : 'healthy',
+        },
+      ].filter(Boolean);
+    },
+
+    getFactorySavedViews() {
+      return [
+        { id: 'constraints', label: 'Constraint Cascade' },
+        { id: 'shared', label: 'Shared Resources' },
+        { id: 'people', label: 'People Zones' },
+        { id: 'sim', label: 'Scenario Compare' },
+      ];
+    },
+
+    applyFactorySavedView(viewId) {
+      this.factorySavedView = viewId;
+      if (viewId === 'sim') {
+        if (!this.factorySimConfig) this.initFactorySimConfig();
+        this.factorySimOpen = true;
+        this.factoryShowFormulas = false;
+        return;
+      }
+      this.factorySimOpen = false;
+      this.factoryShowFormulas = viewId === 'shared';
+    },
+
+    getFactorySavedViewItems() {
+      const cap = this.getFactoryCap();
+      if (this.factorySavedView === 'shared') {
+        return (cap?.sharedResources || []).slice(0, 5).map((resource) => ({
+          title: resource.name,
+          detail: `${Math.round(resource.contention * 100)}% contention`,
+          action: () => {
+            this.factoryShowFormulas = true;
+            this.factorySimOpen = false;
+          },
+        }));
+      }
+      if (this.factorySavedView === 'people') {
+        return (cap?.zones || [])
+          .filter((zone) => zone.is_people_based || zone.id === 'QC_PACK')
+          .slice(0, 5)
+          .map((zone) => ({
+            title: zone.name,
+            detail: `${zone.operators} operators · ${Math.round(zone.load * 100)}% load`,
+            action: () => {
+              this.factoryZoneDetail = zone.id;
+              this.factorySimOpen = false;
+              this.factoryShowFormulas = false;
+            },
+          }));
+      }
+      if (this.factorySavedView === 'sim') {
+        const compare = this.getFactoryScenarioCompare();
+        return compare.items;
+      }
+      return (cap?.constraintCascade || []).slice(0, 5).map((zone) => ({
+        title: zone.name,
+        detail: `${Math.round(zone.load * 100)}% load · ${zone.fix || 'Monitor load'}`,
+        action: () => {
+          this.factoryZoneDetail = zone.id;
+          this.factorySimOpen = false;
+          this.factoryShowFormulas = false;
+        },
+      }));
+    },
+
+    getFactorySavedViewEmptyState() {
+      const labels = {
+        constraints: 'No constraints found right now.',
+        shared: 'No shared-resource pressure right now.',
+        people: 'No people-based zones found.',
+        sim: 'Open the simulator to compare scenarios.',
+      };
+      return labels[this.factorySavedView] || 'No items available.';
+    },
+
+    applyFactoryQuickPreset(preset) {
+      if (!this.factorySimConfig) this.initFactorySimConfig();
+      this.applyFactoryPreset(preset);
+      this.factorySimOpen = true;
+      this.factoryShowFormulas = false;
+      this.factorySavedView = 'sim';
+    },
+
+    focusFactoryZone(zoneId) {
+      if (!zoneId) return;
+      this.factoryZoneDetail = zoneId;
+      this.factorySimOpen = false;
+      this.factoryShowFormulas = false;
+    },
+
+    getFactoryScenarioCompare() {
+      const current = this.getFactoryBaseCap();
+      const simulated = this.getFactoryCap();
+      const throughputDelta = Math.round((simulated?.factoryThroughput || 0) - (current?.factoryThroughput || 0));
+      const bindingChanged = (simulated?.bindingZone?.id || '') !== (current?.bindingZone?.id || '');
+      const currentShared = (current?.sharedResources || []).slice().sort((a, b) => b.contention - a.contention)[0];
+      const simulatedShared = (simulated?.sharedResources || []).slice().sort((a, b) => b.contention - a.contention)[0];
+
+      return {
+        throughputDelta,
+        bindingChanged,
+        currentConstraint: current?.bindingZone?.name || '—',
+        simulatedConstraint: simulated?.bindingZone?.name || '—',
+        items: [
+          {
+            title: 'Throughput change',
+            detail: `${throughputDelta >= 0 ? '+' : ''}${throughputDelta} pcs/day vs current`,
+            action: () => {
+              if (!this.factorySimConfig) this.initFactorySimConfig();
+              this.factorySimOpen = true;
+            },
+          },
+          {
+            title: 'Binding constraint',
+            detail: `${current?.bindingZone?.name || '—'} -> ${simulated?.bindingZone?.name || '—'}`,
+            action: () => {
+              this.factoryZoneDetail = simulated?.bindingZone?.id || current?.bindingZone?.id || null;
+            },
+          },
+          {
+            title: 'Hottest shared resource',
+            detail: `${currentShared?.name || '—'} -> ${simulatedShared?.name || '—'}`,
+            action: () => {
+              this.factoryShowFormulas = true;
+              this.factorySimOpen = false;
+            },
+          },
+        ],
+      };
+    },
+
     factoryBarWidth(load) {
       return Math.min(load * 100, 100).toFixed(1) + '%';
     },
@@ -435,8 +714,10 @@ export function createFactoryModule() {
         if (!res.ok) throw new Error('Failed to load factory config');
         this.factoryConfig = await res.json();
         this._factoryBaseCache = null;
+        this.factoryLastRefresh = new Date();
       } catch (err) {
         console.warn('Factory config load failed, using hardcoded data:', err.message);
+        if (!this.factoryLastRefresh) this.factoryLastRefresh = new Date();
       } finally {
         this.factoryConfigLoading = false;
       }
@@ -453,6 +734,7 @@ export function createFactoryModule() {
         this.factoryConfig = await res.json();
         this._factoryBaseCache = null;
         this.factoryEditingMachine = null;
+        this.factoryLastRefresh = new Date();
       } catch (err) {
         console.error('saveFactoryMachine error:', err);
         this.factoryError = 'Failed to save - check console';
@@ -471,6 +753,7 @@ export function createFactoryModule() {
         this.factoryConfig = await res.json();
         this._factoryBaseCache = null;
         this.factoryEditingZone = null;
+        this.factoryLastRefresh = new Date();
       } catch (err) {
         console.error('saveFactoryZone error:', err);
         this.factoryError = 'Failed to save - check console';
@@ -489,6 +772,7 @@ export function createFactoryModule() {
         this.factoryConfig = await res.json();
         this._factoryBaseCache = null;
         this.factoryEditingOperating = false;
+        this.factoryLastRefresh = new Date();
       } catch (err) {
         console.error('saveFactoryOperating error:', err);
         this.factoryError = 'Failed to save - check console';
@@ -506,6 +790,7 @@ export function createFactoryModule() {
         if (!res.ok) throw new Error('Add failed');
         this.factoryConfig = await res.json();
         this._factoryBaseCache = null;
+        this.factoryLastRefresh = new Date();
       } catch (err) {
         console.error('addFactoryMachine error:', err);
       }
@@ -517,6 +802,7 @@ export function createFactoryModule() {
         if (!res.ok) throw new Error('Delete failed');
         this.factoryConfig = await res.json();
         this._factoryBaseCache = null;
+        this.factoryLastRefresh = new Date();
       } catch (err) {
         console.error('deleteFactoryMachine error:', err);
       }

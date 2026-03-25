@@ -37,7 +37,7 @@
 ## TECH TEAM DATABASES
 
 ### Sprint Board (Tech)
-Database ID: `e5ccd5d3-6330-4147-a210-207982b2c66b`
+Database ID: `2c459dc96d804bce913547e02b78776c`
 
 **Purpose:** Track tech sprint work items (bugs, features, tasks, spikes, chores)
 
@@ -57,7 +57,7 @@ Database ID: `e5ccd5d3-6330-4147-a210-207982b2c66b`
 | Labels | multi_select | Custom tags |
 
 ### Spec Library
-Database ID: `ad5b66e6-e65c-4e85-9b4c-e5d83b49403b`
+Database ID: `5be6d7cf5607407cbca010b422bceb7e`
 
 **Purpose:** Track technical specifications through pipeline (proposed → approved → implemented)
 
@@ -73,7 +73,7 @@ Database ID: `ad5b66e6-e65c-4e85-9b4c-e5d83b49403b`
 | Acceptance Criteria | text | What "done" looks like |
 
 ### Tech Decision Log
-Database ID: `62ce820e-06d2-4045-98da-b4ec8d064f9d`
+Database ID: `1f9193d41ac3409484d2d0ae1442c95b`
 
 **Purpose:** Record technical decisions with context and rationale
 
@@ -92,7 +92,7 @@ Database ID: `62ce820e-06d2-4045-98da-b4ec8d064f9d`
 | Sprint Impact | relation | Related sprint item |
 
 ### Sprint Archive
-Database ID: `ee87ff54-6d2a-4684-99a9-419475b9cb3c`
+Database ID: `9ba8330aa3c044d195b27eb450e278f2`
 
 **Purpose:** Historical record of completed sprints for velocity tracking and retrospectives
 

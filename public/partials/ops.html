@@ -1,0 +1,743 @@
+
+      <!-- Header -->
+      <div class="view-header-bar">
+        <div class="view-header-left">
+          <div class="view-header-text">
+            <h2 class="view-header-title">Inventory &amp; Sales</h2>
+            <span class="view-header-subtitle">Stock health, orders &amp; products</span>
+          </div>
+        </div>
+        <div class="view-header-actions">
+          <span class="view-refresh-label" x-show="opsLastRefresh" x-text="getOpsRefreshLabel()"></span>
+          <button class="btn btn-small btn-icon" @click="loadOps()" :disabled="opsLoading" aria-label="Refresh Ops">
+            <span class="refresh-icon">&#x21bb;</span>
+            <span x-text="opsLoading ? 'Loading...' : 'Refresh'"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="mktops-tabs" style="margin-bottom: 1.25rem;">
+        <button class="filter-pill" :class="opsSection === 'overview' && 'filter-pill-active'" @click="opsSwitchSection('overview')" aria-label="Overview">Overview</button>
+        <button class="filter-pill" :class="opsSection === 'stock' && 'filter-pill-active'" @click="opsSwitchSection('stock')" aria-label="Stock Health">
+          Stock Health
+          <span x-show="ops?.stockHealth" class="crm-tab-count" x-text="ops?.stockHealth?.totalVariants ? formatNumber(ops.stockHealth.totalVariants) : ''"></span>
+        </button>
+        <button class="filter-pill" :class="opsSection === 'sales' && 'filter-pill-active'" @click="opsSwitchSection('sales')" aria-label="Sales">
+          Sales
+          <span x-show="opsSales" class="crm-tab-count" x-text="opsSales ? formatNumber(opsSales.totalOrders) : ''"></span>
+        </button>
+        <button class="filter-pill" :class="opsSection === 'products' && 'filter-pill-active'" @click="opsSwitchSection('products')" aria-label="Products">
+          Products
+          <span x-show="ops?.products" class="crm-tab-count" x-text="ops?.products?.total || ''"></span>
+        </button>
+        <button class="filter-pill" :class="opsSection === 'purchase-orders' && 'filter-pill-active'" @click="opsSwitchSection('purchase-orders')" aria-label="Purchase Orders">
+          Purchase Orders
+          <span x-show="ops?.pendingPOs" class="crm-tab-count" x-text="ops?.pendingPOs?.count || ''"></span>
+        </button>
+      </div>
+
+      <!-- Global loading skeleton -->
+      <div x-show="opsLoading && !ops" class="skeleton-stack" style="padding: 1rem 0;">
+        <div class="loading-skeleton skeleton-text-line"></div>
+        <div class="loading-skeleton skeleton-card"></div>
+        <div class="loading-skeleton skeleton-card"></div>
+      </div>
+
+      <!-- ── OVERVIEW ── -->
+      <template x-if="opsSection === 'overview'">
+        <div>
+          <div x-show="opsLoading && !ops" class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+          <template x-if="!opsLoading || ops">
+            <div>
+              <div class="mktops-overview-shell" style="margin-bottom:1.5rem;">
+                <section class="mktops-hero" :class="'mktops-hero--' + getOpsAreaStatus().tone">
+                  <div class="mktops-hero-copy">
+                    <div class="mktops-hero-kicker">Area Dashboard</div>
+                    <h3 class="mktops-hero-title">Operations operating system</h3>
+                    <p class="mktops-hero-text">See stock health, purchase pressure, and product mix risk before drilling into stock tables, sales, and purchasing details.</p>
+                  </div>
+                  <div class="mktops-hero-status">
+                    <span class="mktops-hero-status-label">Status</span>
+                    <span class="mktops-hero-status-value" x-text="getOpsAreaStatus().label"></span>
+                    <button class="overview-link-btn" @click="opsSwitchSection('stock')">Open Stock</button>
+                  </div>
+                </section>
+
+                <div class="mktops-area-metrics">
+                  <template x-for="metric in getOpsHeroMetrics()" :key="metric.id">
+                    <button class="mktops-area-metric-card area-card-button" @click="getOpsMetricAction(metric.id)()">
+                      <span class="mktops-area-metric-label" x-text="metric.label"></span>
+                      <div class="mktops-area-metric-value" x-text="metric.value"></div>
+                      <span class="mktops-area-metric-note" x-text="metric.note"></span>
+                    </button>
+                  </template>
+                </div>
+
+                <section class="org-col-panel">
+                  <div class="org-section-title-row">
+                    <h3 class="org-section-title">Saved Views</h3>
+                    <span class="org-section-badge" x-text="getOpsSavedViewItems().length"></span>
+                  </div>
+                  <div class="saved-view-pills">
+                    <template x-for="view in getOpsSavedViews()" :key="view.id">
+                      <button class="filter-pill" :class="opsSavedView === view.id && 'filter-pill-active'" @click="applyOpsSavedView(view.id)" x-text="view.label"></button>
+                    </template>
+                  </div>
+                  <div class="overview-feed">
+                    <template x-for="item in getOpsSavedViewItems()" :key="item.title + item.detail">
+                      <button class="overview-feed-item overview-feed-item--warning" @click="item.action()">
+                        <span class="overview-feed-type" x-text="opsSavedView"></span>
+                        <div class="overview-feed-main">
+                          <span class="overview-feed-title" x-text="item.title"></span>
+                          <span class="overview-feed-detail" x-text="item.detail"></span>
+                        </div>
+                      </button>
+                    </template>
+                    <div class="empty-state compact-empty-state" x-show="getOpsSavedViewItems().length === 0">
+                      <p x-text="getOpsSavedViewEmptyState()"></p>
+                    </div>
+                  </div>
+                </section>
+
+                <div class="mktops-overview-grid">
+                  <template x-for="card in getOpsPriorityCards()" :key="card.id">
+                    <section class="mktops-priority-card" :class="'mktops-priority-card--' + card.tone">
+                      <div class="mktops-priority-head">
+                        <div>
+                          <h3 class="mktops-priority-title" x-text="card.title"></h3>
+                          <p class="mktops-priority-copy" x-text="card.label"></p>
+                        </div>
+                        <span class="mktops-priority-value" x-text="card.value"></span>
+                      </div>
+                      <div class="mktops-priority-list">
+                        <template x-for="item in card.items" :key="item.name + item.meta">
+                          <div class="mktops-priority-item">
+                            <span class="mktops-priority-item-name" x-text="item.name"></span>
+                            <span class="mktops-priority-item-meta" x-text="item.meta"></span>
+                          </div>
+                        </template>
+                      </div>
+                    </section>
+                  </template>
+                </div>
+
+                <div class="org-two-col">
+                  <section class="org-col-panel">
+                    <div class="org-section-title-row">
+                      <h3 class="org-section-title">Top Focus</h3>
+                      <span class="org-section-badge" x-text="getOpsFocusList().length"></span>
+                    </div>
+                    <div class="overview-feed">
+                      <template x-for="item in getOpsFocusList()" :key="item.title">
+                        <button class="overview-feed-item overview-feed-item--warning" @click="opsSwitchSection(item.target)">
+                          <span class="overview-feed-type">focus</span>
+                          <div class="overview-feed-main">
+                            <span class="overview-feed-title" x-text="item.title"></span>
+                            <span class="overview-feed-detail" x-text="item.detail"></span>
+                          </div>
+                        </button>
+                      </template>
+                    </div>
+                  </section>
+
+                  <section class="org-col-panel">
+                    <div class="org-section-title-row">
+                      <h3 class="org-section-title">Next Actions</h3>
+                    </div>
+                    <div class="overview-links">
+                      <button class="overview-link-card" @click="opsSwitchSection('stock')">
+                        <span class="overview-link-card-label">Review stock risk</span>
+                        <span class="overview-link-card-copy">Look at variants that are low, out, or nearing stockout.</span>
+                      </button>
+                      <button class="overview-link-card" @click="opsSwitchSection('purchase-orders')">
+                        <span class="overview-link-card-label">Chase pending POs</span>
+                        <span class="overview-link-card-copy">Confirm reorder quantities and whether incoming stock matches the alerts.</span>
+                      </button>
+                      <button class="overview-link-card" @click="opsSwitchSection('products')">
+                        <span class="overview-link-card-label">Check product mix</span>
+                        <span class="overview-link-card-copy">Review tier distribution and vendor exposure across the catalogue.</span>
+                      </button>
+                    </div>
+                  </section>
+                </div>
+              </div>
+
+              <!-- KPI Cards -->
+              <div class="data-card-grid" style="margin-bottom: 1.5rem;">
+                <button class="data-card accent data-card-button" @click="applyOpsSavedView('products')">
+                  <span class="data-card-label">Total Variants</span>
+                  <span class="data-card-value" x-text="ops?.stockHealth?.totalVariants ? formatNumber(ops.stockHealth.totalVariants) : '—'"></span>
+                </button>
+                <button class="data-card success data-card-button" @click="applyOpsSavedView('stock-ok')">
+                  <span class="data-card-label">Healthy Stock</span>
+                  <span class="data-card-value" x-text="ops?.stockHealth?.healthy ?? '—'"></span>
+                </button>
+                <button class="data-card warning data-card-button" @click="applyOpsSavedView('alerts')">
+                  <span class="data-card-label">Low Stock</span>
+                  <span class="data-card-value" x-text="ops?.stockHealth?.lowStock ?? '—'"></span>
+                </button>
+                <button class="data-card danger data-card-button" @click="applyOpsSavedView('alerts')">
+                  <span class="data-card-label">Out of Stock</span>
+                  <span class="data-card-value" x-text="ops?.stockHealth?.outOfStock ?? '—'"></span>
+                </button>
+                <button class="data-card warning data-card-button" @click="applyOpsSavedView('alerts')">
+                  <span class="data-card-label">Reorder Needed</span>
+                  <span class="data-card-value" x-text="ops?.stockHealth?.reorderNeeded ?? '—'"></span>
+                </button>
+                <button class="data-card data-card-button" @click="applyOpsSavedView('pos')">
+                  <span class="data-card-label">Pending POs</span>
+                  <span class="data-card-value" x-text="ops?.pendingPOs?.count ?? '—'"></span>
+                </button>
+              </div>
+
+              <!-- Stacked Bar: Stock Status Distribution -->
+              <template x-if="ops?.stockHealth?.byStatus">
+                <div style="margin-bottom: 1.5rem;">
+                  <div class="ops-section-label">Stock Distribution</div>
+                  <div class="ops-stacked-bar" role="img" aria-label="Stock status distribution bar">
+                    <template x-for="seg in opsStockBarSegments()" :key="seg.name">
+                      <div
+                        class="ops-bar-segment"
+                        :style="`width: ${seg.pct}%; background: ${seg.color};`"
+                        :title="`${seg.name}: ${seg.count}`"
+                      ></div>
+                    </template>
+                  </div>
+                  <div class="ops-bar-legend">
+                    <template x-for="seg in opsStockBarSegments()" :key="seg.name">
+                      <span class="ops-bar-legend-item">
+                        <span class="ops-bar-legend-dot" :style="`background: ${seg.color};`"></span>
+                        <span x-text="`${seg.name} (${seg.count})`"></span>
+                      </span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Two columns: Alerts + Pending POs -->
+              <div class="ops-two-col" style="margin-bottom: 1.5rem;">
+
+                <!-- Stock Alerts -->
+                <div class="data-card" style="padding: 0; overflow: hidden;">
+                  <div style="padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid var(--border);">
+                    <span class="data-card-label">Stock Alerts</span>
+                  </div>
+                  <div style="overflow-x: auto;">
+                    <table class="data-table" style="font-size: 12px;">
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th>Color</th>
+                          <th>Size</th>
+                          <th>Stock</th>
+                          <th>Rate/day</th>
+                          <th>Days Left</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="(row, idx) in (ops?.alerts || []).slice(0, 20)" :key="idx">
+                          <tr>
+                            <td x-text="row.product || '—'" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></td>
+                            <td x-text="row.color || '—'"></td>
+                            <td x-text="row.size || '—'"></td>
+                            <td x-text="row.totalStock ?? '—'"></td>
+                            <td x-text="row.dailySalesRate != null ? row.dailySalesRate.toFixed(1) : '—'"></td>
+                            <td x-text="row.daysUntilStockout != null ? (row.daysUntilStockout === 0 ? '0' : row.daysUntilStockout) : '—'"></td>
+                            <td>
+                              <span class="badge" :class="getStockStatusColor(row.stockStatus)" x-text="stripEmoji(row.stockStatus)"></span>
+                            </td>
+                            <td>
+                              <div class="table-inline-actions">
+                                <template x-for="action in getOpsAlertRowActions(row)" :key="action.label">
+                                  <button class="mini-action-btn" @click="action.handler()" x-text="action.label"></button>
+                                </template>
+                              </div>
+                            </td>
+                          </tr>
+                        </template>
+                        <tr x-show="!ops?.alerts?.length">
+                          <td colspan="8" style="text-align: center; color: var(--text-muted);">No alerts</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Pending Purchase Orders -->
+                <div class="data-card" style="padding: 0; overflow: hidden;">
+                  <div style="padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid var(--border);">
+                    <span class="data-card-label">Pending Purchase Orders</span>
+                  </div>
+                  <div style="overflow-x: auto;">
+                    <table class="data-table" style="font-size: 12px;">
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th>Color</th>
+                          <th>Size</th>
+                          <th>Reorder Qty</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="(po, idx) in (ops?.pendingPOs?.items || []).slice(0, 20)" :key="idx">
+                          <tr>
+                            <td x-text="po.Product || '—'" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></td>
+                            <td x-text="po['Option 1 Value'] || '—'"></td>
+                            <td x-text="po['Option 2 Value'] || '—'"></td>
+                            <td x-text="po.Reorder_Qty ?? '—'"></td>
+                            <td>
+                              <span class="badge" :class="getStockStatusColor(po.Stock_Status)" x-text="stripEmoji(po.Stock_Status || '')"></span>
+                            </td>
+                          </tr>
+                        </template>
+                        <tr x-show="!ops?.pendingPOs?.items?.length">
+                          <td colspan="5" style="text-align: center; color: var(--text-muted);">No pending POs</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Row 4: Product Tiers + Vendors -->
+              <div class="ops-two-col">
+
+                <!-- Product Tiers -->
+                <div class="data-card">
+                  <span class="data-card-label" style="margin-bottom: 0.75rem; display: block;">Product Tiers</span>
+                  <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                    <template x-for="tier in (ops?.products?.byTier || [])" :key="tier.name">
+                      <span class="badge" :data-status="opsTierColor(tier.name)">
+                        Tier <span x-text="tier.name"></span>: <span x-text="tier.count"></span>
+                      </span>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Vendors -->
+                <div class="data-card">
+                  <span class="data-card-label" style="margin-bottom: 0.75rem; display: block;">Vendors</span>
+                  <div style="overflow-x: auto;">
+                    <table class="data-table" style="font-size: 12px;">
+                      <thead>
+                        <tr>
+                          <th>Vendor</th>
+                          <th>Lead Time</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="(v, idx) in (ops?.vendors || [])" :key="idx">
+                          <tr>
+                            <td x-text="v.Vendor || '—'"></td>
+                            <td x-text="v['Lead time'] ? v['Lead time'] + ' days' : '—'"></td>
+                            <td>
+                              <div class="table-inline-actions">
+                                <template x-for="action in getOpsVendorRowActions(v)" :key="action.label">
+                                  <button class="mini-action-btn" @click="action.handler()" x-text="action.label"></button>
+                                </template>
+                              </div>
+                            </td>
+                          </tr>
+                        </template>
+                        <tr x-show="!ops?.vendors?.length">
+                          <td colspan="3" style="text-align: center; color: var(--text-muted);">No vendors</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <!-- ── STOCK HEALTH ── -->
+      <template x-if="opsSection === 'stock'">
+        <div>
+          <!-- Filters -->
+          <div class="mktops-filters" style="margin-bottom: 1rem;">
+            <input
+              class="filter-input"
+              type="search"
+              placeholder="Search product or SKU..."
+              :value="opsStockFilters.search"
+              @input="opsApplyStockFilter('search', $event.target.value)"
+              aria-label="Search stock"
+            >
+            <select class="filter-select" :value="opsStockFilters.status" @change="opsApplyStockFilter('status', $event.target.value)" aria-label="Filter by status">
+              <option value="">All Statuses</option>
+              <option value="OK">OK / Healthy</option>
+              <option value="LOW">Low Stock</option>
+              <option value="REORDER">Reorder Needed</option>
+              <option value="OUT">Out of Stock</option>
+              <option value="EXCESS">Excess</option>
+              <option value="DEAD">Dead Stock</option>
+              <option value="NO_SALES">No Sales</option>
+            </select>
+            <select class="filter-select" :value="opsStockFilters.vendor" @change="opsApplyStockFilter('vendor', $event.target.value)" aria-label="Filter by vendor">
+              <option value="">All Vendors</option>
+              <template x-for="v in (ops?.vendors || [])" :key="v.Vendor">
+                <option :value="v.Vendor" x-text="v.Vendor"></option>
+              </template>
+            </select>
+          </div>
+
+          <div x-show="opsStockLoading" class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+
+          <template x-if="!opsStockLoading">
+            <div>
+              <div class="ops-row-count" x-text="`${opsStockTotal.toLocaleString()} variants`"></div>
+              <div style="overflow-x: auto;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>SKU</th>
+                      <th>Color</th>
+                      <th>Size</th>
+                      <th>Stock</th>
+                      <th>Status</th>
+                      <th>Rate/day</th>
+                      <th>Days Left</th>
+                      <th>Vendor</th>
+                      <th>Tier</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(row, idx) in opsStock" :key="idx">
+                      <tr>
+                        <td x-text="row.Product || '—'" style="max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></td>
+                        <td x-text="row.Variant_SKU || row.Product_Code || '—'" style="font-family: var(--font-mono, monospace); font-size: 11px;"></td>
+                        <td x-text="row['Option 1 Value'] || '—'"></td>
+                        <td x-text="row['Option 2 Value'] || '—'"></td>
+                        <td x-text="row['Total Stock'] ?? '—'"></td>
+                        <td>
+                          <span class="badge" :class="getStockStatusColor(row['Stock Status'])" x-text="stripEmoji(row['Stock Status'] || '')"></span>
+                        </td>
+                        <td x-text="row['Daily Sales Rate'] != null ? Number(row['Daily Sales Rate']).toFixed(1) : '—'"></td>
+                        <td x-text="row['Days Until Stockout'] ?? '—'"></td>
+                        <td x-text="row.Vendor || '—'"></td>
+                        <td>
+                          <span class="badge" :data-status="opsTierColor(row.Product_Tier)" x-text="row.Product_Tier ? 'T' + row.Product_Tier : '—'"></span>
+                        </td>
+                        <td>
+                          <div class="table-inline-actions">
+                            <button class="mini-action-btn" @click="opsFocusVendor(row.Vendor)" x-show="row.Vendor">Vendor</button>
+                            <button class="mini-action-btn" @click="opsFocusPoProduct(row.Product)">POs</button>
+                          </div>
+                        </td>
+                      </tr>
+                    </template>
+                    <tr x-show="!opsStock.length && !opsStockLoading">
+                      <td colspan="11" style="text-align: center; color: var(--text-muted);">No results</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <!-- ── SALES ── -->
+      <template x-if="opsSection === 'sales'">
+        <div>
+          <div x-show="opsSalesLoading && !opsSales" class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+          <template x-if="opsSales && !opsSalesLoading">
+            <div>
+
+              <!-- KPI Row -->
+              <div class="data-card-grid" style="margin-bottom: 1.5rem;">
+                <div class="data-card accent">
+                  <span class="data-card-label">Total Orders</span>
+                  <span class="data-card-value" x-text="formatNumber(opsSales.totalOrders)"></span>
+                </div>
+                <div class="data-card">
+                  <span class="data-card-label">Total Units</span>
+                  <span class="data-card-value" x-text="formatNumber(opsSales.totalQuantity)"></span>
+                </div>
+                <div class="data-card success">
+                  <span class="data-card-label">Total Revenue</span>
+                  <span class="data-card-value" x-text="formatCurrency(opsSales.totalRevenue)"></span>
+                </div>
+              </div>
+
+              <!-- By Channel + Top Cities -->
+              <div class="ops-two-col" style="margin-bottom: 1.5rem;">
+                <div class="data-card" style="padding: 0; overflow: hidden;">
+                  <div style="padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid var(--border);">
+                    <span class="data-card-label">By Channel</span>
+                  </div>
+                  <div style="overflow-x: auto;">
+                    <table class="data-table" style="font-size: 12px;">
+                      <thead>
+                        <tr>
+                          <th>Channel</th>
+                          <th>Orders</th>
+                          <th>Units</th>
+                          <th>Revenue</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="(ch, idx) in (opsSales.byChannel || [])" :key="idx">
+                          <tr>
+                            <td x-text="ch.name || '—'" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></td>
+                            <td x-text="formatNumber(ch.orders)"></td>
+                            <td x-text="formatNumber(ch.qty)"></td>
+                            <td x-text="formatCurrency(ch.revenue)"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="data-card" style="padding: 0; overflow: hidden;">
+                  <div style="padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid var(--border);">
+                    <span class="data-card-label">Top Cities</span>
+                  </div>
+                  <div style="overflow-x: auto;">
+                    <table class="data-table" style="font-size: 12px;">
+                      <thead>
+                        <tr>
+                          <th>City</th>
+                          <th>Orders</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="(city, idx) in (opsSales.byCity || []).slice(0, 10)" :key="idx">
+                          <tr>
+                            <td x-text="city.name || '—'"></td>
+                            <td x-text="formatNumber(city.count)"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Top Products -->
+              <div class="data-card" style="padding: 0; overflow: hidden; margin-bottom: 1.5rem;">
+                <div style="padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid var(--border);">
+                  <span class="data-card-label">Top Products by Quantity</span>
+                </div>
+                <div style="overflow-x: auto;">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Product</th>
+                        <th>Orders</th>
+                        <th>Units Sold</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(p, idx) in (opsSales.topProducts || []).slice(0, 15)" :key="idx">
+                        <tr>
+                          <td x-text="idx + 1" style="color: var(--text-muted);"></td>
+                          <td x-text="p.name || '—'"></td>
+                          <td x-text="formatNumber(p.orders)"></td>
+                          <td x-text="formatNumber(p.qty)"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Recent Orders -->
+              <div class="data-card" style="padding: 0; overflow: hidden;">
+                <div style="padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid var(--border);">
+                  <span class="data-card-label">Recent Orders</span>
+                </div>
+                <div style="overflow-x: auto;">
+                  <table class="data-table" style="font-size: 12px;">
+                    <thead>
+                      <tr>
+                        <th>Order #</th>
+                        <th>Date</th>
+                        <th>Customer</th>
+                        <th>Product</th>
+                        <th>Qty</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(o, idx) in (opsSales.recentOrders || []).slice(0, 20)" :key="idx">
+                        <tr>
+                          <td x-text="o.orderNum || '—'" style="font-family: var(--font-mono, monospace); font-size: 11px;"></td>
+                          <td x-text="o.date || '—'"></td>
+                          <td x-text="o.customer || '—'"></td>
+                          <td x-text="o.product || '—'" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></td>
+                          <td x-text="o.qty ?? '—'"></td>
+                          <td x-text="formatCurrency(o.amount)"></td>
+                          <td>
+                            <span class="badge" x-text="o.status || '—'"></span>
+                          </td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <!-- ── PRODUCTS ── -->
+      <template x-if="opsSection === 'products'">
+        <div>
+          <!-- Filters -->
+          <div class="mktops-filters" style="margin-bottom: 1rem;">
+            <input
+              class="filter-input"
+              type="search"
+              placeholder="Search product..."
+              :value="opsProductsFilters.search"
+              @input="opsApplyProductsFilter('search', $event.target.value)"
+              aria-label="Search products"
+            >
+            <select class="filter-select" :value="opsProductsFilters.tier" @change="opsApplyProductsFilter('tier', $event.target.value)" aria-label="Filter by tier">
+              <option value="">All Tiers</option>
+              <option value="A">Tier A</option>
+              <option value="B">Tier B</option>
+              <option value="C">Tier C</option>
+              <option value="D">Tier D</option>
+            </select>
+            <select class="filter-select" :value="opsProductsFilters.vendor" @change="opsApplyProductsFilter('vendor', $event.target.value)" aria-label="Filter by vendor">
+              <option value="">All Vendors</option>
+              <template x-for="v in (ops?.vendors || [])" :key="v.Vendor">
+                <option :value="v.Vendor" x-text="v.Vendor"></option>
+              </template>
+            </select>
+          </div>
+
+          <div x-show="opsProductsLoading" class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+
+          <template x-if="!opsProductsLoading">
+            <div>
+              <div class="ops-row-count" x-text="`${opsProductsTotal} products`"></div>
+              <div style="overflow-x: auto;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Product Name</th>
+                      <th>Code</th>
+                      <th>Vendor</th>
+                      <th>Tier</th>
+                      <th>Velocity Score</th>
+                      <th>Inventory Type</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(p, idx) in opsProducts" :key="idx">
+                      <tr>
+                        <td x-text="p.Product_Name || '—'"></td>
+                        <td x-text="p.Product_Code || '—'" style="font-family: var(--font-mono, monospace); font-size: 11px;"></td>
+                        <td x-text="p.Vendor || '—'"></td>
+                        <td>
+                          <span class="badge" :data-status="opsTierColor(p['Template Product Tier Classification'])" x-text="p['Template Product Tier Classification'] ? 'T' + p['Template Product Tier Classification'] : '—'"></span>
+                        </td>
+                        <td x-text="p['All Product Velocity Score'] != null ? Number(p['All Product Velocity Score']).toFixed(1) : '—'"></td>
+                        <td x-text="p.Inventory_Type || '—'"></td>
+                        <td>
+                          <span class="badge" x-text="p.Status || '—'"></span>
+                        </td>
+                        <td>
+                          <div class="table-inline-actions">
+                            <template x-for="action in getOpsProductRowActions(p)" :key="action.label">
+                              <button class="mini-action-btn" @click="action.handler()" x-text="action.label"></button>
+                            </template>
+                          </div>
+                        </td>
+                      </tr>
+                    </template>
+                    <tr x-show="!opsProducts.length && !opsProductsLoading">
+                      <td colspan="8" style="text-align: center; color: var(--text-muted);">No products</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <!-- ── PURCHASE ORDERS ── -->
+      <template x-if="opsSection === 'purchase-orders'">
+        <div>
+          <div x-show="opsPOsLoading" class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+          <template x-if="!opsPOsLoading">
+            <div>
+              <div class="ops-row-count" x-text="`${opsPOsTotal} purchase orders`"></div>
+              <div style="overflow-x: auto;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Color</th>
+                      <th>Size</th>
+                      <th>Status</th>
+                      <th>Reorder Qty</th>
+                      <th>Total Stock</th>
+                      <th>Rate/day</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="(po, idx) in opsPOs" :key="idx">
+                      <tr>
+                        <td x-text="po.Product || '—'" style="max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></td>
+                        <td x-text="po['Option 1 Value'] || '—'"></td>
+                        <td x-text="po['Option 2 Value'] || '—'"></td>
+                        <td>
+                          <span class="badge" :class="getStockStatusColor(po.Stock_Status)" x-text="stripEmoji(po.Stock_Status || '')"></span>
+                        </td>
+                        <td x-text="po.Reorder_Qty ?? '—'"></td>
+                        <td x-text="po.Total_Stock ?? '—'"></td>
+                        <td x-text="po['Daily Sales Rate'] != null ? Number(po['Daily Sales Rate']).toFixed(1) : '—'"></td>
+                        <td>
+                          <div class="table-inline-actions">
+                            <template x-for="action in getOpsPoRowActions(po)" :key="action.label">
+                              <button class="mini-action-btn" @click="action.handler()" x-text="action.label"></button>
+                            </template>
+                          </div>
+                        </td>
+                      </tr>
+                    </template>
+                    <tr x-show="!opsPOs.length && !opsPOsLoading">
+                      <td colspan="8" style="text-align: center; color: var(--text-muted);">No purchase orders</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>

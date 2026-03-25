@@ -1,6 +1,9 @@
 node_modules/
 .env
+.env.*
 .sessions/
 .DS_Store
 inspo set up/
 client/
+Zreference/
+*.log

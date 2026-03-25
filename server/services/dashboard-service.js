@@ -1,9 +1,13 @@
 const notionService = require('./notion');
 
 const ACTION_QUEUE_CACHE_TTL = 30 * 1000;
+const TEAM_WORKLOAD_CACHE_TTL = 60 * 1000;
+const RECENT_ACTIVITY_CACHE_TTL = 60 * 1000;
 const DAN_ID = '307247aa0d7b81318999e80042f45d6a';
 
 let actionQueueResponseCache = null;
+let teamWorkloadCache = null;
+let recentActivityCache = null;
 
 function getFreshCache(entry, ttlMs) {
   if (!entry) return null;
@@ -13,14 +17,6 @@ function getFreshCache(entry, ttlMs) {
 
 async function getMorningBrief() {
   return notionService.getMorningBrief();
-}
-
-async function getDashboardPayload() {
-  const summary = await notionService.getDashboardSummary();
-  return {
-    ...summary,
-    morningBrief: notionService.buildMorningBriefFromDashboard(summary),
-  };
 }
 
 function enrichActionQueueCommitments(allCommitments, people, focusAreas, today) {
@@ -122,15 +118,144 @@ async function getActionQueuePayload() {
   return payload;
 }
 
+/**
+ * Compute capacity label from active commitment count.
+ * @param {number} count
+ * @returns {'overloaded'|'moderate'|'light'}
+ */
+function capacityLabel(count) {
+  if (count >= 8) return 'overloaded';
+  if (count >= 5) return 'moderate';
+  return 'light';
+}
+
+/**
+ * Build team workload summary from people + active commitments.
+ * Returns [{ id, name, activeCount, overdueCount, capacity }]
+ */
+async function getTeamWorkload() {
+  const cached = getFreshCache(teamWorkloadCache, TEAM_WORKLOAD_CACHE_TTL);
+  if (cached) return cached;
+
+  const today = new Date().toISOString().split('T')[0];
+
+  const [people, commitments] = await Promise.all([
+    notionService.getPeople(),
+    notionService.getActiveCommitments(),
+  ]);
+
+  // Build lookup: normalised ID (no dashes) → person
+  const personMap = {};
+  people.forEach((p) => {
+    personMap[p.id.replace(/-/g, '')] = { id: p.id, name: p.Name, activeCount: 0, overdueCount: 0 };
+  });
+
+  for (const c of commitments) {
+    const assignedIds = Array.isArray(c['Assigned To']) ? c['Assigned To'] : [];
+    for (const rawId of assignedIds) {
+      const nid = rawId.replace(/-/g, '');
+      if (!personMap[nid]) continue;
+      personMap[nid].activeCount++;
+      const dueDate = typeof c['Due Date'] === 'object' ? c['Due Date']?.start : c['Due Date'];
+      if (dueDate && dueDate < today) {
+        personMap[nid].overdueCount++;
+      }
+    }
+  }
+
+  const result = Object.values(personMap).map((p) => ({
+    id: p.id,
+    name: p.name,
+    activeCount: p.activeCount,
+    overdueCount: p.overdueCount,
+    capacity: capacityLabel(p.activeCount),
+  }));
+
+  teamWorkloadCache = { data: result, time: Date.now() };
+  return result;
+}
+
+/**
+ * Surface activity from the past 48 hours across commitments and decisions.
+ * Returns { completions, newBlockers, recentDecisions } — max 10 items each, sorted by recency.
+ */
+async function getRecentActivity() {
+  const cached = getFreshCache(recentActivityCache, RECENT_ACTIVITY_CACHE_TTL);
+  if (cached) return cached;
+
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+  // getAllCommitments includes Done items (needed for completions); getActiveCommitments covers blockers.
+  const [allCommitments, decisions] = await Promise.all([
+    notionService.getAllCommitments(true), // include Done + Cancelled
+    notionService.getRecentDecisions(2),   // past 2 days
+  ]);
+
+  const recentCommitments = allCommitments.filter(
+    (c) => c.last_edited_time && c.last_edited_time >= cutoff,
+  );
+
+  const completions = recentCommitments
+    .filter((c) => c.Status === 'Done')
+    .sort((a, b) => (b.last_edited_time > a.last_edited_time ? 1 : -1))
+    .slice(0, 10)
+    .map((c) => ({
+      id: c.id,
+      name: c.Name,
+      lastEdited: c.last_edited_time,
+    }));
+
+  const newBlockers = recentCommitments
+    .filter((c) => c.Status === 'Blocked')
+    .sort((a, b) => (b.last_edited_time > a.last_edited_time ? 1 : -1))
+    .slice(0, 10)
+    .map((c) => ({
+      id: c.id,
+      name: c.Name,
+      lastEdited: c.last_edited_time,
+    }));
+
+  const recentDecisions = decisions
+    .slice(0, 10)
+    .map((d) => ({
+      id: d.id,
+      name: d.Name || d.Decision || d.Title || 'Untitled',
+      date: typeof d.Date === 'object' ? d.Date?.start : d.Date,
+    }));
+
+  const result = { completions, newBlockers, recentDecisions };
+  recentActivityCache = { data: result, time: Date.now() };
+  return result;
+}
+
+async function getDashboardPayload() {
+  const [summary, teamWorkload, recentActivity] = await Promise.all([
+    notionService.getDashboardSummary(),
+    getTeamWorkload(),
+    getRecentActivity(),
+  ]);
+  return {
+    ...summary,
+    morningBrief: notionService.buildMorningBriefFromDashboard(summary),
+    teamWorkload,
+    recentActivity,
+  };
+}
+
 function clearCache() {
   actionQueueResponseCache = null;
+  teamWorkloadCache = null;
+  recentActivityCache = null;
 }
 
 module.exports = {
   getMorningBrief,
   getDashboardPayload,
   getActionQueuePayload,
+  getTeamWorkload,
+  getRecentActivity,
   enrichActionQueueCommitments,
   buildActionQueues,
   clearCache,
+  capacityLabel,
 };

@@ -1,11 +1,14 @@
 'use strict';
 
 const dashboardService = require('./dashboard-service');
+const crmService = require('./crm-service');
 const marketingOpsService = require('./marketing-ops-service');
+const opsService = require('./ops-service');
 const techTeamService = require('./tech-team-service');
 const notionService = require('./notion');
+const projectsService = require('./projects-service');
 
-const CACHE_TTL_MS = 30 * 1000;
+const CACHE_TTL_MS = 2 * 60 * 1000;
 
 let overviewCache = null;
 
@@ -236,6 +239,358 @@ function buildInsights(dashboard, actionQueue, mktTasksSummary, techSummary) {
   };
 }
 
+function getAreaStatus({ critical = 0, atRisk = 0, warning = 0, hasData = true } = {}) {
+  if (!hasData) return 'unknown';
+  if (critical > 0) return 'critical';
+  if (atRisk > 0 || warning > 0) return 'at-risk';
+  return 'healthy';
+}
+
+function statusLabel(status) {
+  if (status === 'critical') return 'Critical';
+  if (status === 'at-risk') return 'At Risk';
+  if (status === 'healthy') return 'Healthy';
+  return 'Unknown';
+}
+
+function getCrmStalledCount(crmOverview) {
+  const statuses = crmOverview?.pipeline?.statusBreakdown || crmOverview?.leadStats?.byStatus || [];
+  return statuses.reduce((sum, item) => {
+    const name = String(item.name || item.Status || '').toLowerCase();
+    return name.includes('stall') ? sum + (item.count || 0) : sum;
+  }, 0);
+}
+
+function buildExecutiveKpis({ health, projects, people, crmOverview, opsOverview, dashboard }) {
+  const stalledCrm = getCrmStalledCount(crmOverview);
+  const focusAreaTotal =
+    (health?.focusAreas?.distribution?.onTrack || 0) +
+    (health?.focusAreas?.distribution?.atRisk || 0) +
+    (health?.focusAreas?.distribution?.offTrack || 0);
+  const overloadedPeople = (dashboard?.teamWorkload || []).filter(person => person.capacity === 'overloaded').length;
+  const opsAlerts = opsOverview?.alerts?.length || 0;
+  const opsOutOfStock = opsOverview?.stockHealth?.outOfStock || 0;
+  return [
+    {
+      id: 'focus-areas',
+      title: 'Focus Areas',
+      value: focusAreaTotal,
+      label: 'total',
+      sublabel: `${(health?.focusAreas?.distribution?.atRisk || 0) + (health?.focusAreas?.distribution?.offTrack || 0)} at risk`,
+      badge: (health?.focusAreas?.distribution?.atRisk || 0) + (health?.focusAreas?.distribution?.offTrack || 0) > 0
+        ? `${(health?.focusAreas?.distribution?.atRisk || 0) + (health?.focusAreas?.distribution?.offTrack || 0)} at risk`
+        : null,
+      status: getAreaStatus({
+        critical: health?.focusAreas?.distribution?.offTrack || 0,
+        atRisk: health?.focusAreas?.distribution?.atRisk || 0,
+        hasData: focusAreaTotal > 0,
+      }),
+      targetView: 'dashboard',
+      healthSegments: health?.focusAreas?.distribution || null,
+    },
+    {
+      id: 'projects',
+      title: 'Projects',
+      value: projects?.active || 0,
+      label: 'active',
+      sublabel: `${projects?.avgProgress || 0}% avg progress`,
+      status: getAreaStatus({ atRisk: (projects?.items || []).filter(item => (item.overdueCount || 0) > 0).length, hasData: true }),
+      targetView: 'projects',
+    },
+    {
+      id: 'crm',
+      title: 'CRM',
+      value: crmOverview?.pipeline?.totalLeads || crmOverview?.leadStats?.total || 0,
+      label: 'leads',
+      sublabel: stalledCrm > 0 ? `${stalledCrm} stalled` : 'Pipeline healthy',
+      badge: stalledCrm > 0 ? `${stalledCrm} stalled` : null,
+      status: getAreaStatus({
+        atRisk: stalledCrm,
+        hasData: (crmOverview?.pipeline?.available !== false) || (crmOverview?.leadStats?.total || 0) > 0,
+      }),
+      targetView: 'crm',
+    },
+    {
+      id: 'marketing',
+      title: 'Marketing',
+      value: health?.marketing?.activeCampaigns || 0,
+      label: 'campaigns',
+      sublabel: `${health?.marketing?.tasksOverdue || 0} overdue tasks`,
+      badge: (health?.marketing?.tasksOverdue || 0) > 0 ? `${health?.marketing?.tasksOverdue || 0} overdue` : null,
+      status: getAreaStatus({
+        critical: health?.marketing?.tasksBlocked || 0,
+        atRisk: health?.marketing?.tasksOverdue || 0,
+        hasData: true,
+      }),
+      targetView: 'marketingOps',
+    },
+    {
+      id: 'tech',
+      title: 'Tech',
+      value: health?.tech?.sprintPctComplete || 0,
+      label: 'complete',
+      valueSuffix: '%',
+      sublabel: `${health?.tech?.sprintBlocked || 0} blocked items`,
+      badge: (health?.tech?.sprintBlocked || 0) > 0 ? `${health?.tech?.sprintBlocked || 0} blocked` : null,
+      status: getAreaStatus({
+        critical: health?.tech?.sprintBlocked || 0,
+        hasData: (health?.tech?.sprintTotal || 0) > 0,
+      }),
+      targetView: 'techTeam',
+      progress: health?.tech?.sprintPctComplete || 0,
+    },
+    {
+      id: 'operations',
+      title: 'Operations',
+      value: opsAlerts,
+      label: 'alerts',
+      sublabel: opsOutOfStock > 0 ? `${opsOutOfStock} out of stock` : 'Stock watch stable',
+      badge: opsOutOfStock > 0 ? `${opsOutOfStock} out` : null,
+      status: getAreaStatus({
+        critical: opsOutOfStock,
+        atRisk: opsAlerts,
+        hasData: !!opsOverview,
+      }),
+      targetView: 'ops',
+    },
+    {
+      id: 'team',
+      title: 'Team Load',
+      value: overloadedPeople,
+      label: 'overloaded',
+      sublabel: `${people?.total || 0} people tracked`,
+      badge: overloadedPeople > 0 ? `${overloadedPeople} overloaded` : null,
+      status: getAreaStatus({ atRisk: overloadedPeople, hasData: (people?.total || 0) > 0 }),
+      targetView: 'team',
+    },
+  ];
+}
+
+function buildAreaCards({ health, crmOverview, opsOverview, projects, people, dashboard }) {
+  const stalledCrm = getCrmStalledCount(crmOverview);
+  const overloadedPeople = (dashboard?.teamWorkload || []).filter(person => person.capacity === 'overloaded');
+  const activeProjects = projects?.active || 0;
+  const atRiskProjects = (projects?.items || []).filter(item => (item.overdueCount || 0) > 0).length;
+  const areaCards = [
+    {
+      id: 'projects',
+      label: 'Projects & Focus Areas',
+      status: getAreaStatus({
+        critical: health?.focusAreas?.distribution?.offTrack || 0,
+        atRisk: (health?.focusAreas?.distribution?.atRisk || 0) + atRiskProjects,
+        hasData: activeProjects > 0 || ((health?.focusAreas?.distribution?.onTrack || 0) + (health?.focusAreas?.distribution?.atRisk || 0) + (health?.focusAreas?.distribution?.offTrack || 0) > 0),
+      }),
+      owner: 'Command Centre',
+      headlineMetric: { label: 'Active projects', value: activeProjects },
+      secondaryMetrics: [
+        { label: 'Avg progress', value: `${projects?.avgProgress || 0}%` },
+        { label: 'At risk focus areas', value: (health?.focusAreas?.distribution?.atRisk || 0) + (health?.focusAreas?.distribution?.offTrack || 0) },
+        { label: 'Overdue projects', value: atRiskProjects },
+      ],
+      topRisk: (health?.focusAreas?.atRiskItems || [])[0]
+        ? `${health.focusAreas.atRiskItems[0].name} is ${String(health.focusAreas.atRiskItems[0].health || '').toLowerCase()}`
+        : 'No focus areas flagged',
+      nextMilestone: `${attentionLabel(projects?.items?.[0]?.name, 'Next active project')}`,
+      targetView: 'projects',
+      ctaLabel: 'Open Projects',
+    },
+    {
+      id: 'marketing',
+      label: 'Marketing',
+      status: getAreaStatus({
+        critical: health?.marketing?.tasksBlocked || 0,
+        atRisk: health?.marketing?.tasksOverdue || 0,
+        hasData: true,
+      }),
+      owner: 'Marketing Ops',
+      headlineMetric: { label: 'Active campaigns', value: health?.marketing?.activeCampaigns || 0 },
+      secondaryMetrics: [
+        { label: 'Content pipeline', value: health?.marketing?.contentInPipeline || 0 },
+        { label: 'Overdue tasks', value: health?.marketing?.tasksOverdue || 0 },
+        { label: 'Due next 7d', value: health?.marketing?.contentScheduledNext7Days || 0 },
+      ],
+      topRisk: (health?.marketing?.tasksBlocked || 0) > 0
+        ? `${health.marketing.tasksBlocked} blocked marketing tasks`
+        : `${health?.marketing?.tasksOverdue || 0} overdue marketing tasks`,
+      nextMilestone: `${health?.marketing?.contentScheduledNext7Days || 0} content items scheduled in the next 7 days`,
+      targetView: 'marketingOps',
+      ctaLabel: 'Open Marketing',
+    },
+    {
+      id: 'crm',
+      label: 'CRM Pipeline',
+      status: getAreaStatus({
+        atRisk: stalledCrm,
+        hasData: (crmOverview?.pipeline?.available !== false) || (crmOverview?.leadStats?.total || 0) > 0,
+      }),
+      owner: 'CRM',
+      headlineMetric: { label: 'Total leads', value: crmOverview?.pipeline?.totalLeads || crmOverview?.leadStats?.total || 0 },
+      secondaryMetrics: [
+        { label: 'Lead flows', value: crmOverview?.flowStats?.total || 0 },
+        { label: 'Stalled', value: stalledCrm },
+        { label: 'Team', value: crmOverview?.team?.count || 0 },
+      ],
+      topRisk: stalledCrm > 0 ? `${stalledCrm} leads are stalled` : 'No stalled pipeline signal',
+      nextMilestone: crmOverview?.leadStats?.recentLeads?.[0]?.name
+        ? `Newest lead: ${crmOverview.leadStats.recentLeads[0].name}`
+        : 'Review newest qualified leads',
+      targetView: 'crm',
+      ctaLabel: 'Open CRM',
+    },
+    {
+      id: 'tech',
+      label: 'Tech Team',
+      status: getAreaStatus({
+        critical: health?.tech?.sprintBlocked || 0,
+        atRisk: (health?.tech?.backlogP0P1 || 0) > 0 ? 1 : 0,
+        hasData: (health?.tech?.sprintTotal || 0) > 0,
+      }),
+      owner: 'Tech Team',
+      headlineMetric: { label: 'Sprint progress', value: `${health?.tech?.sprintPctComplete || 0}%` },
+      secondaryMetrics: [
+        { label: 'Blocked', value: health?.tech?.sprintBlocked || 0 },
+        { label: 'Backlog', value: health?.tech?.backlogTotal || 0 },
+        { label: 'P0/P1', value: health?.tech?.backlogP0P1 || 0 },
+      ],
+      topRisk: (health?.tech?.sprintBlocked || 0) > 0
+        ? `${health.tech.sprintBlocked} sprint items are blocked`
+        : `${health?.tech?.backlogP0P1 || 0} high-priority backlog items`,
+      nextMilestone: `${health?.tech?.specsInReview || 0} specs in review`,
+      targetView: 'techTeam',
+      ctaLabel: 'Open Tech',
+    },
+    {
+      id: 'operations',
+      label: 'Operations',
+      status: getAreaStatus({
+        critical: opsOverview?.stockHealth?.outOfStock || 0,
+        atRisk: (opsOverview?.stockHealth?.lowStock || 0) + (opsOverview?.stockHealth?.reorderNeeded || 0),
+        hasData: !!opsOverview,
+      }),
+      owner: 'Ops',
+      headlineMetric: { label: 'Stock alerts', value: opsOverview?.alerts?.length || 0 },
+      secondaryMetrics: [
+        { label: 'Out of stock', value: opsOverview?.stockHealth?.outOfStock || 0 },
+        { label: 'Reorder', value: opsOverview?.stockHealth?.reorderNeeded || 0 },
+        { label: 'Pending POs', value: opsOverview?.pendingPOs?.count || 0 },
+      ],
+      topRisk: (opsOverview?.alerts || [])[0]
+        ? `${opsOverview.alerts[0].product || 'Item'} is ${String(opsOverview.alerts[0].stockStatus || '').trim()}`
+        : 'No urgent stock alerts',
+      nextMilestone: `${opsOverview?.products?.total || 0} product types tracked`,
+      targetView: 'ops',
+      ctaLabel: 'Open Ops',
+    },
+    {
+      id: 'team',
+      label: 'Team',
+      status: getAreaStatus({
+        atRisk: overloadedPeople.length,
+        hasData: (people?.total || 0) > 0,
+      }),
+      owner: 'People',
+      headlineMetric: { label: 'People tracked', value: people?.total || 0 },
+      secondaryMetrics: [
+        { label: 'Overloaded', value: overloadedPeople.length },
+        { label: 'Moderate', value: (dashboard?.teamWorkload || []).filter(person => person.capacity === 'moderate').length },
+        { label: 'Light', value: (dashboard?.teamWorkload || []).filter(person => person.capacity === 'light').length },
+      ],
+      topRisk: overloadedPeople[0]
+        ? `${overloadedPeople[0].name} has ${overloadedPeople[0].activeCount} active commitments`
+        : 'No overload signals right now',
+      nextMilestone: people?.members?.[0]?.name
+        ? `Next check-in: ${people.members[0].name}`
+        : 'Open team directory',
+      targetView: 'team',
+      ctaLabel: 'Open Team',
+    },
+  ];
+  return areaCards.map(card => ({
+    ...card,
+    statusLabel: statusLabel(card.status),
+  }));
+}
+
+function buildActivityFeed({ dashboard, attention, insights }) {
+  const items = [];
+  for (const blocker of (dashboard?.recentActivity?.newBlockers || []).slice(0, 4)) {
+    items.push({
+      id: `blocker-${blocker.id}`,
+      type: 'blocked',
+      title: blocker.name,
+      detail: 'New blocker raised',
+      timestamp: blocker.lastEdited,
+      targetView: 'dashboard',
+      tone: 'critical',
+    });
+  }
+  for (const completion of (dashboard?.recentActivity?.completions || []).slice(0, 4)) {
+    items.push({
+      id: `completion-${completion.id}`,
+      type: 'done',
+      title: completion.name,
+      detail: 'Commitment completed',
+      timestamp: completion.lastEdited,
+      targetView: 'commitments',
+      tone: 'healthy',
+    });
+  }
+  for (const decision of (insights?.recentDecisions || []).slice(0, 4)) {
+    const date = typeof decision.Date === 'object' ? decision.Date?.start : decision.Date;
+    items.push({
+      id: `decision-${decision.id}`,
+      type: 'decision',
+      title: decision.Name || decision.Decision || 'Decision',
+      detail: 'Recent decision logged',
+      timestamp: date || null,
+      targetView: 'decisions',
+      tone: 'neutral',
+    });
+  }
+  for (const item of (attention?.upcomingDeadlines || []).slice(0, 3)) {
+    items.push({
+      id: `deadline-${item.id}`,
+      type: 'deadline',
+      title: item.name,
+      detail: item.owner ? `Due soon · ${item.owner}` : 'Due soon',
+      timestamp: item.dueDate,
+      targetView: 'commitments',
+      tone: 'warning',
+    });
+  }
+  return items
+    .filter(item => item.title)
+    .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+    .slice(0, 10);
+}
+
+function attentionLabel(value, fallback) {
+  return value || fallback;
+}
+
+function buildQuickLinks({ attention, areaCards }) {
+  const links = [
+    {
+      id: 'action-queue',
+      label: 'Action Queue',
+      description: `${attention?.counts?.waitingOnDan || 0} items waiting on Dan`,
+      targetView: 'actionQueue',
+    },
+    {
+      id: 'dashboard',
+      label: 'Execution Dashboard',
+      description: `${attention?.counts?.overdueTotal || 0} overdue commitments`,
+      targetView: 'dashboard',
+    },
+  ];
+  return links.concat((areaCards || []).slice(0, 4).map(card => ({
+    id: `area-${card.id}`,
+    label: card.label,
+    description: card.topRisk,
+    targetView: card.targetView,
+  })));
+}
+
 async function getOverviewPayload() {
   const cached = getFreshCache();
   if (cached) return cached;
@@ -249,6 +604,10 @@ async function getOverviewPayload() {
     aiTeamResult,
     techBacklogResult,
     sessionsResult,
+    peopleResult,
+    projectsPayloadResult,
+    crmOverviewResult,
+    opsOverviewResult,
   ] = await Promise.allSettled([
     dashboardService.getActionQueuePayload(),
     dashboardService.getDashboardPayload(),
@@ -258,6 +617,10 @@ async function getOverviewPayload() {
     notionService.getAITeam(),
     techTeamService.getTechBacklog({}),
     notionService.getSessionsLog(30),
+    notionService.getPeople(),
+    projectsService.getProjectsPayload(),
+    crmService.getOverview(),
+    opsService.getOverview(),
   ]);
 
   const actionQueue = actionQueueResult.status === 'fulfilled' ? actionQueueResult.value : null;
@@ -268,6 +631,12 @@ async function getOverviewPayload() {
   const aiTeam = aiTeamResult.status === 'fulfilled' ? aiTeamResult.value : [];
   const techBacklog = techBacklogResult.status === 'fulfilled' ? techBacklogResult.value : [];
   const sessions = sessionsResult.status === 'fulfilled' ? sessionsResult.value : [];
+  const peopleRaw = peopleResult.status === 'fulfilled' ? (peopleResult.value || []) : [];
+  const projectsRaw = projectsPayloadResult.status === 'fulfilled'
+    ? (projectsPayloadResult.value && projectsPayloadResult.value.projects ? projectsPayloadResult.value.projects : [])
+    : [];
+  const crmOverview = crmOverviewResult.status === 'fulfilled' ? crmOverviewResult.value : null;
+  const opsOverview = opsOverviewResult.status === 'fulfilled' ? opsOverviewResult.value : null;
 
   // Log any source failures but continue with partial data
   [
@@ -279,16 +648,57 @@ async function getOverviewPayload() {
     ['ai-team', aiTeamResult],
     ['tech-backlog', techBacklogResult],
     ['sessions', sessionsResult],
+    ['people', peopleResult],
+    ['projects', projectsPayloadResult],
+    ['crm-overview', crmOverviewResult],
+    ['ops-overview', opsOverviewResult],
   ].forEach(([name, result]) => {
     if (result.status === 'rejected') {
       console.error(`[overview] ${name} failed:`, result.reason && result.reason.message);
     }
   });
 
+  const attention = buildAttention(actionQueue, dashboard);
+  const health = buildHealth(dashboard, mktOpsSummary, mktTasksSummary, techSummary, aiTeam, techBacklog, sessions);
+  const insights = buildInsights(dashboard, actionQueue, mktTasksSummary, techSummary);
+  const people = {
+    total: peopleRaw.length,
+    members: peopleRaw.map(p => ({
+      id: p.id,
+      name: p.Name,
+      role: p.Role || p.Title || '',
+      status: p.Status || 'Active',
+    })).slice(0, 12),
+  };
+  const projects = {
+    total: projectsRaw.length,
+    active: projectsRaw.filter(p => p.Status !== 'Done' && p.Status !== 'Cancelled').length,
+    avgProgress: Math.round(projectsRaw.reduce((sum, p) => sum + (p.progressPercent || 0), 0) / Math.max(projectsRaw.length, 1)),
+    items: projectsRaw.slice(0, 8).map(p => ({
+      id: p.id,
+      name: p.Name,
+      status: p.Status,
+      progress: p.progressPercent || 0,
+      openCount: p.openCount || 0,
+      overdueCount: p.overdueCount || 0,
+    })),
+  };
+  const executiveKpis = buildExecutiveKpis({ attention, health, projects, people, crmOverview, opsOverview, dashboard });
+  const areaCards = buildAreaCards({ health, crmOverview, opsOverview, projects, people, dashboard });
+  const activityFeed = buildActivityFeed({ dashboard, attention, insights });
+
   const payload = {
-    attention: buildAttention(actionQueue, dashboard),
-    health: buildHealth(dashboard, mktOpsSummary, mktTasksSummary, techSummary, aiTeam, techBacklog, sessions),
-    insights: buildInsights(dashboard, actionQueue, mktTasksSummary, techSummary),
+    attention,
+    health,
+    insights,
+    people,
+    projects,
+    crm: crmOverview,
+    ops: opsOverview,
+    executiveKpis,
+    areaCards,
+    activityFeed,
+    quickLinks: buildQuickLinks({ attention, areaCards }),
     timestamp: new Date().toISOString(),
   };
 

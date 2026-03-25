@@ -258,6 +258,36 @@ router.get('/people/:id/detail', async (req, res) => {
 });
 
 /**
+ * GET /api/notion/team-workload
+ * Per-person commitment count + capacity label.
+ * Returns [{ id, name, activeCount, overdueCount, capacity }]
+ */
+router.get('/team-workload', async (req, res) => {
+  try {
+    const workload = await dashboardService.getTeamWorkload();
+    res.json({ teamWorkload: workload });
+  } catch (err) {
+    console.error('Team workload error:', err);
+    res.status(500).json({ error: 'Failed to load team workload' });
+  }
+});
+
+/**
+ * GET /api/notion/recent-activity
+ * Commitments and decisions touched in the past 48 hours.
+ * Returns { completions, newBlockers, recentDecisions }
+ */
+router.get('/recent-activity', async (req, res) => {
+  try {
+    const activity = await dashboardService.getRecentActivity();
+    res.json(activity);
+  } catch (err) {
+    console.error('Recent activity error:', err);
+    res.status(500).json({ error: 'Failed to load recent activity' });
+  }
+});
+
+/**
  * GET /api/notion/action-queue
  * Returns Dan's action queue and Runner's queue computed from commitments.
  * Dan's queue: blocked items, decision-needed items, overdue items assigned to Dan.

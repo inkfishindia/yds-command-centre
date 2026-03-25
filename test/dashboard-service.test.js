@@ -7,9 +7,30 @@ describe('Dashboard Service — exports', () => {
     assert.equal(typeof service.getMorningBrief, 'function');
     assert.equal(typeof service.getDashboardPayload, 'function');
     assert.equal(typeof service.getActionQueuePayload, 'function');
+    assert.equal(typeof service.getTeamWorkload, 'function');
+    assert.equal(typeof service.getRecentActivity, 'function');
     assert.equal(typeof service.enrichActionQueueCommitments, 'function');
     assert.equal(typeof service.buildActionQueues, 'function');
     assert.equal(typeof service.clearCache, 'function');
+  });
+});
+
+describe('Dashboard Service — capacityLabel', () => {
+  const { capacityLabel } = require('../server/services/dashboard-service');
+
+  it('returns overloaded for count >= 8', () => {
+    assert.equal(capacityLabel(8), 'overloaded');
+    assert.equal(capacityLabel(12), 'overloaded');
+  });
+
+  it('returns moderate for count >= 5 and < 8', () => {
+    assert.equal(capacityLabel(5), 'moderate');
+    assert.equal(capacityLabel(7), 'moderate');
+  });
+
+  it('returns light for count < 5', () => {
+    assert.equal(capacityLabel(0), 'light');
+    assert.equal(capacityLabel(4), 'light');
   });
 });
 

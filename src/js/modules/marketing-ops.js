@@ -5,6 +5,12 @@ export function createMarketingOpsModule() {
     mktopsLoading: false,
     mktopsSection: 'overview',
     mktopsLastRefresh: null,
+    mktopsCampaignSearch: '',
+    mktopsStatusFilter: '',
+    mktopsSavedView: 'blockers',
+    mktopsSequenceView: 'table',
+    mktopsJourneyFilter: '',
+    mktopsActionLoading: null,
 
     // Marketing AI Tools inputs
     mktopsAiInputs: { segment: '', context: '', competitor: '', focus: '', topic: '', audience: '', goal: '', product: '', budget: '' },
@@ -96,10 +102,17 @@ export function createMarketingOpsModule() {
       const signal = this.beginRequest('marketingOps');
       this.mktopsLoading = true;
       try {
-        const res = await fetch('/api/marketing-ops', { signal });
-        if (res.ok) {
-          this.mktops = await res.json();
+        const [summaryRes, taskSummaryRes] = await Promise.all([
+          fetch('/api/marketing-ops', { signal }),
+          fetch('/api/marketing-ops/tasks/summary').catch(() => null),
+        ]);
+        if (summaryRes.ok) {
+          this.mktops = await summaryRes.json();
           this.mktopsLastRefresh = new Date();
+          this.runNotificationChecks?.('marketing');
+        }
+        if (taskSummaryRes && taskSummaryRes.ok) {
+          this.mktopsTasksSummary = await taskSummaryRes.json();
         }
       } catch (err) {
         if (this.isAbortError(err)) return;
@@ -116,6 +129,300 @@ export function createMarketingOpsModule() {
       if (diff < 60) return `Refreshed ${diff}s ago`;
       if (diff < 3600) return `Refreshed ${Math.round(diff / 60)}m ago`;
       return `Refreshed ${Math.round(diff / 3600)}h ago`;
+    },
+
+    getMarketingAreaStatus() {
+      const blocked = this.mktops?.stats?.blockedCampaigns?.length || 0;
+      const review = this.mktops?.stats?.needsReviewContent?.length || 0;
+      const overdue = this.mktopsTasksSummary?.overdue || 0;
+      if (blocked > 0) return { tone: 'critical', label: 'Needs Intervention' };
+      if (review > 0 || overdue > 0) return { tone: 'warning', label: 'Needs Attention' };
+      if (!this.mktops) return { tone: 'neutral', label: 'Loading' };
+      return { tone: 'healthy', label: 'Healthy' };
+    },
+
+    getMarketingHeroMetrics() {
+      return [
+        {
+          id: 'campaigns',
+          label: 'Active Campaigns',
+          value: this.mktops?.stats?.activeCampaigns || 0,
+          note: `${this.mktops?.stats?.blockedCampaigns?.length || 0} blocked`,
+        },
+        {
+          id: 'pipeline',
+          label: 'Content Pipeline',
+          value: this.mktops?.stats?.contentInPipeline || 0,
+          note: `${this.mktops?.stats?.needsReviewContent?.length || 0} in brand review`,
+        },
+        {
+          id: 'sequences',
+          label: 'Live Sequences',
+          value: this.mktops?.stats?.liveSequences || 0,
+          note: `${this.mktops?.stats?.unhealthySequences?.length || 0} unhealthy`,
+        },
+        {
+          id: 'sessions',
+          label: 'Sessions This Week',
+          value: this.mktops?.stats?.sessionsThisWeek || 0,
+          note: `${this.mktopsTasksSummary?.inProgress || 0} tasks in progress`,
+        },
+      ];
+    },
+
+    getMarketingMetricAction(metricId) {
+      const actions = {
+        campaigns: () => this.applyMarketingSavedView('blockers'),
+        pipeline: () => this.applyMarketingSavedView('review'),
+        sequences: () => this.applyMarketingSavedView('sequences'),
+        sessions: () => this.applyMarketingSavedView('sessions'),
+      };
+      return actions[metricId] || (() => {});
+    },
+
+    getMarketingPriorityCards() {
+      return [
+        {
+          id: 'blockers',
+          title: 'Blockers',
+          tone: (this.mktops?.stats?.blockedCampaigns?.length || 0) > 0 ? 'critical' : 'healthy',
+          value: this.mktops?.stats?.blockedCampaigns?.length || 0,
+          label: 'campaigns blocked or waiting on Dan',
+          items: (this.mktops?.stats?.blockedCampaigns || []).slice(0, 4).map(item => ({
+            name: item.Name,
+            meta: item.Status || item.Stage || '',
+          })),
+        },
+        {
+          id: 'throughput',
+          title: 'Throughput',
+          tone: 'neutral',
+          value: this.mktops?.stats?.contentInPipeline || 0,
+          label: 'content items moving through the system',
+          items: [
+            { name: 'Live campaigns', meta: String(this.mktops?.stats?.activeCampaigns || 0) },
+            { name: 'Live sequences', meta: String(this.mktops?.stats?.liveSequences || 0) },
+            { name: 'Sessions this week', meta: String(this.mktops?.stats?.sessionsThisWeek || 0) },
+          ],
+        },
+        {
+          id: 'workload',
+          title: 'Workload',
+          tone: (this.mktopsTasksSummary?.overdue || 0) > 0 ? 'warning' : 'healthy',
+          value: this.mktopsTasksSummary?.total || 0,
+          label: 'marketing tasks tracked',
+          items: [
+            { name: 'Overdue', meta: String(this.mktopsTasksSummary?.overdue || 0) },
+            { name: 'Blocked', meta: String(this.mktopsTasksSummary?.blocked || 0) },
+            { name: 'Urgent', meta: String(this.mktopsTasksSummary?.urgent || 0) },
+          ],
+        },
+      ];
+    },
+
+    getMarketingFocusList() {
+      const blocked = (this.mktops?.stats?.blockedCampaigns || []).slice(0, 2).map(item => ({
+        title: item.Name,
+        detail: item.Status || 'Blocked',
+        target: 'campaigns',
+      }));
+      const review = (this.mktops?.stats?.needsReviewContent || []).slice(0, 2).map(item => ({
+        title: item.Name,
+        detail: item.Status || 'Brand Review',
+        target: 'content',
+      }));
+      const issues = [...blocked, ...review];
+      if (issues.length > 0) return issues;
+      return [
+        {
+          title: 'Campaign system is clear',
+          detail: 'No blocked campaigns or review pileup right now',
+          target: 'campaigns',
+        },
+      ];
+    },
+
+    getMarketingSavedViews() {
+      return [
+        { id: 'blockers', label: 'Blocked Campaigns' },
+        { id: 'review', label: 'Needs Review' },
+        { id: 'sequences', label: 'Unhealthy Sequences' },
+        { id: 'sessions', label: 'Sessions This Week' },
+      ];
+    },
+
+    applyMarketingSavedView(viewId) {
+      this.mktopsSavedView = viewId;
+      if (viewId === 'review') {
+        this.openMarketingSection('content');
+        return;
+      }
+      if (viewId === 'sequences') {
+        this.openMarketingSection('sequences');
+        return;
+      }
+      if (viewId === 'sessions') {
+        this.openMarketingSection('sessions');
+        return;
+      }
+      this.mktopsStatusFilter = 'Blocked';
+      this.openMarketingSection('campaigns');
+    },
+
+    getMarketingSavedViewItems() {
+      if (this.mktopsSavedView === 'review') {
+        return (this.mktops?.stats?.needsReviewContent || []).slice(0, 5).map((item) => ({
+          title: item.Name,
+          detail: item.Status || item.Platform || 'Needs review',
+          action: () => {
+            this.openMarketingSection('content');
+            this.openDetailPanel(item.id, item.Name);
+          },
+        }));
+      }
+      if (this.mktopsSavedView === 'sequences') {
+        return (this.mktops?.stats?.unhealthySequences || []).slice(0, 5).map((item) => ({
+          title: item.Name,
+          detail: item.Status || item['Journey Stage'] || 'Sequence issue',
+          action: () => {
+            this.openMarketingSection('sequences');
+            this.openDetailPanel(item.id, item.Name);
+          },
+        }));
+      }
+      if (this.mktopsSavedView === 'sessions') {
+        return (this.mktops?.sessions || []).slice(0, 5).map((item) => ({
+          title: item.Name,
+          detail: this.formatMktDate(item.Date || item['Session Date'] || item['Publish Date']),
+          action: () => {
+            this.openMarketingSection('sessions');
+            this.openDetailPanel(item.id, item.Name);
+          },
+        }));
+      }
+      return (this.mktops?.stats?.blockedCampaigns || []).slice(0, 5).map((item) => ({
+        title: item.Name,
+        detail: item.Status || item.Stage || 'Blocked campaign',
+        action: () => {
+          this.mktopsStatusFilter = item.Status || 'Blocked';
+          this.openMarketingSection('campaigns');
+          this.openDetailPanel(item.id, item.Name);
+          this.loadCampaignCommitments(item.id);
+        },
+      }));
+    },
+
+    getMarketingSavedViewEmptyState() {
+      const labels = {
+        blockers: 'No blocked campaigns right now.',
+        review: 'Nothing is waiting on content review.',
+        sequences: 'No unhealthy sequences right now.',
+        sessions: 'No sessions found this week.',
+      };
+      return labels[this.mktopsSavedView] || 'No items available.';
+    },
+
+    async openMarketingOwnerContext(ownerName) {
+      if (!ownerName) return;
+      if (Array.isArray(this.teamData) && this.teamData.length === 0) {
+        await this.loadTeam();
+      }
+      const normalized = String(ownerName).trim().toLowerCase();
+      const person = (this.teamData || []).find((entry) => String(entry.Name || '').trim().toLowerCase() === normalized);
+      if (person?.id) {
+        this.openPersonView(person);
+        return;
+      }
+      await this.openNavigationTarget('team');
+      this.showInfo(`Opened Team for ${ownerName}`);
+    },
+
+    formatMktDate(value) {
+      if (!value) return '—';
+      const raw = typeof value === 'object' && value !== null && value.start ? value.start : String(value);
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) return raw;
+      return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    },
+
+    getCampaignsByStage(stage) {
+      const campaigns = Array.isArray(this.mktops?.campaigns) ? this.mktops.campaigns : [];
+      const query = this.mktopsCampaignSearch.trim().toLowerCase();
+      return campaigns.filter(campaign => {
+        if ((campaign.Stage || '') !== stage) return false;
+        if (this.mktopsStatusFilter && (campaign.Status || '') !== this.mktopsStatusFilter) return false;
+        if (!query) return true;
+        const name = String(campaign.Name || '').toLowerCase();
+        const owner = Array.isArray(campaign.ownerNames) ? campaign.ownerNames.join(' ').toLowerCase() : '';
+        return name.includes(query) || owner.includes(query);
+      });
+    },
+
+    getContentByStatus(status) {
+      const content = Array.isArray(this.mktops?.content) ? this.mktops.content : [];
+      return content.filter(item => (item.Status || '') === status);
+    },
+
+    getFilteredSequences() {
+      const sequences = Array.isArray(this.mktops?.sequences) ? this.mktops.sequences : [];
+      if (!this.mktopsJourneyFilter) return sequences;
+      return sequences.filter(sequence => (sequence['Journey Stage'] || '') === this.mktopsJourneyFilter);
+    },
+
+    getSequencesByJourneyStage(stage) {
+      return this.getFilteredSequences().filter(sequence => (sequence['Journey Stage'] || '') === stage);
+    },
+
+    getSequenceHealth(sequence) {
+      const status = String(sequence?.Status || '').toLowerCase();
+      if (status.includes('paused') || status.includes('stopped') || status.includes('unhealthy')) return 'critical';
+      const openRate = Number(sequence?.['Open Rate'] || 0);
+      const clickRate = Number(sequence?.['Click Rate'] || 0);
+      const unsubRate = Number(sequence?.['Unsubscribe Rate'] || 0);
+      if (unsubRate >= 3 || (openRate > 0 && openRate < 15)) return 'critical';
+      if (clickRate > 0 && clickRate < 1) return 'warning';
+      return 'healthy';
+    },
+
+    async loadCampaignCommitments(campaignId) {
+      if (!campaignId) return;
+      try {
+        const res = await fetch(`/api/marketing-ops/campaigns/${campaignId}/commitments`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const count = Array.isArray(data?.commitments) ? data.commitments.length : 0;
+        if (count > 0) {
+          this.showInfo(`${count} linked commitments found for this campaign`);
+        }
+      } catch (err) {
+        console.warn('Campaign commitments load error:', err);
+      }
+    },
+
+    async campaignAction(campaignId, property, value) {
+      if (!campaignId || !property) return;
+      this.mktopsActionLoading = campaignId;
+      try {
+        const result = await this.changeStatus('/api/marketing-ops/campaigns/:id', campaignId, property, value);
+        if (result) {
+          await this.loadMarketingOps();
+        }
+      } finally {
+        this.mktopsActionLoading = null;
+      }
+    },
+
+    openMarketingSection(section) {
+      this.mktopsSection = section;
+      if (section === 'calendar' && !this.calendarData && !this.calendarLoading) {
+        this.loadCalendar();
+      }
+      if (section === 'tasks' && !this.mktopsTasks && !this.mktopsTasksLoading) {
+        this.loadMarketingTasks();
+      }
+      if (section === 'competitors' && !this.ciData) {
+        this.loadCompetitorIntel();
+      }
     },
 
     // ── Content Calendar Methods ──────────────────────────────

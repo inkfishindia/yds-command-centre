@@ -140,6 +140,11 @@ describe('Sheets Service — isConfigured', () => {
 // ── getPipelineData — unconfigured ────────────────────────────────────────────
 
 describe('Sheets Service — getPipelineData (unconfigured)', () => {
+  let savedEnv;
+
+  beforeEach(() => { savedEnv = saveAndClearSheetsEnv(); });
+  afterEach(() => restoreSheetsEnv(savedEnv));
+
   it('returns { available: false } when not configured', async () => {
     const { getPipelineData } = require('../server/services/sheets');
     const result = await getPipelineData();
@@ -257,12 +262,12 @@ describe('Sheets Service — SHEET_REGISTRY', () => {
     }
   });
 
-  it('each registry entry has spreadsheetKey, sheetName, and gid', () => {
+  it('each registry entry has spreadsheetKey and sheetName (gid optional)', () => {
     sheetsService = require('../server/services/sheets');
     for (const [key, entry] of Object.entries(sheetsService.SHEET_REGISTRY)) {
       assert.ok(entry.spreadsheetKey, `${key} missing spreadsheetKey`);
       assert.ok(entry.sheetName, `${key} missing sheetName`);
-      assert.ok(entry.gid !== undefined, `${key} missing gid`);
+      // gid is only required for deleteRow — not all entries need it
     }
   });
 });
@@ -331,6 +336,11 @@ describe('Sheets Service — fetchSheet (unconfigured)', () => {
 // ── Error discrimination shape ────────────────────────────────────────────────
 
 describe('Sheets Service — error discrimination contract', () => {
+  let savedEnv;
+
+  beforeEach(() => { savedEnv = saveAndClearSheetsEnv(); });
+  afterEach(() => restoreSheetsEnv(savedEnv));
+
   it('unavailable result always has a reason field that is not_configured or api_error', async () => {
     // In any environment (configured or not), an unavailable result must have a discriminating reason.
     const { getPipelineData } = require('../server/services/sheets');

@@ -1,0 +1,765 @@
+        <div class="view-header-bar">
+          <div class="view-header-left">
+            <span class="view-header-emoji">📊</span>
+            <div class="view-header-text">
+              <h2 class="view-header-title" x-text="getGreeting()"></h2>
+              <span class="view-header-subtitle" x-text="getTodayDate()"></span>
+            </div>
+          </div>
+          <div class="view-header-actions">
+            <span class="cache-age" x-show="dashboard && dashboard.timestamp" x-text="getCacheAge(dashboard?.timestamp)"></span>
+            <span class="view-refresh-label" x-show="lastRefresh" x-text="getDashboardRefreshLabel()"></span>
+            <button class="btn btn-small btn-secondary" @click="showCreateCommitment = true">+ Commitment</button>
+            <button class="btn btn-small btn-secondary" @click="showCreateDecision = true">+ Decision</button>
+            <button class="btn btn-small btn-icon" @click="loadDashboard()" :class="dashboardLoading && 'btn-spinning'">
+              <span class="refresh-icon">&#x21bb;</span> Refresh
+            </button>
+          </div>
+        </div>
+        <div class="dashboard-mobile-shortcuts" x-show="dashboard">
+          <button class="dashboard-mobile-shortcut" @click="view = 'actionQueue'; loadActionQueue()">
+            <span class="dashboard-mobile-shortcut-label">Action Queue</span>
+            <span class="dashboard-mobile-shortcut-value" x-text="(actionQueue?.dansQueueCount || 0) + (actionQueue?.runnersQueueCount || 0)"></span>
+          </button>
+          <button class="dashboard-mobile-shortcut" @click="openNavigationTarget('projects')">
+            <span class="dashboard-mobile-shortcut-label">Projects</span>
+            <span class="dashboard-mobile-shortcut-value" x-text="getGlobalMetrics().activeProjects"></span>
+          </button>
+          <button class="dashboard-mobile-shortcut" @click="openNavigationTarget('commitments')">
+            <span class="dashboard-mobile-shortcut-label">Tasks</span>
+            <span class="dashboard-mobile-shortcut-value" x-text="getGlobalMetrics().openCommitments"></span>
+          </button>
+        </div>
+        <template x-if="!dashboard && dashboardLoading">
+          <div>
+            <!-- Hero stats skeleton -->
+            <div class="data-card-grid" style="margin-bottom: 16px;">
+              <template x-for="i in 5" :key="i">
+                <div class="loading-skeleton skeleton-stat-card"></div>
+              </template>
+            </div>
+            <!-- Health strip skeleton -->
+            <div class="health-strip skeleton-gap-sm">
+              <div class="skeleton skeleton-card" style="min-width:140px;height:72px;flex-shrink:0"></div>
+              <div class="skeleton skeleton-card" style="min-width:140px;height:72px;flex-shrink:0"></div>
+              <div class="skeleton skeleton-card" style="min-width:140px;height:72px;flex-shrink:0"></div>
+              <div class="skeleton skeleton-card" style="min-width:140px;height:72px;flex-shrink:0"></div>
+            </div>
+            <!-- 2-col grid skeleton -->
+            <div class="dashboard-grid-2col skeleton-gap">
+              <div class="skeleton skeleton-card" style="height:200px"></div>
+              <div class="skeleton skeleton-card" style="height:200px"></div>
+            </div>
+          </div>
+        </template>
+        <template x-if="dashboard">
+          <div class="dashboard-container-3zone">
+
+            <div class="mktops-overview-shell" style="margin-bottom:1.5rem;">
+              <section class="mktops-hero" :class="'mktops-hero--' + getDashboardAreaStatus().tone">
+                <div class="mktops-hero-copy">
+                  <div class="mktops-hero-kicker">Area Dashboard</div>
+                  <h3 class="mktops-hero-title">Daily command cockpit</h3>
+                  <p class="mktops-hero-text">Start with the pressure points, capacity risks, and movement across the system, then drop into the existing morning brief and execution panels underneath.</p>
+                </div>
+                <div class="mktops-hero-status">
+                  <span class="mktops-hero-status-label">Status</span>
+                  <span class="mktops-hero-status-value" x-text="getDashboardAreaStatus().label"></span>
+                  <button class="overview-link-btn" @click="openNavigationTarget('actionQueue')">Open Queue</button>
+                </div>
+              </section>
+
+              <div class="mktops-area-metrics">
+                <template x-for="metric in getDashboardHeroMetrics()" :key="metric.id">
+                  <button class="mktops-area-metric-card area-card-button" @click="getDashboardMetricAction(metric.id)()">
+                    <span class="mktops-area-metric-label" x-text="metric.label"></span>
+                    <div class="mktops-area-metric-value" x-text="metric.value"></div>
+                    <span class="mktops-area-metric-note" x-text="metric.note"></span>
+                  </button>
+                </template>
+              </div>
+
+              <section class="org-col-panel">
+                <div class="org-section-title-row">
+                  <h3 class="org-section-title">Saved Views</h3>
+                  <span class="org-section-badge" x-text="getDashboardSavedViewItems().length"></span>
+                </div>
+                <div class="saved-view-pills">
+                  <template x-for="view in getDashboardSavedViews()" :key="view.id">
+                    <button class="filter-pill" :class="dashboardSavedView === view.id && 'filter-pill-active'" @click="applyDashboardSavedView(view.id)" x-text="view.label"></button>
+                  </template>
+                </div>
+                <div class="overview-feed">
+                  <template x-for="item in getDashboardSavedViewItems()" :key="item.title + item.detail">
+                    <button class="overview-feed-item overview-feed-item--warning" @click="item.action()">
+                      <span class="overview-feed-type" x-text="dashboardSavedView"></span>
+                      <div class="overview-feed-main">
+                        <span class="overview-feed-title" x-text="item.title"></span>
+                        <span class="overview-feed-detail" x-text="item.detail"></span>
+                      </div>
+                    </button>
+                  </template>
+                  <div class="empty-state compact-empty-state" x-show="getDashboardSavedViewItems().length === 0">
+                    <p x-text="getDashboardSavedViewEmptyState()"></p>
+                  </div>
+                </div>
+              </section>
+
+              <div class="mktops-overview-grid">
+                <template x-for="card in getDashboardPriorityCards()" :key="card.id">
+                  <section class="mktops-priority-card" :class="'mktops-priority-card--' + card.tone">
+                    <div class="mktops-priority-head">
+                      <div>
+                        <h3 class="mktops-priority-title" x-text="card.title"></h3>
+                        <p class="mktops-priority-copy" x-text="card.label"></p>
+                      </div>
+                      <span class="mktops-priority-value" x-text="card.value"></span>
+                    </div>
+                    <div class="mktops-priority-list">
+                      <template x-for="item in card.items" :key="item.name + item.meta">
+                        <div class="mktops-priority-item">
+                          <span class="mktops-priority-item-name" x-text="item.name"></span>
+                          <span class="mktops-priority-item-meta" x-text="item.meta"></span>
+                        </div>
+                      </template>
+                    </div>
+                  </section>
+                </template>
+              </div>
+
+              <div class="org-two-col">
+                <section class="org-col-panel">
+                  <div class="org-section-title-row">
+                    <h3 class="org-section-title">Top Focus</h3>
+                    <span class="org-section-badge" x-text="getDashboardFocusList().length"></span>
+                  </div>
+                  <div class="overview-feed">
+                    <template x-for="item in getDashboardFocusList()" :key="item.title">
+                      <button class="overview-feed-item" :class="'overview-feed-item--' + item.tone" @click="item.action()">
+                        <span class="overview-feed-type">focus</span>
+                        <div class="overview-feed-main">
+                          <span class="overview-feed-title" x-text="item.title"></span>
+                          <span class="overview-feed-detail" x-text="item.detail"></span>
+                        </div>
+                      </button>
+                    </template>
+                  </div>
+                </section>
+
+                <section class="org-col-panel">
+                  <div class="org-section-title-row">
+                    <h3 class="org-section-title">Next Actions</h3>
+                  </div>
+                  <div class="overview-links">
+                    <button class="overview-link-card" @click="openNavigationTarget('actionQueue')">
+                      <span class="overview-link-card-label">Work the queue</span>
+                      <span class="overview-link-card-copy">Clear overdue, blocked, and waiting items before they spill into the day.</span>
+                    </button>
+                    <button class="overview-link-card" @click="openNavigationTarget('team')">
+                      <span class="overview-link-card-label">Check team load</span>
+                      <span class="overview-link-card-copy">Review overloaded people and rebalance if active work is clustering.</span>
+                    </button>
+                    <button class="overview-link-card" @click="openNavigationTarget('projects')">
+                      <span class="overview-link-card-label">Review active projects</span>
+                      <span class="overview-link-card-copy">Jump into live cross-functional work that may be shaping today’s pressure.</span>
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════
+                 ZONE A — Morning Brief Hero Banner
+            ═══════════════════════════════════════════════════════ -->
+            <div class="dashboard-morning-brief-banner">
+
+              <!-- Left: Overdue alert -->
+              <div class="brief-banner-section brief-banner-overdue">
+                <div class="brief-banner-section-label">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M8 4v4l2 2"/></svg>
+                  OVERDUE
+                </div>
+                <template x-if="briefLoading">
+                  <div class="skeleton skeleton-text" style="width:80px;height:14px;"></div>
+                </template>
+                <template x-if="!briefLoading && morningBrief">
+                  <div class="brief-banner-overdue-content">
+                    <span class="brief-banner-overdue-count"
+                          :class="(morningBrief.overdueCount || 0) > 0 ? 'brief-banner-overdue-count--danger' : 'brief-banner-overdue-count--ok'"
+                          x-text="morningBrief.overdueCount || 0"></span>
+                    <div class="brief-banner-overdue-items">
+                      <template x-for="item in (morningBrief.overdueItems || []).slice(0, 3)" :key="item.name">
+                        <div class="brief-banner-overdue-item">
+                          <span class="brief-banner-overdue-name" x-text="item.name"></span>
+                          <span class="badge" :data-health="item.severity === 'critical' ? 'off track' : 'at risk'" x-text="item.daysOverdue + 'd'"></span>
+                        </div>
+                      </template>
+                      <div class="brief-banner-overdue-item text-muted" x-show="(morningBrief.overdueCount || 0) === 0">All clear</div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Center: Top 3 Today -->
+              <div class="brief-banner-section brief-banner-top3">
+                <div class="brief-banner-section-label">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 2l1.5 4.5H14l-3.7 2.7 1.4 4.3L8 11l-3.7 2.5 1.4-4.3L2 6.5h4.5z"/></svg>
+                  TOP 3 TODAY
+                </div>
+                <template x-if="briefLoading">
+                  <div class="skeleton skeleton-text" style="width:120px;height:14px;"></div>
+                </template>
+                <template x-if="!briefLoading && morningBrief">
+                  <ol class="brief-banner-top3-list">
+                    <template x-for="(item, i) in (morningBrief.topThree || []).slice(0, 3)" :key="i">
+                      <li class="brief-banner-top3-item">
+                        <span class="brief-number" x-text="i + 1"></span>
+                        <span x-text="item.name"></span>
+                      </li>
+                    </template>
+                    <li class="brief-banner-top3-item text-muted" x-show="!(morningBrief.topThree && morningBrief.topThree.length)">Nothing scheduled</li>
+                  </ol>
+                </template>
+              </div>
+
+              <!-- Right: Flags -->
+              <div class="brief-banner-section brief-banner-flags">
+                <div class="brief-banner-section-label">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 2v14M3 2l10 4-10 5"/></svg>
+                  FLAGS
+                </div>
+                <template x-if="briefLoading">
+                  <div class="skeleton skeleton-text" style="width:100px;height:14px;"></div>
+                </template>
+                <template x-if="!briefLoading && morningBrief">
+                  <div class="brief-banner-flags-list">
+                    <template x-for="flag in (morningBrief.flags || []).slice(0, 3)" :key="flag.message">
+                      <div class="brief-banner-flag">
+                        <span class="badge" :data-health="flag.type === 'overload' ? 'off track' : 'at risk'" x-text="flag.type"></span>
+                        <span class="brief-banner-flag-msg" x-text="flag.message"></span>
+                      </div>
+                    </template>
+                    <div class="brief-banner-flag text-muted" x-show="!(morningBrief.flags && morningBrief.flags.length)">No flags</div>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Waiting On (compact pill, only if items exist) -->
+              <template x-if="!briefLoading && morningBrief && morningBrief.waitingOn && morningBrief.waitingOn.length">
+                <div class="brief-banner-section brief-banner-waiting">
+                  <div class="brief-banner-section-label">WAITING ON</div>
+                  <div class="brief-banner-flags-list">
+                    <template x-for="item in (morningBrief.waitingOn || [])" :key="item.id || item.name">
+                      <div class="brief-banner-flag">
+                        <span x-text="item.name"></span>
+                        <span class="text-muted" x-show="item.blockerDetail" x-text="'— ' + item.blockerDetail"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
+            </div><!-- end Zone A -->
+
+            <!-- ═══════════════════════════════════════════════════════
+                 ZONE B — Dual Health Lanes
+            ═══════════════════════════════════════════════════════ -->
+            <div class="dashboard-health-lanes">
+
+              <!-- B-LEFT: Business Health -->
+              <div class="dashboard-business-health">
+                <div class="dashboard-zone-header">Business Health</div>
+
+                <!-- CRM Pipeline Summary -->
+                <div class="data-card">
+                  <div class="dashboard-business-header-row">
+                    <span class="data-card-label">CRM Pipeline</span>
+                    <span class="text-muted" style="font-size:11px;" x-show="pipeline && pipeline.timestamp" x-text="getCacheAge(pipeline?.timestamp)"></span>
+                  </div>
+
+                  <template x-if="pipelineLoading && !pipeline">
+                    <div class="skeleton skeleton-card" style="height:80px;margin-top:8px;"></div>
+                  </template>
+
+                  <template x-if="pipeline && !pipeline.available">
+                    <p class="pipeline-placeholder">Not connected. Set GOOGLE_SERVICE_ACCOUNT_KEY to enable.</p>
+                  </template>
+
+                  <template x-if="pipeline && pipeline.available">
+                    <div>
+                      <!-- Total leads + status donut -->
+                      <div class="dashboard-pipeline-summary">
+                        <div class="dashboard-pipeline-total">
+                          <span class="data-card-value" x-text="pipeline.totalLeads || pipeline.b2b?.total || 0"></span>
+                          <span class="data-card-label" style="margin-top:2px;">Total Leads</span>
+                        </div>
+                        <div x-html="generateDonutChart(getPipelineDonutData(), 80)"></div>
+                        <div class="dashboard-pipeline-legend">
+                          <template x-for="item in getPipelineDonutData()" :key="item.label">
+                            <div class="dashboard-legend-row">
+                              <span class="chart-legend-dot" :style="'background:' + item.color"></span>
+                              <span class="text-secondary text-xs" x-text="item.label"></span>
+                              <span class="font-mono text-xs" style="margin-left:auto;" x-text="item.value"></span>
+                            </div>
+                          </template>
+                          <template x-if="getPipelineDonutData().length === 0">
+                            <span class="text-muted text-xs">No status data</span>
+                          </template>
+                        </div>
+                      </div>
+
+                      <!-- B2B funnel mini -->
+                      <div class="dashboard-zone-subheader">B2B Funnel</div>
+                      <div class="dashboard-mini-funnel">
+                        <template x-for="stage in (pipeline.b2b?.stages || [])" :key="stage.name">
+                          <div class="funnel-stage">
+                            <span class="funnel-stage-name" x-text="stage.name"></span>
+                            <div class="funnel-bar">
+                              <div class="funnel-bar-fill b2b"
+                                   :style="'width:' + (stage.count / getMaxStageCount(pipeline.b2b?.stages) * 100) + '%'">
+                              </div>
+                            </div>
+                            <span class="funnel-stage-count" x-text="stage.count"></span>
+                          </div>
+                        </template>
+                      </div>
+                      <div class="health-metric-grid" style="margin-top:8px;">
+                        <div class="health-metric-card">
+                          <span class="health-metric-value" x-text="pipeline.b2b?.totalActive || 0"></span>
+                          <span class="health-metric-label">Active</span>
+                        </div>
+                        <div class="health-metric-card" x-show="(pipeline.b2b?.slaBreaches || 0) > 0">
+                          <span class="health-metric-value" style="color:var(--red);" x-text="pipeline.b2b?.slaBreaches || 0"></span>
+                          <span class="health-metric-label">SLA Breach</span>
+                        </div>
+                        <div class="health-metric-card">
+                          <span class="health-metric-value" x-text="pipeline.b2b?.total || 0"></span>
+                          <span class="health-metric-label">Total</span>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+
+                  <template x-if="!pipelineLoading && !pipeline">
+                    <p class="pipeline-placeholder">Pipeline data unavailable.</p>
+                  </template>
+                </div>
+
+                <!-- Commitment Status Donut -->
+                <div class="data-card" style="margin-top:12px;">
+                  <span class="data-card-label">Commitment Status</span>
+                  <div class="dashboard-pipeline-summary" style="margin-top:8px;">
+                    <div x-html="generateDonutChart(getDashboardBurndownData(), 80)"></div>
+                    <div class="dashboard-pipeline-legend">
+                      <template x-for="item in getDashboardBurndownData()" :key="item.label">
+                        <div class="dashboard-legend-row" style="cursor:pointer;"
+                             @click="item.label === 'Overdue' ? (view = 'actionQueue', loadActionQueue()) : item.label === 'Active' ? openNavigationTarget('commitments') : null">
+                          <span class="chart-legend-dot" :style="'background:' + item.color"></span>
+                          <span class="text-secondary text-xs" x-text="item.label"></span>
+                          <span class="font-mono text-xs" style="margin-left:auto;" x-text="item.value"></span>
+                        </div>
+                      </template>
+                      <template x-if="getDashboardBurndownData().length === 0">
+                        <span class="text-muted text-xs">No commitments</span>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+
+              </div><!-- end B-left -->
+
+              <!-- B-RIGHT: Execution Health -->
+              <div class="dashboard-execution-health">
+                <div class="dashboard-zone-header">Execution Health</div>
+
+                <!-- Stat cards row -->
+                <div class="data-card-grid" style="margin-bottom:12px;">
+                  <div class="data-card accent">
+                    <span class="data-card-label">Open Commitments</span>
+                    <span class="data-card-value" x-text="getGlobalMetrics()?.openCommitments || 0"></span>
+                    <div class="data-card-trend" :class="(dashboard?.overdue?.length || 0) === 0 ? 'up' : 'neutral'">
+                      <span x-text="(dashboard?.overdue?.length || 0) + ' overdue'"></span>
+                    </div>
+                  </div>
+                  <div class="data-card" :class="(dashboard?.overdue?.length || 0) > 0 ? 'danger' : 'success'">
+                    <span class="data-card-label">Overdue</span>
+                    <span class="data-card-value" x-text="dashboard?.overdue?.length || 0"></span>
+                    <div class="data-card-trend" :class="(dashboard?.overdue?.length || 0) > 0 ? 'down' : 'up'">
+                      <span x-text="(dashboard?.overdue?.length || 0) > 0 ? 'Needs attention' : 'All clear'"></span>
+                    </div>
+                  </div>
+                  <div class="data-card accent">
+                    <span class="data-card-label">Active Projects</span>
+                    <span class="data-card-value" x-text="getGlobalMetrics()?.activeProjects || 0"></span>
+                    <div class="data-card-trend neutral">
+                      <span x-text="(projects?.length || 0) + ' total'"></span>
+                    </div>
+                  </div>
+                  <div class="data-card" :class="(actionQueue?.dansQueueCount || 0) > 0 ? 'warning' : 'success'">
+                    <span class="data-card-label">Your Queue</span>
+                    <span class="data-card-value" x-text="actionQueue?.dansQueueCount || 0"></span>
+                    <div class="data-card-trend" :class="(actionQueue?.dansQueueCount || 0) > 0 ? 'down' : 'up'">
+                      <span x-text="(actionQueue?.dansQueueCount || 0) > 0 ? 'Items waiting' : 'Clear'"></span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Team Workload Strip -->
+                <div class="data-card" style="margin-bottom:12px;" x-show="teamWorkload && teamWorkload.length">
+                  <span class="data-card-label">Team Workload</span>
+                  <div class="team-workload-strip">
+                    <template x-for="person in teamWorkload" :key="person.id || person.name">
+                      <div class="workload-person">
+                        <span class="workload-person-name" x-text="person.name"></span>
+                        <div class="workload-bar-track">
+                          <div class="workload-bar"
+                               :class="'workload-' + (person.capacity || 'light')">
+                          </div>
+                        </div>
+                        <span class="workload-label"
+                              :class="'workload-' + (person.capacity || 'light')"
+                              x-text="person.capacity || 'light'"></span>
+                        <span class="text-muted text-xs" x-show="person.activeCount !== undefined" x-text="person.activeCount + ' tasks'"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Focus Area Health Strip -->
+                <div class="data-card" x-show="dashboard && dashboard.focusAreas && dashboard.focusAreas.length">
+                  <span class="data-card-label">Focus Areas</span>
+                  <div class="health-strip" style="margin-top:8px;">
+                    <template x-for="area in getSortedFocusAreas()" :key="area.id">
+                      <button class="health-chip"
+                              :class="'health-chip-' + getComputedHealth(area).color"
+                              @click="openFocusAreaView(area)">
+                        <span class="health-chip-dot"></span>
+                        <span class="health-chip-name" x-text="area.Name || 'Untitled'"></span>
+                        <span class="health-chip-stats">
+                          <span x-text="(area.commitmentCount || 0) + ' open'"></span>
+                          <span class="health-chip-overdue" x-show="area.overdueCount > 0"
+                                x-text="area.overdueCount + ' overdue'"></span>
+                        </span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Project Progress -->
+                <div class="data-card" style="margin-top:12px;">
+                  <span class="data-card-label">Project Progress</span>
+                  <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+                    <template x-for="proj in (dashboard?.projects || []).filter(p => p.progressPercent > 0).slice(0, 5)" :key="proj.id">
+                      <div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
+                          <span style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;cursor:pointer;color:var(--accent);" @click="openDetailPanel(proj.id, proj.name)" x-text="proj.name"></span>
+                          <span class="font-mono text-muted" style="font-size:11px;flex-shrink:0;margin-left:8px;" x-text="proj.progressPercent + '%'"></span>
+                        </div>
+                        <div x-html="generateProgressBar(proj.progressPercent, 100, proj.progressPercent >= 75 ? 'var(--green)' : proj.progressPercent >= 40 ? 'var(--accent)' : 'var(--amber)')"></div>
+                      </div>
+                    </template>
+                    <template x-if="(dashboard?.projects || []).filter(p => p.progressPercent > 0).length === 0">
+                      <span class="text-muted" style="font-size:12px;">No progress data available</span>
+                    </template>
+                  </div>
+                </div>
+
+              </div><!-- end B-right -->
+
+            </div><!-- end Zone B -->
+
+            <!-- ═══════════════════════════════════════════════════════
+                 ZONE C — Action & Activity
+            ═══════════════════════════════════════════════════════ -->
+            <div class="dashboard-action-zone">
+
+              <!-- C-LEFT: Overdue Triage (grouped by focus area) -->
+              <div class="dashboard-overdue-triage">
+                <div class="dashboard-zone-header">
+                  Overdue Triage
+                  <span class="badge" data-health="off track" x-show="dashboard?.overdue?.length > 0" x-text="dashboard?.overdue?.length || 0"></span>
+                </div>
+
+                <!-- Bulk actions -->
+                <div class="bulk-actions" x-show="selectedOverdue.length > 0" x-cloak>
+                  <span class="bulk-count" x-text="selectedOverdue.length + ' selected'"></span>
+                  <button class="btn btn-small btn-done" @click="bulkMarkDone()">Done All</button>
+                  <button class="btn btn-small btn-snooze" @click="bulkSnooze(3)">Snooze +3d</button>
+                  <button class="btn btn-small btn-snooze" @click="bulkSnooze(7)">Snooze +7d</button>
+                  <button class="btn btn-small" @click="selectedOverdue = []">Clear</button>
+                </div>
+
+                <!-- Empty state -->
+                <div class="dashboard-triage-empty" x-show="!dashboard.overdue || dashboard.overdue.length === 0">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+                  <span>All clear — no overdue items</span>
+                </div>
+
+                <!-- Grouped overdue (desktop table) -->
+                <div class="dashboard-overdue-groups" x-show="dashboard.overdue && dashboard.overdue.length > 0">
+                  <template x-for="group in getOverdueByFocusArea()" :key="group.area">
+                    <div class="overdue-group">
+                      <button class="overdue-group-header" @click="toggleOverdueGroup(group.area)">
+                        <span class="overdue-group-name" x-text="group.area"></span>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                          <span class="badge" data-health="off track" x-text="group.items.length"></span>
+                          <svg class="overdue-group-chevron" :class="{'rotated': !isOverdueGroupCollapsed(group.area)}" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+                        </div>
+                      </button>
+                      <div class="overdue-group-body" x-show="!isOverdueGroupCollapsed(group.area)">
+                        <!-- Mobile cards -->
+                        <div class="dashboard-mobile-commitments">
+                          <template x-for="(c, index) in group.items" :key="'mg-' + c.id">
+                            <div class="dashboard-mobile-commitment-card">
+                              <div class="dashboard-mobile-commitment-top">
+                                <div class="dashboard-mobile-commitment-title-wrap">
+                                  <input type="checkbox" :checked="isOverdueSelected(c.id)" @change="toggleOverdueSelect(c.id)" aria-label="Select commitment">
+                                  <button class="dashboard-mobile-commitment-title" @click="toggleCommitmentRow('og-' + group.area + '-' + index)" x-text="c.Name || 'Untitled'"></button>
+                                </div>
+                                <span class="badge" :data-priority="badgeAttr(c.Priority)" x-text="c.Priority || '—'" x-show="c.Priority"></span>
+                              </div>
+                              <div class="dashboard-mobile-commitment-meta">
+                                <span x-text="c.assignedNames && c.assignedNames.length ? c.assignedNames.join(', ') : 'Unassigned'"></span>
+                                <span class="relative-date overdue" x-text="formatRelativeDate(c['Due Date'])"></span>
+                              </div>
+                              <div class="dashboard-mobile-commitment-actions">
+                                <button class="action-btn action-done" @click.stop="quickMarkDone(c)">Done</button>
+                                <button class="action-btn action-snooze" @click.stop="showSnoozeFor = (showSnoozeFor === c.id ? null : c.id); showReassignFor = null">Snooze</button>
+                                <button class="action-btn action-reassign" @click.stop="showReassignFor = (showReassignFor === c.id ? null : c.id); showSnoozeFor = null">Reassign</button>
+                                <button class="btn btn-small" @click.stop="openDetailPanel(c.id, c.Name)">Open</button>
+                              </div>
+                              <div class="snooze-picker" x-show="showSnoozeFor === c.id" @click.stop>
+                                <button class="snooze-preset" @click.stop="quickSnooze(c.id, getSnoozeDate('tomorrow'))">Tomorrow</button>
+                                <button class="snooze-preset" @click.stop="quickSnooze(c.id, getSnoozeDate('+3'))">+3 days</button>
+                                <button class="snooze-preset" @click.stop="quickSnooze(c.id, getSnoozeDate('+7'))">+7 days</button>
+                                <input type="date" class="snooze-date-input" @change.stop="quickSnooze(c.id, $event.target.value)" title="Pick a date">
+                              </div>
+                              <div class="reassign-picker" x-show="showReassignFor === c.id" @click.stop>
+                                <template x-for="p in (dashboard?.people || [])" :key="p.id">
+                                  <button class="reassign-person" @click.stop="quickReassign(c.id, p.id, p.Name)" x-text="p.Name || 'Unknown'"></button>
+                                </template>
+                              </div>
+                              <div class="dashboard-mobile-commitment-detail" x-show="expandedCommitmentRow === 'og-' + group.area + '-' + index">
+                                <div class="commitment-detail-field" x-show="c.focusAreaNames && c.focusAreaNames.length">
+                                  <span class="commitment-detail-key">Focus</span>
+                                  <span class="commitment-detail-val" x-text="c.focusAreaNames.join(', ')"></span>
+                                </div>
+                                <div class="commitment-detail-field" x-show="c.Notes">
+                                  <span class="commitment-detail-key">Notes</span>
+                                  <span class="commitment-detail-val" x-text="c.Notes"></span>
+                                </div>
+                                <div class="commitment-detail-actions">
+                                  <div class="commitment-actions">
+                                    <button class="action-btn action-done" @click.stop="quickMarkDone(c)" title="Mark Done">Done</button>
+                                    <button class="action-btn action-snooze" @click.stop="showSnoozeFor = (showSnoozeFor === c.id ? null : c.id); showReassignFor = null" title="Snooze">Snooze</button>
+                                    <button class="action-btn action-reassign" @click.stop="showReassignFor = (showReassignFor === c.id ? null : c.id); showSnoozeFor = null" title="Reassign">Reassign</button>
+                                    <button class="btn btn-small" @click.stop="openDetailPanel(c.id, c.Name)">Open</button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </template>
+                        </div>
+                      </div><!-- end overdue-group-body -->
+                    </div><!-- end overdue-group -->
+                  </template>
+                </div><!-- end overdue-groups -->
+
+              </div><!-- end C-left: Overdue Triage -->
+
+              <!-- C-RIGHT: Activity Feed -->
+              <div class="dashboard-activity-feed">
+                <div class="dashboard-zone-header">
+                  Recent Activity
+                  <button class="btn btn-small btn-secondary" @click="loadDashboard()" :class="dashboardLoading && 'btn-spinning'" style="margin-left:auto;" title="Refresh">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M13.5 2.5A7 7 0 1 0 14 9"/><path d="M10 1l4 1.5L12.5 6"/></svg>
+                  </button>
+                </div>
+
+                <!-- Loading state -->
+                <template x-if="dashboardLoading && !recentActivity">
+                  <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+                    <div class="skeleton skeleton-text" style="height:32px;"></div>
+                    <div class="skeleton skeleton-text" style="height:32px;"></div>
+                    <div class="skeleton skeleton-text" style="height:32px;"></div>
+                  </div>
+                </template>
+
+                <!-- Empty state -->
+                <div class="dashboard-activity-empty" x-show="!dashboardLoading && (!recentActivity || getActivityFeedItems().length === 0)">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 2v10M12 18v4M4.93 4.93l7.07 7.07M16 12h4M4 12H2M19.07 4.93l-7.07 7.07M12 22a10 10 0 1 0 0-20"/></svg>
+                  <span>Nothing recent in the last 48h</span>
+                </div>
+
+                <!-- Activity items -->
+                <div class="activity-feed-list" x-show="recentActivity && getActivityFeedItems().length > 0">
+                  <template x-for="item in getActivityFeedItems()" :key="item.id || item.name">
+                    <div class="activity-item"
+                         :class="'activity-item-' + item.type"
+                         @click="item.id ? openDetailPanel(item.id, item.name) : null"
+                         :style="item.id ? 'cursor:pointer;' : ''">
+                      <!-- Icon -->
+                      <div class="activity-item-icon">
+                        <!-- success: green check -->
+                        <svg x-show="item.type === 'success'" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M5 8l2 2 4-4"/></svg>
+                        <!-- alert: amber triangle -->
+                        <svg x-show="item.type === 'alert'" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 2L15 14H1z"/><path d="M8 7v3M8 12v.5"/></svg>
+                        <!-- decision: blue circle dot -->
+                        <svg x-show="item.type === 'decision'" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M8 5v3l2 2"/></svg>
+                      </div>
+                      <div class="activity-item-body">
+                        <span class="activity-item-name" x-text="item.name"></span>
+                        <span class="activity-item-time text-muted" x-text="getRelativeTime(item.time)"></span>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- Decisions section (from dashboard.recentDecisions, compact) -->
+                <template x-if="dashboard.recentDecisions && dashboard.recentDecisions.length > 0">
+                  <div style="margin-top:16px;">
+                    <div class="dashboard-zone-subheader">Recent Decisions</div>
+                    <div class="decision-filters" style="margin-bottom:8px;">
+                      <input type="text" class="decision-search" placeholder="Search decisions..." x-model="decisionSearch" @input="expandedDecision = null">
+                      <select class="decision-filter-select" x-model="decisionFocusArea" @change="expandedDecision = null" aria-label="Filter by focus area">
+                        <option value="">All Focus Areas</option>
+                        <template x-for="fa in getDecisionFilterOptions().focusAreas" :key="fa">
+                          <option :value="fa" x-text="fa"></option>
+                        </template>
+                      </select>
+                      <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
+                        <button class="filter-pill" :class="{'filter-pill-active': decisionDateRange === 'all'}" @click="decisionDateRange = 'all'; expandedDecision = null">All</button>
+                        <button class="filter-pill" :class="{'filter-pill-active': decisionDateRange === 'month'}" @click="decisionDateRange = 'month'; expandedDecision = null">Month</button>
+                        <button class="filter-pill" :class="{'filter-pill-active': decisionDateRange === 'week'}" @click="decisionDateRange = 'week'; expandedDecision = null">Week</button>
+                        <span class="notion-result-count" x-text="getFilteredDecisions().length + ' decisions'"></span>
+                      </div>
+                    </div>
+                    <template x-if="getFilteredDecisions().length === 0">
+                      <p class="text-muted" style="font-size:12px;padding:8px 0;">No decisions match filters.</p>
+                    </template>
+                    <template x-if="getFilteredDecisions().length > 0">
+                      <div class="decision-timeline">
+                        <template x-for="group in getDecisionsByMonth()" :key="group.month">
+                          <div class="decision-month-group">
+                            <div class="decision-month-header">
+                              <span x-text="group.month"></span>
+                              <span class="decision-month-count" x-text="'— ' + group.count + (group.count === 1 ? ' decision' : ' decisions')"></span>
+                            </div>
+                            <template x-for="(d, idx) in group.decisions" :key="d.id">
+                              <div class="decision-card" :class="{'decision-expanded': expandedDecision === d.id}">
+                                <div class="decision-header" @click="expandedDecision = expandedDecision === d.id ? null : d.id">
+                                  <div class="decision-title" x-text="d.Name || 'Untitled'" @click.stop="openDetailPanel(d.id, d.Name)" style="cursor:pointer;"></div>
+                                  <div class="decision-meta">
+                                    <span class="decision-date" x-text="formatDate(d.Date)"></span>
+                                    <span class="decision-owner" x-text="d.Owner || '—'"></span>
+                                  </div>
+                                  <svg class="decision-chevron" :class="{'rotated': expandedDecision === d.id}" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+                                </div>
+                                <div class="decision-body" x-show="expandedDecision === d.id" x-transition.duration.200ms>
+                                  <template x-if="d.Context"><div class="decision-field"><div class="decision-field-label">Context</div><div class="decision-field-value" x-text="d.Context"></div></div></template>
+                                  <template x-if="d.Decision"><div class="decision-field"><div class="decision-field-label">Decision</div><div class="decision-field-value" x-text="d.Decision"></div></div></template>
+                                  <template x-if="d.Rationale"><div class="decision-field"><div class="decision-field-label">Rationale</div><div class="decision-field-value" x-text="d.Rationale"></div></div></template>
+                                  <template x-if="d['Risks Accepted']"><div class="decision-field decision-risk"><div class="decision-field-label">Risks Accepted</div><div class="decision-field-value" x-text="d['Risks Accepted']"></div></div></template>
+                                  <template x-if="d['Alternatives Considered']"><div class="decision-field"><div class="decision-field-label">Alternatives Considered</div><div class="decision-field-value" x-text="d['Alternatives Considered']"></div></div></template>
+                                  <div class="decision-actions"><button class="btn btn-sm" @click.stop="openDetailPanel(d.id, d.Name)">View Full Page</button></div>
+                                </div>
+                              </div>
+                            </template>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+
+              </div><!-- end C-right: Activity Feed -->
+
+            </div><!-- end Zone C -->
+
+            <!-- Upcoming commitments (compact, below zone C) -->
+            <template x-if="upcomingCommitments.length > 0">
+              <div style="margin-top:16px;">
+                <h3 class="section-title">Coming Up This Week</h3>
+                <div class="table-wrap">
+                  <table class="data-table">
+                    <thead>
+                      <tr><th>Task</th><th>Owner</th><th>Due</th><th>Status</th><th>Priority</th></tr>
+                    </thead>
+                    <template x-for="(c, index) in upcomingCommitments" :key="c.id">
+                      <tbody>
+                        <tr class="commitment-row" :class="{'commitment-row-expanded': expandedCommitmentRow === 'upcoming-' + index}" @click="toggleCommitmentRow('upcoming-' + index)">
+                          <td><span class="table-link" x-text="c.Name || 'Untitled'"></span></td>
+                          <td x-text="c.assignedNames && c.assignedNames.length ? c.assignedNames.join(', ') : '—'"></td>
+                          <td><span class="relative-date" x-text="formatRelativeDate(c['Due Date'])"></span></td>
+                          <td><span class="badge editable-badge" :data-status="badgeAttr(c.Status)" x-text="c.Status || '—'" @click.stop="openEditDropdown(c.id, 'Status', $event)"></span></td>
+                          <td><span class="badge" :data-priority="badgeAttr(c.Priority)" x-text="c.Priority || '—'" x-show="c.Priority"></span></td>
+                        </tr>
+                        <tr x-show="expandedCommitmentRow === 'upcoming-' + index" class="commitment-detail-row">
+                          <td colspan="5">
+                            <div class="commitment-detail">
+                              <template x-if="c.Notes"><div class="commitment-detail-field"><span class="commitment-detail-key">Notes</span><span class="commitment-detail-val" x-text="c.Notes"></span></div></template>
+                              <template x-if="c.focusAreaNames && c.focusAreaNames.length"><div class="commitment-detail-field"><span class="commitment-detail-key">Focus Area</span><span class="commitment-detail-val" x-text="c.focusAreaNames.join(', ')"></span></div></template>
+                              <template x-if="c.Type"><div class="commitment-detail-field"><span class="commitment-detail-key">Type</span><span class="commitment-detail-val" x-text="c.Type"></span></div></template>
+                              <div class="commitment-detail-actions">
+                                <div class="commitment-actions">
+                                  <button class="action-btn action-done" @click.stop="quickMarkDone(c)" title="Mark Done">Done</button>
+                                  <button class="action-btn action-snooze" @click.stop="showSnoozeFor = (showSnoozeFor === c.id ? null : c.id); showReassignFor = null" title="Snooze">Snooze</button>
+                                  <button class="action-btn action-reassign" @click.stop="showReassignFor = (showReassignFor === c.id ? null : c.id); showSnoozeFor = null" title="Reassign">Reassign</button>
+                                </div>
+                                <div class="snooze-picker" x-show="showSnoozeFor === c.id" @click.stop>
+                                  <button class="snooze-preset" @click.stop="quickSnooze(c.id, getSnoozeDate('tomorrow'))">Tomorrow</button>
+                                  <button class="snooze-preset" @click.stop="quickSnooze(c.id, getSnoozeDate('+3'))">+3 days</button>
+                                  <button class="snooze-preset" @click.stop="quickSnooze(c.id, getSnoozeDate('+7'))">+7 days</button>
+                                  <input type="date" class="snooze-date-input" @change.stop="quickSnooze(c.id, $event.target.value)" title="Pick a date">
+                                </div>
+                                <div class="reassign-picker" x-show="showReassignFor === c.id" @click.stop>
+                                  <template x-for="p in (dashboard?.people || [])" :key="p.id">
+                                    <button class="reassign-person" @click.stop="quickReassign(c.id, p.id, p.Name)" x-text="p.Name || 'Unknown'"></button>
+                                  </template>
+                                </div>
+                                <button class="btn btn-small" @click.stop="openDetailPanel(c.id, c.Name)">View Full Page</button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </template>
+                  </table>
+                </div>
+                <!-- Show Completed This Week toggle -->
+                <div class="completed-toggle-row">
+                  <label class="completed-toggle-label">
+                    <input type="checkbox" x-model="showCompletedThisWeek" class="completed-toggle-checkbox">
+                    Show completed this week
+                  </label>
+                </div>
+                <template x-if="showCompletedThisWeek">
+                  <div x-show="getCompletedThisWeek().length > 0">
+                    <h3 class="section-title section-title--muted">Completed This Week</h3>
+                    <div class="table-wrap">
+                      <table class="data-table data-table--muted">
+                        <thead><tr><th>Task</th><th>Owner</th><th>Due</th><th>Priority</th></tr></thead>
+                        <template x-for="(c, index) in getCompletedThisWeek()" :key="c.id">
+                          <tbody>
+                            <tr class="commitment-row commitment-row--done" @click="openDetailPanel(c.id, c.Name)">
+                              <td><span class="table-link done-strikethrough" x-text="c.Name || 'Untitled'"></span></td>
+                              <td x-text="c.assignedNames && c.assignedNames.length ? c.assignedNames.join(', ') : '—'"></td>
+                              <td><span class="relative-date done" x-text="formatRelativeDate(c['Due Date'])"></span></td>
+                              <td><span class="badge" :data-priority="badgeAttr(c.Priority)" x-text="c.Priority || '—'" x-show="c.Priority"></span></td>
+                            </tr>
+                          </tbody>
+                        </template>
+                      </table>
+                    </div>
+                  </div>
+                </template>
+                <template x-if="showCompletedThisWeek">
+                  <div x-show="getCompletedThisWeek().length === 0">
+                    <p class="empty-state empty-state--inline">No completed items found for this week.</p>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+          </div><!-- end dashboard-container-3zone -->
+        </template>

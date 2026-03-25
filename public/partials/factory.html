@@ -1,0 +1,964 @@
+      <div class="view-header-bar factory-view-header">
+        <div class="view-header-left">
+          <span class="view-header-emoji">🏭</span>
+          <div class="view-header-text">
+            <h2 class="view-header-title">Factory</h2>
+            <span class="view-header-subtitle">Configuration and simulation</span>
+          </div>
+        </div>
+        <div class="view-header-actions">
+          <span x-show="factoryConfigLoading" class="factory-config-loading" aria-live="polite">Loading config...</span>
+          <span class="view-refresh-label" x-show="factoryLastRefresh" x-text="getFactoryRefreshLabel()"></span>
+          <button class="btn btn-small btn-icon" @click="loadFactoryConfig()" :disabled="factoryConfigLoading" aria-label="Refresh Factory">
+            <span class="refresh-icon">&#x21bb;</span>
+            <span x-text="factoryConfigLoading ? 'Loading...' : 'Refresh'"></span>
+          </button>
+          <button
+            class="factory-sim-toggle-btn"
+            :class="factoryShowFormulas && 'factory-sim-toggle-active'"
+            @click="factoryShowFormulas = !factoryShowFormulas; if(factoryShowFormulas && factorySimOpen) factorySimOpen = false"
+            aria-label="Toggle formula reference"
+          >
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+            <span x-text="factoryShowFormulas ? 'Close Ref' : 'How it works'"></span>
+          </button>
+          <button
+            class="factory-sim-toggle-btn"
+            :class="factorySimOpen && 'factory-sim-toggle-active'"
+            @click="toggleFactorySim(); if(factorySimOpen && factoryShowFormulas) factoryShowFormulas = false"
+            aria-label="Toggle simulation panel"
+          >
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+            <span x-text="factorySimOpen ? 'Close Sim' : 'Simulate'"></span>
+          </button>
+        </div>
+      </div>
+
+      <template x-if="view === 'factory'">
+        <div class="factory-layout" :class="(factorySimOpen || factoryShowFormulas) && 'factory-sim-active'">
+          <!-- Save error toast -->
+          <div
+            x-show="factoryError"
+            x-transition.opacity
+            class="factory-error-toast"
+            x-text="factoryError"
+            role="alert"
+            aria-live="assertive"
+          ></div>
+          <div class="factory-main">
+
+          <div class="mktops-overview-shell" style="margin-bottom:1.5rem;">
+            <section class="mktops-hero" :class="'mktops-hero--' + getFactoryAreaStatus().tone">
+              <div class="mktops-hero-copy">
+                <div class="mktops-hero-kicker">Area Dashboard</div>
+                <h3 class="mktops-hero-title">Factory capacity system</h3>
+                <p class="mktops-hero-text">Start with the bottlenecks, shared resources, and staffing assumptions, then drill into zone details and run simulations from the same operating model.</p>
+              </div>
+              <div class="mktops-hero-status">
+                <span class="mktops-hero-status-label">Status</span>
+                <span class="mktops-hero-status-value" x-text="getFactoryAreaStatus().label"></span>
+                <button class="overview-link-btn" @click="toggleFactorySim()">Open Simulator</button>
+              </div>
+            </section>
+
+            <div class="mktops-area-metrics">
+              <template x-for="metric in getFactoryHeroMetrics()" :key="metric.id">
+                <button class="mktops-area-metric-card area-card-button" @click="getFactoryMetricAction(metric.id)()">
+                  <span class="mktops-area-metric-label" x-text="metric.label"></span>
+                  <div class="mktops-area-metric-value" x-text="metric.value"></div>
+                  <span class="mktops-area-metric-note" x-text="metric.note"></span>
+                </button>
+              </template>
+            </div>
+
+            <section class="org-col-panel">
+              <div class="org-section-title-row">
+                <h3 class="org-section-title">Saved Views</h3>
+                <span class="org-section-badge" x-text="getFactorySavedViewItems().length"></span>
+              </div>
+              <div class="saved-view-pills">
+                <template x-for="view in getFactorySavedViews()" :key="view.id">
+                  <button class="filter-pill" :class="factorySavedView === view.id && 'filter-pill-active'" @click="applyFactorySavedView(view.id)" x-text="view.label"></button>
+                </template>
+              </div>
+              <div class="overview-feed">
+                <template x-for="item in getFactorySavedViewItems()" :key="item.title + item.detail">
+                  <button class="overview-feed-item overview-feed-item--warning" @click="item.action()">
+                    <span class="overview-feed-type" x-text="factorySavedView"></span>
+                    <div class="overview-feed-main">
+                      <span class="overview-feed-title" x-text="item.title"></span>
+                      <span class="overview-feed-detail" x-text="item.detail"></span>
+                    </div>
+                  </button>
+                </template>
+                <div class="empty-state compact-empty-state" x-show="getFactorySavedViewItems().length === 0">
+                  <p x-text="getFactorySavedViewEmptyState()"></p>
+                </div>
+              </div>
+            </section>
+
+            <section class="org-col-panel" x-show="factorySimConfig">
+              <div class="org-section-title-row">
+                <h3 class="org-section-title">Scenario Compare</h3>
+                <span class="org-section-badge" x-text="getFactoryScenarioCompare().throughputDelta >= 0 ? '+' + getFactoryScenarioCompare().throughputDelta : getFactoryScenarioCompare().throughputDelta"></span>
+              </div>
+              <div class="saved-view-pills" style="margin-bottom:0.75rem;">
+                <button class="filter-pill" @click="applyFactoryQuickPreset('qc_fixed')">QC Fixed</button>
+                <button class="filter-pill" @click="applyFactoryQuickPreset('phase3')">Phase 3</button>
+                <button class="filter-pill" @click="applyFactoryQuickPreset('growth')">Growth</button>
+                <button class="filter-pill" @click="applyFactoryQuickPreset('second_shift')">2nd Shift</button>
+              </div>
+              <div class="mktops-priority-list">
+                <div class="mktops-priority-item">
+                  <span class="mktops-priority-item-name">Throughput Delta</span>
+                  <span class="mktops-priority-item-meta" x-text="(getFactoryScenarioCompare().throughputDelta >= 0 ? '+' : '') + getFactoryScenarioCompare().throughputDelta + ' pcs/day'"></span>
+                </div>
+                <div class="mktops-priority-item">
+                  <span class="mktops-priority-item-name">Constraint Shift</span>
+                  <span class="mktops-priority-item-meta" x-text="getFactoryScenarioCompare().currentConstraint + ' -> ' + getFactoryScenarioCompare().simulatedConstraint"></span>
+                </div>
+                <div class="mktops-priority-item">
+                  <span class="mktops-priority-item-name">Simulator</span>
+                  <button class="overview-link-btn" @click="factorySimOpen = true; factoryShowFormulas = false">Open Scenario</button>
+                </div>
+              </div>
+            </section>
+
+            <div class="mktops-overview-grid">
+              <template x-for="card in getFactoryPriorityCards()" :key="card.id">
+                <section class="mktops-priority-card" :class="'mktops-priority-card--' + card.tone">
+                  <div class="mktops-priority-head">
+                    <div>
+                      <h3 class="mktops-priority-title" x-text="card.title"></h3>
+                      <p class="mktops-priority-copy" x-text="card.label"></p>
+                    </div>
+                    <span class="mktops-priority-value" x-text="card.value"></span>
+                  </div>
+                  <div class="mktops-priority-list">
+                    <template x-for="item in card.items" :key="item.name + item.meta">
+                      <div class="mktops-priority-item">
+                        <span class="mktops-priority-item-name" x-text="item.name"></span>
+                        <span class="mktops-priority-item-meta" x-text="item.meta"></span>
+                      </div>
+                    </template>
+                  </div>
+                </section>
+              </template>
+            </div>
+
+            <div class="org-two-col">
+              <section class="org-col-panel">
+                <div class="org-section-title-row">
+                  <h3 class="org-section-title">Top Focus</h3>
+                  <span class="org-section-badge" x-text="getFactoryFocusList().length"></span>
+                </div>
+                <div class="overview-feed">
+                  <template x-for="item in getFactoryFocusList()" :key="item.title">
+                    <button
+                      class="overview-feed-item"
+                      :class="'overview-feed-item--' + item.tone"
+                      @click="item.action()"
+                    >
+                      <span class="overview-feed-type">focus</span>
+                      <div class="overview-feed-main">
+                        <span class="overview-feed-title" x-text="item.title"></span>
+                        <span class="overview-feed-detail" x-text="item.detail"></span>
+                      </div>
+                    </button>
+                  </template>
+                </div>
+              </section>
+
+              <section class="org-col-panel">
+                <div class="org-section-title-row">
+                  <h3 class="org-section-title">Next Actions</h3>
+                </div>
+                <div class="overview-links">
+                  <button class="overview-link-card" @click="factoryZoneDetail = getFactoryCap().bindingZone.id">
+                    <span class="overview-link-card-label">Open binding constraint</span>
+                    <span class="overview-link-card-copy">Jump straight to the zone that currently caps throughput.</span>
+                  </button>
+                  <button class="overview-link-card" @click="factoryShowFormulas = true; factorySimOpen = false">
+                    <span class="overview-link-card-label">Review model logic</span>
+                    <span class="overview-link-card-copy">Check formulas, shared-resource rules, and what assumptions are shaping the output.</span>
+                  </button>
+                  <button class="overview-link-card" @click="if(!factorySimConfig) initFactorySimConfig(); factorySimOpen = true; factoryShowFormulas = false">
+                    <span class="overview-link-card-label">Run a scenario</span>
+                    <span class="overview-link-card-copy">Stress test orders, staffing, and machine availability before changing the floor plan.</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <!-- TOP ROW: 3 summary cards -->
+          <div class="factory-summary-row">
+
+            <!-- Factory Throughput -->
+            <div class="factory-kpi-card" :class="'factory-kpi-' + getFactoryCap().bindingZone.status.toLowerCase()">
+              <div class="factory-kpi-label">Factory Throughput</div>
+              <div class="factory-kpi-value" x-text="getFactoryCap().factoryThroughput + ' pcs/day'"></div>
+              <div class="factory-kpi-sub">
+                <span x-text="'of ' + getFactoryCap().total_daily_pieces + ' pcs demand'"></span>
+                <span class="status-badge small" :class="{'danger': getFactoryCap().bindingZone.status === 'OVER', 'warning': getFactoryCap().bindingZone.status === 'AT_RISK', 'success': getFactoryCap().bindingZone.status === 'OK'}" x-text="getFactoryCap().bindingZone.status === 'OVER' ? 'Constrained' : 'On Track'"></span>
+              </div>
+            </div>
+
+            <!-- Binding Constraint -->
+            <div class="factory-kpi-card" :class="'factory-kpi-' + getFactoryCap().bindingZone.status.toLowerCase()">
+              <div class="factory-kpi-label">Binding Constraint</div>
+              <div class="factory-kpi-value" x-text="getFactoryCap().bindingZone.name"></div>
+              <div class="factory-kpi-sub">
+                <span x-text="getFactoryCap().bindingZone.capacity + ' pcs/day capacity'"></span>
+                <span class="status-badge small" :class="{'danger': getFactoryCap().bindingZone.status === 'OVER', 'warning': getFactoryCap().bindingZone.status === 'AT_RISK', 'success': getFactoryCap().bindingZone.status === 'OK'}" x-text="Math.round(getFactoryCap().bindingZone.load * 100) + '% loaded'"></span>
+              </div>
+            </div>
+
+            <!-- Data Source -->
+            <div class="factory-kpi-card">
+              <div class="factory-kpi-label">Data Source</div>
+              <div class="factory-kpi-value">Benchmark Data</div>
+              <div class="factory-kpi-sub factory-kpi-note">Using industry benchmarks — no measured tally data yet</div>
+            </div>
+
+          </div>
+
+          <!-- MIDDLE: Zone capacity bars -->
+          <div class="factory-section">
+            <h3 class="factory-section-title">Zone Capacity vs Demand</h3>
+            <div class="factory-zones">
+              <template x-for="zone in getFactoryCap().zones" :key="zone.id">
+                <div class="factory-zone-wrapper">
+                  <!-- Zone row -->
+                  <button
+                    class="factory-zone-row"
+                    :class="factoryZoneDetail === zone.id && 'factory-zone-row-open'"
+                    @click="toggleFactoryZone(zone.id)"
+                    :aria-expanded="factoryZoneDetail === zone.id"
+                    :aria-label="'Toggle details for ' + zone.name"
+                  >
+                    <div class="factory-zone-meta">
+                      <span class="factory-zone-name" x-text="zone.name"></span>
+                      <span class="factory-zone-method" x-text="zone.method"></span>
+                    </div>
+                    <div class="factory-zone-bar-wrap">
+                      <div class="factory-zone-bar">
+                        <div
+                          class="factory-zone-bar-fill"
+                          :data-load-status="zone.status"
+                          :style="'width:' + factoryBarWidth(zone.load)"
+                        ></div>
+                      </div>
+                    </div>
+                    <div class="factory-zone-stats">
+                      <span class="factory-zone-cap" x-text="zone.capacity + ' pcs/day'"></span>
+                      <span class="factory-zone-load" :data-load-status="zone.status" x-text="factoryBarLabel(zone.load)"></span>
+                      <span class="status-badge small" :class="{'danger': zone.status === 'OVER', 'warning': zone.status === 'AT_RISK', 'success': zone.status === 'OK'}" x-text="zone.status.replace('_',' ')"></span>
+                    </div>
+                    <svg class="factory-zone-chevron" :class="factoryZoneDetail === zone.id && 'factory-zone-chevron-open'" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                  </button>
+
+                  <!-- Zone detail (expanded) -->
+                  <div class="factory-zone-detail" x-show="factoryZoneDetail === zone.id" x-cloak>
+
+                    <!-- Zone-level edit header -->
+                    <div class="factory-zone-detail-header">
+                      <div class="factory-zone-detail-meta">
+                        <span class="factory-zone-detail-title" x-text="zone.name"></span>
+                        <span class="factory-zone-detail-ops" x-show="factoryEditingZone !== zone.id">
+                          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zm5 2a2 2 0 11-4 0 2 2 0 014 0zm-4 7a4 4 0 00-8 0v1h8v-1zM6 8a2 2 0 11-4 0 2 2 0 014 0zm10 7a3.99 3.99 0 00-1.46-3.08A3.98 3.98 0 0118 15v1h-2zM3.08 11.92A3.99 3.99 0 002 15v1h2v-1c0-.88.28-1.69.76-2.36-.37-.24-.7-.53-.99-.85l.31.13z"/></svg>
+                          <span x-text="zone.operators + ' operators'"></span>
+                          <template x-if="zone.notes"><span class="factory-zone-notes" x-text="'— ' + zone.notes"></span></template>
+                        </span>
+                        <!-- Zone formula + rules display (view mode) -->
+                        <div class="factory-formula-line" x-show="factoryEditingZone !== zone.id && zone.formula" x-cloak>
+                          <span class="factory-formula-label">formula:</span>
+                          <span class="factory-formula-text" x-text="zone.formula"></span>
+                        </div>
+                        <div class="factory-rule-pills" x-show="factoryEditingZone !== zone.id && zone.rules && zone.rules.length > 0" x-cloak>
+                          <template x-for="rule in (zone.rules || [])" :key="rule.type + rule.description">
+                            <span
+                              class="factory-rule-pill"
+                              :class="'factory-rule-pill-' + rule.type"
+                              :title="rule.description"
+                            >
+                              <!-- caps_zone / sub_bottleneck: warning triangle -->
+                              <template x-if="rule.type === 'caps_zone' || rule.type === 'sub_bottleneck'">
+                                <svg viewBox="0 0 20 20" fill="currentColor" width="10" height="10" aria-hidden="true"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                              </template>
+                              <!-- shared_resource / uses_shared_resource: link icon -->
+                              <template x-if="rule.type === 'shared_resource' || rule.type === 'uses_shared_resource'">
+                                <svg viewBox="0 0 20 20" fill="currentColor" width="10" height="10" aria-hidden="true"><path fill-rule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clip-rule="evenodd"/></svg>
+                              </template>
+                              <!-- people_based: person icon -->
+                              <template x-if="rule.type === 'people_based'">
+                                <svg viewBox="0 0 20 20" fill="currentColor" width="10" height="10" aria-hidden="true"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zm5 2a2 2 0 11-4 0 2 2 0 014 0zm-4 7a4 4 0 00-8 0v1h8v-1z"/></svg>
+                              </template>
+                              <!-- has_mode: toggle/switch icon -->
+                              <template x-if="rule.type === 'has_mode'">
+                                <svg viewBox="0 0 20 20" fill="currentColor" width="10" height="10" aria-hidden="true"><path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z"/></svg>
+                              </template>
+                              <span x-text="rule.type.replace(/_/g, ' ')"></span>
+                            </span>
+                          </template>
+                        </div>
+
+                        <!-- Zone inline edit form -->
+                        <div class="factory-edit-inline" x-show="factoryEditingZone === zone.id" x-cloak>
+                          <label class="factory-edit-field">
+                            <span>Operators</span>
+                            <input type="number" class="factory-edit-input" min="0" max="20"
+                              x-model.number="factoryZoneEdits.operators" />
+                          </label>
+                          <label class="factory-edit-field">
+                            <span>Notes</span>
+                            <input type="text" class="factory-edit-input" placeholder="Optional note"
+                              x-model="factoryZoneEdits.notes" />
+                          </label>
+                          <label class="factory-edit-field factory-edit-field-wide">
+                            <span>Formula</span>
+                            <input type="text" class="factory-edit-input" placeholder="e.g. min(sum_of_printers, curer_capacity)"
+                              x-model="factoryZoneEdits.formula" />
+                          </label>
+                          <div class="factory-edit-actions" style="width:100%; flex-direction:column; align-items:flex-start; gap:0.4rem">
+                            <!-- Rules editor -->
+                            <div class="factory-rules-edit-section">
+                              <span class="factory-rules-edit-label">Rules</span>
+                              <template x-for="(rule, idx) in (factoryZoneEdits.rules || [])" :key="idx">
+                                <div class="factory-rule-edit">
+                                  <select class="factory-edit-input factory-edit-input-sm factory-rule-type-select" x-model="factoryZoneEdits.rules[idx].type">
+                                    <option value="caps_zone">caps_zone</option>
+                                    <option value="sub_bottleneck">sub_bottleneck</option>
+                                    <option value="shared_resource">shared_resource</option>
+                                    <option value="uses_shared_resource">uses_shared_resource</option>
+                                    <option value="people_based">people_based</option>
+                                    <option value="has_mode">has_mode</option>
+                                  </select>
+                                  <input type="text" class="factory-edit-input factory-rule-target-input"
+                                    placeholder="target / resource / machine"
+                                    :value="factoryZoneEdits.rules[idx].target || factoryZoneEdits.rules[idx].bottleneck_machine || factoryZoneEdits.rules[idx].resource || ''"
+                                    @input="factoryZoneEdits.rules[idx].target = $event.target.value" />
+                                  <input type="text" class="factory-edit-input factory-rule-desc-input"
+                                    placeholder="description"
+                                    x-model="factoryZoneEdits.rules[idx].description" />
+                                  <button class="factory-rule-remove-btn" type="button" @click="removeZoneRule(idx)" title="Remove rule">&times;</button>
+                                </div>
+                              </template>
+                              <button class="factory-rule-add-btn" type="button" @click="addZoneRule()">+ Add rule</button>
+                            </div>
+                            <div class="factory-edit-actions" style="padding-top:0.25rem">
+                              <button class="factory-edit-save-btn" @click="commitEditZone(zone.id)">Save</button>
+                              <button class="factory-edit-cancel-btn" @click="cancelEditZone()">Cancel</button>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="table-inline-actions" x-show="factoryEditingZone !== zone.id" style="margin-top:0.5rem;">
+                          <button class="mini-action-btn" @click="applyFactorySavedView('sim')">Simulate</button>
+                          <button class="mini-action-btn" @click="factoryShowFormulas = true; factorySimOpen = false">Rules</button>
+                        </div>
+                      </div>
+                      <button
+                        class="factory-edit-btn"
+                        x-show="factoryEditingZone !== zone.id"
+                        @click="startEditZone(zone)"
+                        aria-label="Edit zone specs"
+                        title="Edit zone"
+                      >
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+                      </button>
+                    </div>
+
+                    <template x-if="zone.is_people_based">
+                      <div class="factory-zone-people-note">
+                        <svg viewBox="0 0 20 20" fill="currentColor" class="factory-icon-sm"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zm5 2a2 2 0 11-4 0 2 2 0 014 0zm-4 7a4 4 0 00-8 0v1h8v-1zM6 8a2 2 0 11-4 0 2 2 0 014 0zm10 7a3.99 3.99 0 00-1.46-3.08A3.98 3.98 0 0118 15v1h-2zM3.08 11.92A3.99 3.99 0 002 15v1h2v-1c0-.88.28-1.69.76-2.36-.37-.24-.7-.53-.99-.85l.31.13z"/></svg>
+                        <span>People-based zone — <strong x-text="zone.operators + ' operators'"></strong> at 7 min/piece combined, 74% efficiency</span>
+                      </div>
+                    </template>
+                    <template x-if="!zone.is_people_based && zone.sub_bottleneck">
+                      <div class="factory-zone-bottleneck-note">
+                        <svg viewBox="0 0 20 20" fill="currentColor" class="factory-icon-sm"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                        <span>Output capped by <strong x-text="zone.sub_bottleneck"></strong></span>
+                      </div>
+                    </template>
+                    <template x-if="zone.machines.length > 0">
+                      <div class="factory-machine-table-wrap">
+                        <table class="factory-machine-table">
+                          <thead>
+                            <tr>
+                              <th>Machine</th>
+                              <th>Brand</th>
+                              <th>Type</th>
+                              <th class="text-right">Theoretical/hr</th>
+                              <th class="text-right">Realistic/day</th>
+                              <th>Role</th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <template x-for="m in zone.machines" :key="m.id">
+                              <tr :class="m.is_sub_bottleneck && 'factory-row-bottleneck'">
+                                <!-- Edit row: spans all columns when this machine is being edited -->
+                                <td colspan="7" x-show="factoryEditingMachine === m.id" style="padding:0">
+                                  <div class="factory-edit-inline factory-machine-edit-row">
+                                    <label class="factory-edit-field">
+                                      <span>Name</span>
+                                      <input type="text" class="factory-edit-input" x-model="factoryMachineEdits.name" />
+                                    </label>
+                                    <label class="factory-edit-field">
+                                      <span>Theoretical/hr</span>
+                                      <input type="number" class="factory-edit-input" min="0" step="0.5"
+                                        x-model.number="factoryMachineEdits.theoretical_pcs_per_hour" />
+                                    </label>
+                                    <label class="factory-edit-field">
+                                      <span>Available min/day</span>
+                                      <input type="number" class="factory-edit-input" min="0" max="600"
+                                        x-model.number="factoryMachineEdits.available_minutes" placeholder="auto" />
+                                    </label>
+                                    <label class="factory-edit-field">
+                                      <span>Efficiency (0–1)</span>
+                                      <input type="number" class="factory-edit-input" min="0" max="1" step="0.05"
+                                        x-model.number="factoryMachineEdits.efficiency_factor" placeholder="inherit" />
+                                    </label>
+                                    <label class="factory-edit-field factory-edit-field-wide">
+                                      <span>Notes</span>
+                                      <input type="text" class="factory-edit-input" x-model="factoryMachineEdits.notes" placeholder="Optional" />
+                                    </label>
+                                    <label class="factory-edit-field factory-edit-field-wide">
+                                      <span>Formula</span>
+                                      <input type="text" class="factory-edit-input" x-model="factoryMachineEdits.formula" placeholder="e.g. theoretical_pcs_per_hour * (available_minutes / 60) * efficiency_factor" />
+                                    </label>
+                                    <!-- Rules editor -->
+                                    <div class="factory-rules-edit-section" style="width:100%">
+                                      <span class="factory-rules-edit-label">Rules</span>
+                                      <template x-for="(rule, idx) in (factoryMachineEdits.rules || [])" :key="idx">
+                                        <div class="factory-rule-edit">
+                                          <select class="factory-edit-input factory-edit-input-sm factory-rule-type-select" x-model="factoryMachineEdits.rules[idx].type">
+                                            <option value="caps_zone">caps_zone</option>
+                                            <option value="sub_bottleneck">sub_bottleneck</option>
+                                            <option value="shared_resource">shared_resource</option>
+                                            <option value="uses_shared_resource">uses_shared_resource</option>
+                                            <option value="people_based">people_based</option>
+                                            <option value="has_mode">has_mode</option>
+                                          </select>
+                                          <input type="text" class="factory-edit-input factory-rule-target-input"
+                                            placeholder="target / resource"
+                                            :value="factoryMachineEdits.rules[idx].target || ''"
+                                            @input="factoryMachineEdits.rules[idx].target = $event.target.value" />
+                                          <input type="text" class="factory-edit-input factory-rule-desc-input"
+                                            placeholder="description"
+                                            x-model="factoryMachineEdits.rules[idx].description" />
+                                          <button class="factory-rule-remove-btn" type="button" @click="removeMachineRule(idx)" title="Remove rule">&times;</button>
+                                        </div>
+                                      </template>
+                                      <button class="factory-rule-add-btn" type="button" @click="addMachineRule()">+ Add rule</button>
+                                    </div>
+                                    <div class="factory-edit-actions">
+                                      <button class="factory-edit-save-btn" @click="commitEditMachine(m.id)">Save</button>
+                                      <button class="factory-edit-cancel-btn" @click="cancelEditMachine()">Cancel</button>
+                                    </div>
+                                  </div>
+                                </td>
+                                <!-- Normal cells: hidden when this machine is being edited -->
+                                <td x-show="factoryEditingMachine !== m.id" x-text="m.name"></td>
+                                <td x-show="factoryEditingMachine !== m.id" x-text="m.brand"></td>
+                                <td x-show="factoryEditingMachine !== m.id" x-text="m.type"></td>
+                                <td x-show="factoryEditingMachine !== m.id" class="text-right" x-text="m.theoretical_pcs_per_hour + '/hr'"></td>
+                                <td x-show="factoryEditingMachine !== m.id" class="text-right" x-text="m.realistic_daily + '/day'"></td>
+                                <td x-show="factoryEditingMachine !== m.id">
+                                  <span x-show="m.is_sub_bottleneck" class="factory-role-badge factory-role-bottleneck">Sub-bottleneck</span>
+                                  <span x-show="!m.is_sub_bottleneck && (m.type === 'CURER' || m.type === 'PRETREAT')" class="factory-role-badge factory-role-support">Support</span>
+                                  <span x-show="!m.is_sub_bottleneck && m.type !== 'CURER' && m.type !== 'PRETREAT'" class="factory-role-badge factory-role-production">Production</span>
+                                </td>
+                                <td x-show="factoryEditingMachine !== m.id">
+                                  <button
+                                    class="factory-edit-btn"
+                                    @click="startEditMachine(m)"
+                                    aria-label="Edit machine specs"
+                                    title="Edit machine"
+                                  >
+                                    <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" aria-hidden="true"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+                                  </button>
+                                </td>
+                              </tr>
+                              <!-- Formula + rules row (view mode only, shown when machine has formula or rules) -->
+                              <tr x-show="factoryEditingMachine !== m.id && (m.formula || (m.rules && m.rules.length > 0))" class="factory-machine-meta-row">
+                                <td colspan="7" style="padding: 0.2rem 0.5rem 0.45rem 0.75rem; border-top: none">
+                                  <div class="factory-formula-line" x-show="m.formula">
+                                    <span class="factory-formula-label">formula:</span>
+                                    <span class="factory-formula-text" x-text="m.formula"></span>
+                                    <span class="factory-formula-result" x-text="'= ' + m.realistic_daily + ' pcs/day'"></span>
+                                  </div>
+                                  <div class="factory-rule-pills" x-show="m.rules && m.rules.length > 0">
+                                    <template x-for="rule in (m.rules || [])" :key="rule.type + rule.description">
+                                      <span
+                                        class="factory-rule-pill"
+                                        :class="'factory-rule-pill-' + rule.type"
+                                        :title="rule.description"
+                                      >
+                                        <!-- caps_zone / sub_bottleneck -->
+                                        <template x-if="rule.type === 'caps_zone' || rule.type === 'sub_bottleneck'">
+                                          <svg viewBox="0 0 20 20" fill="currentColor" width="10" height="10" aria-hidden="true"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                                        </template>
+                                        <!-- shared_resource / uses_shared_resource -->
+                                        <template x-if="rule.type === 'shared_resource' || rule.type === 'uses_shared_resource'">
+                                          <svg viewBox="0 0 20 20" fill="currentColor" width="10" height="10" aria-hidden="true"><path fill-rule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clip-rule="evenodd"/></svg>
+                                        </template>
+                                        <!-- people_based -->
+                                        <template x-if="rule.type === 'people_based'">
+                                          <svg viewBox="0 0 20 20" fill="currentColor" width="10" height="10" aria-hidden="true"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zm5 2a2 2 0 11-4 0 2 2 0 014 0zm-4 7a4 4 0 00-8 0v1h8v-1z"/></svg>
+                                        </template>
+                                        <!-- has_mode -->
+                                        <template x-if="rule.type === 'has_mode'">
+                                          <svg viewBox="0 0 20 20" fill="currentColor" width="10" height="10" aria-hidden="true"><path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z"/></svg>
+                                        </template>
+                                        <span x-text="rule.type.replace(/_/g, ' ')"></span>
+                                      </span>
+                                    </template>
+                                  </div>
+                                </td>
+                              </tr>
+                            </template>
+                          </tbody>
+                        </table>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- BOTTOM: Two-column section -->
+          <div class="factory-bottom-row">
+
+            <!-- Constraint Cascade -->
+            <div class="factory-section factory-section-half">
+              <h3 class="factory-section-title">Constraint Cascade</h3>
+              <p class="factory-section-desc">Zones sorted by load — highest first</p>
+              <div class="factory-cascade">
+                <template x-for="(zone, idx) in getFactoryCap().constraintCascade" :key="zone.id">
+                  <div class="factory-cascade-item">
+                    <div class="factory-cascade-rank" x-text="idx + 1"></div>
+                    <div class="factory-cascade-body">
+                      <div class="factory-cascade-header">
+                        <span class="factory-cascade-name" x-text="zone.name"></span>
+                        <span class="status-badge small" :class="{'danger': zone.status === 'OVER', 'warning': zone.status === 'AT_RISK', 'success': zone.status === 'OK'}" x-text="Math.round(zone.load * 100) + '%'"></span>
+                      </div>
+                      <div class="factory-cascade-stats" x-text="zone.capacity + ' cap · ' + zone.demand + ' demand'"></div>
+                      <div class="factory-cascade-fix" x-text="zone.fix"></div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- Shared Resources -->
+            <div class="factory-section factory-section-half">
+              <h3 class="factory-section-title">Shared Resources</h3>
+              <p class="factory-section-desc">Cross-zone contention monitoring</p>
+              <div class="factory-shared">
+                <template x-for="res in getFactoryCap().sharedResources" :key="res.id">
+                  <div class="factory-shared-item">
+                    <div class="factory-shared-header">
+                      <span class="factory-shared-name" x-text="res.name"></span>
+                      <span class="status-badge small" :class="{'danger': res.status === 'OVER', 'warning': res.status === 'AT_RISK', 'success': res.status === 'OK'}" x-text="Math.round(res.contention * 100) + '%'"></span>
+                    </div>
+                    <div class="factory-zone-bar factory-shared-bar">
+                      <div
+                        class="factory-zone-bar-fill"
+                        :data-load-status="res.status"
+                        :style="'width:' + factoryBarWidth(res.contention)"
+                      ></div>
+                    </div>
+                    <div class="factory-shared-note" x-text="res.capacity + ' cap/day · ' + res.demand + ' demand · ' + res.note"></div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Assumptions footer -->
+          <div class="factory-assumptions">
+            <template x-if="!factoryEditingOperating">
+              <div class="factory-assumptions-read">
+                <span class="factory-assumptions-label" x-text="factorySimOpen ? 'Simulating:' : 'Model Assumptions:'"></span>
+                <span x-text="getFactoryCap().assumptions.shift_hours + 'h shift'"></span>
+                <span class="factory-assumptions-sep">·</span>
+                <span x-text="getFactoryCap().assumptions.orders_per_day + ' orders/day'"></span>
+                <span class="factory-assumptions-sep">·</span>
+                <span x-text="getFactoryCap().assumptions.avg_pieces_per_order + ' pcs/order avg'"></span>
+                <span class="factory-assumptions-sep">·</span>
+                <span x-text="Math.round(getFactoryCap().assumptions.efficiency_factor * 100) + '% efficiency factor'"></span>
+                <button class="factory-edit-btn factory-assumptions-edit-btn" @click="startEditOperating()" aria-label="Edit operating assumptions" title="Edit assumptions">
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" aria-hidden="true"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+                </button>
+              </div>
+            </template>
+            <template x-if="factoryEditingOperating">
+              <div class="factory-edit-inline factory-operating-edit">
+                <span class="factory-assumptions-label">Edit Assumptions:</span>
+                <label class="factory-edit-field">
+                  <span>Shift hours</span>
+                  <input type="number" class="factory-edit-input factory-edit-input-sm" min="4" max="24" step="0.5"
+                    x-model.number="factoryOperatingEdits.shift_hours" />
+                </label>
+                <label class="factory-edit-field">
+                  <span>Orders/day</span>
+                  <input type="number" class="factory-edit-input factory-edit-input-sm" min="1" max="1000"
+                    x-model.number="factoryOperatingEdits.orders_per_day" />
+                </label>
+                <label class="factory-edit-field">
+                  <span>Pcs/order avg</span>
+                  <input type="number" class="factory-edit-input factory-edit-input-sm" min="1" max="50" step="0.5"
+                    x-model.number="factoryOperatingEdits.avg_pieces_per_order" />
+                </label>
+                <div class="factory-edit-actions">
+                  <button class="factory-edit-save-btn" @click="commitEditOperating()">Save</button>
+                  <button class="factory-edit-cancel-btn" @click="cancelEditOperating()">Cancel</button>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          </div><!-- /factory-main -->
+
+          <!-- ── SIMULATION SIDEBAR ──────────────────────────────────────────── -->
+          <div class="factory-sim-sidebar" x-show="factorySimOpen" x-transition.opacity x-cloak>
+
+            <!-- Presets -->
+            <div class="factory-sim-section">
+              <div class="factory-sim-section-title">Presets</div>
+              <div class="factory-sim-presets">
+                <template x-for="p in [
+                  {id:'current',label:'Current'},
+                  {id:'qc_fixed',label:'QC Fixed'},
+                  {id:'phase3',label:'Phase 3'},
+                  {id:'growth',label:'Growth'},
+                  {id:'20cr',label:'20 Crore'},
+                  {id:'machine_down_dtg',label:'DTG Down'},
+                  {id:'machine_down_dtf',label:'DTF Down'},
+                  {id:'qc_absent',label:'QC Absent'},
+                  {id:'monsoon',label:'Monsoon'},
+                  {id:'second_shift',label:'2nd Shift'}
+                ]" :key="p.id">
+                  <button
+                    class="factory-sim-preset-btn"
+                    :class="factorySimPreset === p.id && 'factory-sim-preset-active'"
+                    @click="applyFactoryPreset(p.id)"
+                    x-text="p.label"
+                  ></button>
+                </template>
+              </div>
+            </div>
+
+            <div class="factory-sim-columns">
+
+              <!-- LEFT COLUMN -->
+              <div class="factory-sim-col">
+
+                <!-- DEMAND -->
+                <div class="factory-sim-section">
+                  <div class="factory-sim-section-title">Demand</div>
+                  <template x-if="factorySimConfig">
+                    <div>
+                      <div class="factory-sim-field">
+                        <label class="factory-sim-label">
+                          Orders / day
+                          <span class="factory-sim-val" x-text="factorySimConfig.orders_per_day"></span>
+                        </label>
+                        <input type="range" class="factory-sim-range" min="10" max="500" step="5"
+                          x-model.number="factorySimConfig.orders_per_day"
+                          @input="factorySimPreset = 'custom'"
+                        />
+                      </div>
+                      <div class="factory-sim-field">
+                        <label class="factory-sim-label">
+                          Pieces / order
+                          <span class="factory-sim-val" x-text="factorySimConfig.avg_pieces_per_order"></span>
+                        </label>
+                        <input type="range" class="factory-sim-range" min="1" max="10" step="0.5"
+                          x-model.number="factorySimConfig.avg_pieces_per_order"
+                          @input="factorySimPreset = 'custom'"
+                        />
+                      </div>
+                      <div class="factory-sim-derived">
+                        Total demand: <strong x-text="Math.round(factorySimConfig.orders_per_day * factorySimConfig.avg_pieces_per_order) + ' pcs/day'"></strong>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- ORDER MIX -->
+                <div class="factory-sim-section">
+                  <div class="factory-sim-section-title">
+                    Order Mix
+                    <span class="factory-sim-mix-total"
+                      :class="simMethodSplitTotal() !== 100 && 'factory-sim-mix-warn'"
+                      x-text="'Total: ' + simMethodSplitTotal() + '%'"
+                    ></span>
+                  </div>
+                  <template x-if="factorySimConfig">
+                    <div>
+                      <template x-for="method in ['DTG','DTF','SUB','EMB','VNL','SCR']" :key="method">
+                        <div class="factory-sim-field">
+                          <label class="factory-sim-label">
+                            <span x-text="method"></span>
+                            <span class="factory-sim-val" x-text="factorySimConfig.method_split[method] + '%'"></span>
+                          </label>
+                          <input type="range" class="factory-sim-range" min="0" max="100" step="5"
+                            :value="factorySimConfig.method_split[method]"
+                            @input="factorySimConfig.method_split[method] = parseInt($event.target.value); factorySimPreset = 'custom'"
+                          />
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- SHIFTS -->
+                <div class="factory-sim-section">
+                  <div class="factory-sim-section-title">Shifts</div>
+                  <template x-if="factorySimConfig">
+                    <div>
+                      <div class="factory-sim-radios">
+                        <label class="factory-sim-radio">
+                          <input type="radio" :checked="factorySimConfig.shifts === 1"
+                            @change="factorySimConfig.shifts = 1; factorySimPreset = 'custom'" />
+                          1 shift
+                        </label>
+                        <label class="factory-sim-radio">
+                          <input type="radio" :checked="factorySimConfig.shifts === 2"
+                            @change="factorySimConfig.shifts = 2; factorySimPreset = 'custom'" />
+                          2 shifts
+                        </label>
+                      </div>
+                      <template x-if="factorySimConfig.shifts === 2">
+                        <div class="factory-sim-field" style="margin-top:0.5rem">
+                          <label class="factory-sim-label">
+                            2nd shift efficiency
+                            <span class="factory-sim-val" x-text="factorySimConfig.second_shift_efficiency + '%'"></span>
+                          </label>
+                          <input type="range" class="factory-sim-range" min="70" max="95" step="5"
+                            x-model.number="factorySimConfig.second_shift_efficiency"
+                            @input="factorySimPreset = 'custom'"
+                          />
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+
+              </div>
+
+              <!-- RIGHT COLUMN -->
+              <div class="factory-sim-col">
+
+                <!-- PROCESS IMPROVEMENTS -->
+                <div class="factory-sim-section">
+                  <div class="factory-sim-section-title">Process Improvements</div>
+                  <template x-if="factorySimConfig">
+                    <div>
+                      <div class="factory-sim-field">
+                        <label class="factory-sim-label">
+                          Efficiency factor
+                          <span class="factory-sim-val" x-text="factorySimConfig.efficiency + '%'"></span>
+                        </label>
+                        <input type="range" class="factory-sim-range" min="50" max="95" step="5"
+                          x-model.number="factorySimConfig.efficiency"
+                          @input="factorySimPreset = 'custom'"
+                        />
+                      </div>
+                      <label class="factory-sim-check">
+                        <input type="checkbox"
+                          :checked="factorySimConfig.curer_stagger"
+                          @change="factorySimConfig.curer_stagger = $event.target.checked; factorySimPreset = 'custom'"
+                        />
+                        <span>Curer stagger-loading <em>(+30% DTG curing)</em></span>
+                      </label>
+                      <label class="factory-sim-check">
+                        <input type="checkbox"
+                          :checked="factorySimConfig.dtf_parallel"
+                          @change="factorySimConfig.dtf_parallel = $event.target.checked; factorySimPreset = 'custom'"
+                        />
+                        <span>DTF parallel operation <em>(+40% DTF)</em></span>
+                      </label>
+                      <label class="factory-sim-check">
+                        <input type="checkbox"
+                          :checked="factorySimConfig.gang_cutting"
+                          @change="factorySimConfig.gang_cutting = $event.target.checked; factorySimPreset = 'custom'"
+                        />
+                        <span>Gang cutting vinyl <em>(2× vinyl throughput)</em></span>
+                      </label>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- QC + PACKING -->
+                <div class="factory-sim-section">
+                  <div class="factory-sim-section-title">QC + Packing</div>
+                  <template x-if="factorySimConfig">
+                    <div>
+                      <div class="factory-sim-field">
+                        <label class="factory-sim-label">
+                          QC/Pack staff
+                          <span class="factory-sim-val" x-text="factorySimConfig.qc_operators + ' operators'"></span>
+                        </label>
+                        <input type="range" class="factory-sim-range" min="1" max="10" step="1"
+                          x-model.number="factorySimConfig.qc_operators"
+                          @input="factorySimPreset = 'custom'"
+                        />
+                      </div>
+                      <label class="factory-sim-check">
+                        <input type="checkbox"
+                          :checked="factorySimConfig.qc_separated"
+                          @change="factorySimConfig.qc_separated = $event.target.checked; factorySimPreset = 'custom'"
+                        />
+                        <span>Separate QC + packing stations <em>(parallel, ~2× throughput)</em></span>
+                      </label>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- MACHINES -->
+                <div class="factory-sim-section">
+                  <div class="factory-sim-section-title">Machines</div>
+                  <template x-if="factorySimConfig">
+                    <div class="factory-sim-machines">
+                      <template x-for="m in getFactoryData().machines.filter(m => m.zone !== 'FUSING')" :key="m.id">
+                        <label class="factory-sim-check">
+                          <input type="checkbox"
+                            :checked="factorySimConfig.machine_overrides[m.id] !== false"
+                            @change="
+                              if ($event.target.checked) {
+                                delete factorySimConfig.machine_overrides[m.id];
+                              } else {
+                                factorySimConfig.machine_overrides[m.id] = false;
+                              }
+                              factorySimPreset = 'custom';
+                            "
+                          />
+                          <span><em x-text="m.zone + ':'"></em> <strong x-text="m.name"></strong></span>
+                        </label>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- RESULTS: Before vs After comparison -->
+            <div class="factory-sim-results">
+              <div class="factory-sim-results-title">Simulation Results</div>
+              <div class="factory-sim-compare-grid">
+
+                <div class="factory-sim-compare-item">
+                  <div class="factory-sim-compare-label">Factory Throughput</div>
+                  <div class="factory-sim-compare-vals">
+                    <span class="factory-sim-before" x-text="getFactoryBaseCap().factoryThroughput + ' pcs/day'"></span>
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true"><path fill-rule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                    <span class="factory-sim-after" x-text="getFactoryCap().factoryThroughput + ' pcs/day'"></span>
+                    <span class="factory-sim-delta"
+                      :class="getFactoryCap().factoryThroughput >= getFactoryBaseCap().factoryThroughput ? 'factory-sim-delta-pos' : 'factory-sim-delta-neg'"
+                      x-text="(getFactoryCap().factoryThroughput >= getFactoryBaseCap().factoryThroughput ? '+' : '') + (getFactoryCap().factoryThroughput - getFactoryBaseCap().factoryThroughput) + ' pcs'"
+                    ></span>
+                  </div>
+                </div>
+
+                <div class="factory-sim-compare-item">
+                  <div class="factory-sim-compare-label">Max Orders / Day</div>
+                  <div class="factory-sim-compare-vals">
+                    <span class="factory-sim-before" x-text="getFactoryBaseCap().bindingZone ? Math.floor(getFactoryBaseCap().bindingZone.capacity / getFactoryBaseCap().assumptions.avg_pieces_per_order) + ' orders' : '—'"></span>
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true"><path fill-rule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                    <span class="factory-sim-after" x-text="getFactoryCap().bindingZone ? Math.floor(getFactoryCap().bindingZone.capacity / factorySimConfig.avg_pieces_per_order) + ' orders' : '—'"></span>
+                  </div>
+                </div>
+
+                <div class="factory-sim-compare-item">
+                  <div class="factory-sim-compare-label">Binding Constraint</div>
+                  <div class="factory-sim-compare-vals">
+                    <span class="factory-sim-before" x-text="getFactoryBaseCap().bindingZone.name"></span>
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true"><path fill-rule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                    <span class="factory-sim-after" x-text="getFactoryCap().bindingZone.name"></span>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Zone load mini bars -->
+              <div class="factory-sim-zone-bars">
+                <div class="factory-sim-zone-bars-title">Zone Load (simulated)</div>
+                <template x-for="zone in getFactoryCap().zones" :key="zone.id">
+                  <div class="factory-sim-zone-bar-row">
+                    <span class="factory-sim-zone-bar-label" x-text="zone.name"></span>
+                    <div class="factory-zone-bar factory-sim-mini-bar">
+                      <div class="factory-zone-bar-fill"
+                        :data-load-status="zone.status"
+                        :style="'width:' + factoryBarWidth(zone.load)"
+                      ></div>
+                    </div>
+                    <span class="factory-zone-load" :data-load-status="zone.status" x-text="factoryBarLabel(zone.load)"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+          </div>
+          <!-- END SIMULATION SIDEBAR -->
+
+          <!-- ── FORMULA / LOGIC REFERENCE SIDEBAR ──────────────────────────── -->
+          <div class="factory-formula-sidebar" x-show="factoryShowFormulas" x-transition.opacity x-cloak>
+            <div class="factory-sim-section">
+              <div class="factory-sim-section-title">How the model works</div>
+              <p class="factory-section-desc" style="margin:0.25rem 0 0">Formulas used to calculate zone capacity and throughput.</p>
+            </div>
+
+            <template x-if="factoryConfig && factoryConfig.formulas && Object.keys(factoryConfig.formulas).length > 1">
+              <div>
+                <template x-for="entry in Object.entries(factoryConfig.formulas).filter(([k]) => k !== '_note')" :key="entry[0]">
+                  <div class="factory-formula-card">
+                    <div class="factory-formula-name" x-text="entry[0].replace(/_/g, ' ')"></div>
+                    <div class="factory-formula-code" x-text="entry[1]"></div>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <template x-if="!factoryConfig || !factoryConfig.formulas || Object.keys(factoryConfig.formulas).length <= 1">
+              <div class="factory-formula-card">
+                <!-- Built-in formula reference when API not loaded -->
+                <div class="factory-formula-name">Available Minutes / Day</div>
+                <div class="factory-formula-code">avail_min = shift_hours × 60 − maintenance − changeover</div>
+                <div class="factory-formula-desc">Net production time after subtracting mandatory maintenance and average changeover per shift.</div>
+
+                <div class="factory-formula-name" style="margin-top:1rem">Machine Daily Capacity</div>
+                <div class="factory-formula-code">daily_cap = (avail_min / 60) × theoretical_pcs_per_hour × efficiency</div>
+                <div class="factory-formula-desc">Realistic output per machine per day, scaled by the global efficiency factor.</div>
+
+                <div class="factory-formula-name" style="margin-top:1rem">Zone Capacity</div>
+                <div class="factory-formula-code">zone_cap = min(machine_caps) for sequential; sum for parallel</div>
+                <div class="factory-formula-desc">A zone's throughput is limited by its slowest sequential machine (bottleneck).</div>
+
+                <div class="factory-formula-name" style="margin-top:1rem">Zone Demand</div>
+                <div class="factory-formula-code">zone_demand = total_pieces × order_mix[zone]</div>
+                <div class="factory-formula-desc">How many pieces per day this zone must produce, based on the order method split.</div>
+
+                <div class="factory-formula-name" style="margin-top:1rem">Load Ratio</div>
+                <div class="factory-formula-code">load = zone_demand / zone_cap</div>
+                <div class="factory-formula-desc">Values above 1.0 = constrained. OK &lt; 0.70, Approaching 0.70–0.85, At Risk 0.85–1.0, Over ≥ 1.0.</div>
+
+                <div class="factory-formula-name" style="margin-top:1rem">Factory Throughput</div>
+                <div class="factory-formula-code">throughput = min(zone_cap / order_mix[zone]) across all zones</div>
+                <div class="factory-formula-desc">The binding constraint zone sets the ceiling for the entire factory.</div>
+
+                <div class="factory-formula-name" style="margin-top:1rem">QC + Packing (people-based)</div>
+                <div class="factory-formula-code">qc_cap = operators × (shift_min / qc_min_per_piece) × qc_efficiency</div>
+                <div class="factory-formula-desc">7 min/piece combined touch time, 74% efficiency per operator.</div>
+              </div>
+            </template>
+          </div>
+          <!-- END FORMULA SIDEBAR -->
+
+        </div><!-- /factory-layout -->
+      </template>

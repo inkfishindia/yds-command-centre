@@ -1,0 +1,542 @@
+
+      <div class="view-header-bar">
+        <div class="view-header-left">
+          <span class="view-header-emoji">🧩</span>
+          <div class="view-header-text">
+            <h2 class="view-header-title">Business Model Canvas</h2>
+            <span class="view-header-subtitle">Strategic business model view</span>
+          </div>
+        </div>
+        <div class="view-header-actions">
+          <span class="view-refresh-label" x-show="bmcLastRefresh" x-text="getBmcRefreshLabel()"></span>
+          <button class="btn btn-small btn-icon" @click="loadBmc()" :disabled="bmcLoading">
+            <span class="refresh-icon">&#x21bb;</span>
+            <span x-text="bmcLoading ? 'Loading...' : 'Refresh'"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading skeleton -->
+      <div x-show="bmcLoading && !bmc" class="skeleton-stack" style="padding: 1rem 0;">
+        <div class="loading-skeleton skeleton-card" style="height: 60px;"></div>
+        <div class="loading-skeleton skeleton-card" style="height: 300px;"></div>
+      </div>
+
+      <!-- Not configured -->
+      <div x-show="!bmcLoading && bmc && bmc.available === false" class="empty-state" style="margin: 2rem 0;">
+        <p><strong>BMC spreadsheet not connected.</strong></p>
+        <p>Set the BMC_SPREADSHEET_ID environment variable to load the Business Model Canvas.</p>
+      </div>
+
+      <!-- Canvas Grid -->
+      <template x-if="bmc && bmc.available !== false">
+        <div>
+          <div class="bmc-hero">
+            <div class="bmc-hero-copy">
+              <span class="bmc-eyebrow">Strategic Operating System</span>
+              <h3>Business model structure, executive signals, and expansion-ready detail in one canvas.</h3>
+              <p>
+                Review the highest-leverage motions first, then open any section to inspect the underlying operating data.
+              </p>
+              <div class="bmc-spotlights">
+                <template x-if="getBmcSpotlight('flywheels')">
+                  <div class="bmc-spotlight">
+                    <span class="bmc-spotlight-label">Primary Motion</span>
+                    <strong x-text="getBmcSpotlight('flywheels').title"></strong>
+                    <span x-text="getBmcSpotlight('flywheels').preview"></span>
+                  </div>
+                </template>
+                <template x-if="getBmcSpotlight('segments')">
+                  <div class="bmc-spotlight">
+                    <span class="bmc-spotlight-label">Lead Segment</span>
+                    <strong x-text="getBmcSpotlight('segments').title"></strong>
+                    <span x-text="getBmcSpotlight('segments').status || getBmcSpotlight('segments').preview"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="bmc-hero-metrics">
+              <template x-for="metric in getBmcHeroMetrics()" :key="metric.label">
+                <div class="bmc-hero-card">
+                  <span class="bmc-hero-label" x-text="metric.label"></span>
+                  <strong class="bmc-hero-value" x-text="metric.value"></strong>
+                  <span class="bmc-hero-note" x-text="metric.note"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="mktops-overview-shell" style="margin-bottom:1.5rem;">
+            <section class="mktops-hero" :class="'mktops-hero--' + getBmcAreaStatus().tone">
+              <div class="mktops-hero-copy">
+                <div class="mktops-hero-kicker">Area Dashboard</div>
+                <h3 class="mktops-hero-title">Business model control layer</h3>
+                <p class="mktops-hero-text">Use this layer to spot strategic risk, jump into the right block, and then work inside the canvas with the same connected dashboard pattern as the operational areas.</p>
+              </div>
+              <div class="mktops-hero-status">
+                <span class="mktops-hero-status-label">Status</span>
+                <span class="mktops-hero-status-value" x-text="getBmcAreaStatus().label"></span>
+                <button class="overview-link-btn" @click="bmcFilter = 'risk'">Review Risks</button>
+              </div>
+            </section>
+
+            <div class="mktops-overview-grid">
+              <template x-for="card in getBmcPriorityCards()" :key="card.id">
+                <section class="mktops-priority-card" :class="'mktops-priority-card--' + card.tone">
+                  <div class="mktops-priority-head">
+                    <div>
+                      <h3 class="mktops-priority-title" x-text="card.title"></h3>
+                      <p class="mktops-priority-copy" x-text="card.label"></p>
+                    </div>
+                    <span class="mktops-priority-value" x-text="card.value"></span>
+                  </div>
+                  <div class="mktops-priority-list">
+                    <template x-for="item in card.items" :key="item.name + item.meta">
+                      <div class="mktops-priority-item">
+                        <span class="mktops-priority-item-name" x-text="item.name"></span>
+                        <span class="mktops-priority-item-meta" x-text="item.meta"></span>
+                      </div>
+                    </template>
+                  </div>
+                </section>
+              </template>
+            </div>
+
+            <div class="org-two-col">
+              <section class="org-col-panel">
+                <div class="org-section-title-row">
+                  <h3 class="org-section-title">Top Focus</h3>
+                  <span class="org-section-badge" x-text="getBmcFocusList().length"></span>
+                </div>
+                <div class="overview-feed">
+                  <template x-for="item in getBmcFocusList()" :key="item.title">
+                    <button class="overview-feed-item" :class="'overview-feed-item--' + item.tone" @click="item.action()">
+                      <span class="overview-feed-type">focus</span>
+                      <div class="overview-feed-main">
+                        <span class="overview-feed-title" x-text="item.title"></span>
+                        <span class="overview-feed-detail" x-text="item.detail"></span>
+                      </div>
+                    </button>
+                  </template>
+                </div>
+              </section>
+
+              <section class="org-col-panel">
+                <div class="org-section-title-row">
+                  <h3 class="org-section-title">Next Actions</h3>
+                </div>
+                <div class="overview-links">
+                  <button class="overview-link-card" @click="bmcFilter = 'risk'; bmcFocus = ''">
+                    <span class="overview-link-card-label">Open at-risk blocks</span>
+                    <span class="overview-link-card-copy">Filter the canvas down to the sections that need strategic attention first.</span>
+                  </button>
+                  <button class="overview-link-card" @click="bmcFocus = 'flywheels'; bmcFilter = 'all'">
+                    <span class="overview-link-card-label">Review flywheels</span>
+                    <span class="overview-link-card-copy">Check the value proposition motions currently anchoring the model.</span>
+                  </button>
+                  <button class="overview-link-card" @click="bmcFocus = 'revenue_streams'; bmcFilter = 'money'">
+                    <span class="overview-link-card-label">Inspect revenue model</span>
+                    <span class="overview-link-card-copy">Jump straight into the earning logic and the streams behind it.</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <div class="bmc-toolbar">
+            <div class="bmc-toolbar-group">
+              <input type="text" class="filter-search bmc-search" placeholder="Search canvas..." x-model="bmcSearch" aria-label="Search business model canvas" />
+            </div>
+            <div class="bmc-toolbar-group">
+              <button class="filter-pill" :class="bmcFilter === 'highlights' && 'filter-pill-active'" @click="bmcFilter = 'highlights'">Highlights</button>
+              <button class="filter-pill" :class="bmcFilter === 'all' && 'filter-pill-active'" @click="bmcFilter = 'all'">All</button>
+              <button class="filter-pill" :class="bmcFilter === 'risk' && 'filter-pill-active'" @click="bmcFilter = 'risk'">At Risk</button>
+              <button class="filter-pill" :class="bmcFilter === 'validated' && 'filter-pill-active'" @click="bmcFilter = 'validated'">Validated</button>
+              <button class="filter-pill" :class="bmcFilter === 'owners' && 'filter-pill-active'" @click="bmcFilter = 'owners'">Owned</button>
+              <button class="filter-pill" :class="bmcFilter === 'money' && 'filter-pill-active'" @click="bmcFilter = 'money'">Money</button>
+            </div>
+            <div class="bmc-toolbar-group" x-show="bmcFocus">
+              <span class="bmc-focus-label">Focused: <span x-text="getBmcFocusLabel()"></span></span>
+              <button class="filter-pill" @click="clearBmcFocus()">Clear Focus</button>
+            </div>
+          </div>
+
+          <div class="bmc-canvas">
+
+            <div class="bmc-block bmc-partners">
+              <div class="bmc-block-header">
+                <div>
+                  <span class="bmc-block-title">Key Partners</span>
+                  <p class="bmc-block-summary" x-text="getBmcSectionSummary('partners')"></p>
+                </div>
+                <span class="bmc-block-count" x-text="getBmcBlockItems('partners').length"></span>
+              </div>
+              <div class="bmc-block-actions">
+                <button class="filter-pill" @click="bmcFocus = 'partners'">Focus</button>
+              </div>
+              <div class="bmc-block-items bmc-block-items-rich">
+                <template x-for="item in getBmcTopItems('partners', 5)" :key="item.rowIndex || JSON.stringify(item)">
+                  <button type="button" class="bmc-item-card" @click="openBmcDetail('partners', item)">
+                    <div class="bmc-item-row">
+                      <span class="bmc-item-name" x-text="getBmcItemLabel('partners', item)"></span>
+                      <span class="status-badge small" :class="getBmcStatusClass(getBmcStatus('partners', item))" x-show="getBmcStatus('partners', item)" x-text="getBmcStatus('partners', item)"></span>
+                    </div>
+                    <p class="bmc-item-preview" x-text="getBmcItemPreview('partners', item)"></p>
+                    <div class="bmc-meta-grid">
+                      <template x-for="meta in getBmcMetaLines('partners', item)" :key="meta.label">
+                        <div class="bmc-meta-chip"><span x-text="meta.label"></span><strong x-text="meta.value"></strong></div>
+                      </template>
+                    </div>
+                  </button>
+                </template>
+                <div class="bmc-more" x-show="getBmcBlockItems('partners').length > 5" x-text="'+' + (getBmcBlockItems('partners').length - 5) + ' more partners'"></div>
+                <div class="bmc-empty" x-show="getBmcFilteredItems('partners').length === 0">No partner data matches the current filters.</div>
+              </div>
+            </div>
+
+            <div class="bmc-block bmc-activities">
+              <div class="bmc-block-header">
+                <div>
+                  <span class="bmc-block-title">Key Activities</span>
+                  <p class="bmc-block-summary" x-text="getBmcSectionSummary('hubs')"></p>
+                </div>
+                <span class="bmc-block-count" x-text="getBmcBlockItems('hubs').length"></span>
+              </div>
+              <div class="bmc-block-actions">
+                <button class="filter-pill" @click="bmcFocus = 'hubs'">Focus</button>
+              </div>
+              <div class="bmc-block-items bmc-block-items-rich">
+                <template x-for="item in getBmcTopItems('hubs', 4)" :key="item.rowIndex || JSON.stringify(item)">
+                  <button type="button" class="bmc-item-card" @click="openBmcDetail('hubs', item)">
+                    <div class="bmc-item-row">
+                      <span class="bmc-item-name" x-text="getBmcItemLabel('hubs', item)"></span>
+                      <span class="status-badge small" :class="getBmcStatusClass(getBmcStatus('hubs', item))" x-show="getBmcStatus('hubs', item)" x-text="getBmcStatus('hubs', item)"></span>
+                    </div>
+                    <p class="bmc-item-preview" x-text="getBmcItemPreview('hubs', item)"></p>
+                    <div class="bmc-meta-grid">
+                      <template x-for="meta in getBmcMetaLines('hubs', item)" :key="meta.label">
+                        <div class="bmc-meta-chip"><span x-text="meta.label"></span><strong x-text="meta.value"></strong></div>
+                      </template>
+                    </div>
+                  </button>
+                </template>
+                <div class="bmc-empty" x-show="getBmcFilteredItems('hubs').length === 0">No activity data matches the current filters.</div>
+              </div>
+            </div>
+
+            <div class="bmc-block bmc-value-props bmc-block-accent">
+              <div class="bmc-block-header">
+                <div>
+                  <span class="bmc-block-title">Value Propositions</span>
+                  <p class="bmc-block-summary" x-text="getBmcSectionSummary('flywheels')"></p>
+                </div>
+                <span class="bmc-block-count" x-text="getBmcBlockItems('flywheels').length"></span>
+              </div>
+              <div class="bmc-block-actions">
+                <button class="filter-pill" @click="bmcFocus = 'flywheels'">Focus</button>
+              </div>
+              <div class="bmc-block-items bmc-block-items-rich bmc-featured-stack">
+                <template x-for="item in getBmcTopItems('flywheels', 3)" :key="item.rowIndex || JSON.stringify(item)">
+                  <button type="button" class="bmc-item-card bmc-item-card-featured" @click="openBmcDetail('flywheels', item)">
+                    <div class="bmc-item-row">
+                      <span class="bmc-item-name" x-text="getBmcItemLabel('flywheels', item)"></span>
+                      <span class="status-badge small" :class="getBmcStatusClass(getBmcStatus('flywheels', item))" x-show="getBmcStatus('flywheels', item)" x-text="getBmcStatus('flywheels', item)"></span>
+                    </div>
+                    <p class="bmc-item-preview" x-text="getBmcItemPreview('flywheels', item)"></p>
+                    <div class="bmc-meta-grid">
+                      <template x-for="meta in getBmcMetaLines('flywheels', item)" :key="meta.label">
+                        <div class="bmc-meta-chip"><span x-text="meta.label"></span><strong x-text="meta.value"></strong></div>
+                      </template>
+                    </div>
+                  </button>
+                </template>
+                <div class="bmc-empty" x-show="getBmcFilteredItems('flywheels').length === 0">No value proposition data matches the current filters.</div>
+              </div>
+            </div>
+
+            <div class="bmc-block bmc-channels">
+              <div class="bmc-block-header">
+                <div>
+                  <span class="bmc-block-title">Channels</span>
+                  <p class="bmc-block-summary" x-text="getBmcSectionSummary('channels')"></p>
+                </div>
+                <span class="bmc-block-count" x-text="getBmcBlockItems('channels').length"></span>
+              </div>
+              <div class="bmc-block-actions">
+                <button class="filter-pill" @click="bmcFocus = 'channels'">Focus</button>
+              </div>
+              <div class="bmc-block-items bmc-block-items-rich">
+                <template x-for="item in getBmcTopItems('channels', 5)" :key="item.rowIndex || JSON.stringify(item)">
+                  <button type="button" class="bmc-item-card" @click="openBmcDetail('channels', item)">
+                    <div class="bmc-item-row">
+                      <span class="bmc-item-name" x-text="getBmcItemLabel('channels', item)"></span>
+                      <span class="status-badge small" :class="getBmcStatusClass(getBmcStatus('channels', item))" x-show="getBmcStatus('channels', item)" x-text="getBmcStatus('channels', item)"></span>
+                    </div>
+                    <p class="bmc-item-preview" x-text="getBmcItemPreview('channels', item)"></p>
+                    <div class="bmc-meta-grid">
+                      <template x-for="meta in getBmcMetaLines('channels', item)" :key="meta.label">
+                        <div class="bmc-meta-chip"><span x-text="meta.label"></span><strong x-text="meta.value"></strong></div>
+                      </template>
+                    </div>
+                  </button>
+                </template>
+                <div class="bmc-empty" x-show="getBmcFilteredItems('channels').length === 0">No channel data matches the current filters.</div>
+              </div>
+            </div>
+
+            <div class="bmc-block bmc-segments">
+              <div class="bmc-block-header">
+                <div>
+                  <span class="bmc-block-title">Customer Segments</span>
+                  <p class="bmc-block-summary" x-text="getBmcSectionSummary('segments')"></p>
+                </div>
+                <span class="bmc-block-count" x-text="getBmcBlockItems('segments').length"></span>
+              </div>
+              <div class="bmc-block-actions">
+                <button class="filter-pill" @click="bmcFocus = 'segments'">Focus</button>
+              </div>
+              <div class="bmc-block-items bmc-block-items-rich">
+                <template x-for="item in getBmcTopItems('segments', 5)" :key="item.rowIndex || JSON.stringify(item)">
+                  <button type="button" class="bmc-item-card" @click="openBmcDetail('segments', item)">
+                    <div class="bmc-item-row">
+                      <span class="bmc-item-name" x-text="getBmcItemLabel('segments', item)"></span>
+                      <span class="status-badge small" :class="getBmcStatusClass(getBmcStatus('segments', item))" x-show="getBmcStatus('segments', item)" x-text="getBmcStatus('segments', item)"></span>
+                    </div>
+                    <p class="bmc-item-preview" x-text="getBmcItemPreview('segments', item)"></p>
+                    <div class="bmc-meta-grid">
+                      <template x-for="meta in getBmcMetaLines('segments', item)" :key="meta.label">
+                        <div class="bmc-meta-chip"><span x-text="meta.label"></span><strong x-text="meta.value"></strong></div>
+                      </template>
+                    </div>
+                  </button>
+                </template>
+                <div class="bmc-empty" x-show="getBmcFilteredItems('segments').length === 0">No segment data matches the current filters.</div>
+              </div>
+            </div>
+
+            <div class="bmc-block bmc-resources">
+              <div class="bmc-block-header">
+                <div>
+                  <span class="bmc-block-title">Key Resources</span>
+                  <p class="bmc-block-summary" x-text="getBmcSectionSummary('team')"></p>
+                </div>
+                <span class="bmc-block-count" x-text="getBmcBlockItems('team').length"></span>
+              </div>
+              <div class="bmc-block-actions">
+                <button class="filter-pill" @click="bmcFocus = 'team'">Focus</button>
+              </div>
+              <div class="bmc-block-items bmc-block-items-rich">
+                <template x-for="item in getBmcTopItems('team', 5)" :key="item.rowIndex || JSON.stringify(item)">
+                  <button type="button" class="bmc-item-card" @click="openBmcDetail('team', item)">
+                    <div class="bmc-item-row">
+                      <span class="bmc-item-name" x-text="getBmcItemLabel('team', item)"></span>
+                      <span class="status-badge small" :class="getBmcStatusClass(getBmcStatus('team', item))" x-show="getBmcStatus('team', item)" x-text="getBmcStatus('team', item)"></span>
+                    </div>
+                    <p class="bmc-item-preview" x-text="getBmcItemPreview('team', item)"></p>
+                    <div class="bmc-meta-grid">
+                      <template x-for="meta in getBmcMetaLines('team', item)" :key="meta.label">
+                        <div class="bmc-meta-chip"><span x-text="meta.label"></span><strong x-text="meta.value"></strong></div>
+                      </template>
+                    </div>
+                  </button>
+                </template>
+                <div class="bmc-empty" x-show="getBmcFilteredItems('team').length === 0">No resource data matches the current filters.</div>
+              </div>
+            </div>
+
+            <div class="bmc-block bmc-bus-units">
+              <div class="bmc-block-header">
+                <div>
+                  <span class="bmc-block-title">Business Units</span>
+                  <p class="bmc-block-summary" x-text="getBmcSectionSummary('business_units')"></p>
+                </div>
+                <span class="bmc-block-count" x-text="getBmcBlockItems('business_units').length"></span>
+              </div>
+              <div class="bmc-block-actions">
+                <button class="filter-pill" @click="bmcFocus = 'business_units'">Focus</button>
+              </div>
+              <div class="bmc-block-items bmc-block-items-rich">
+                <template x-for="item in getBmcTopItems('business_units', 4)" :key="item.rowIndex || JSON.stringify(item)">
+                  <button type="button" class="bmc-item-card" @click="openBmcDetail('business_units', item)">
+                    <div class="bmc-item-row">
+                      <span class="bmc-item-name" x-text="getBmcItemLabel('business_units', item)"></span>
+                      <span class="status-badge small" :class="getBmcStatusClass(getBmcStatus('business_units', item))" x-show="getBmcStatus('business_units', item)" x-text="getBmcStatus('business_units', item)"></span>
+                    </div>
+                    <p class="bmc-item-preview" x-text="getBmcItemPreview('business_units', item)"></p>
+                    <div class="bmc-meta-grid">
+                      <template x-for="meta in getBmcMetaLines('business_units', item)" :key="meta.label">
+                        <div class="bmc-meta-chip"><span x-text="meta.label"></span><strong x-text="meta.value"></strong></div>
+                      </template>
+                    </div>
+                  </button>
+                </template>
+                <div class="bmc-empty" x-show="getBmcFilteredItems('business_units').length === 0">No business unit data matches the current filters.</div>
+              </div>
+            </div>
+
+            <div class="bmc-block bmc-costs">
+              <div class="bmc-block-header">
+                <div>
+                  <span class="bmc-block-title">Cost Structure</span>
+                  <p class="bmc-block-summary" x-text="getBmcSectionSummary('cost_structure')"></p>
+                </div>
+                <span class="bmc-block-count" x-text="getBmcBlockItems('cost_structure').length"></span>
+              </div>
+              <div class="bmc-block-actions">
+                <button class="filter-pill" @click="bmcFocus = 'cost_structure'">Focus</button>
+              </div>
+              <div class="bmc-block-items bmc-block-items-rich">
+                <template x-for="item in getBmcTopItems('cost_structure', 6)" :key="item.rowIndex || JSON.stringify(item)">
+                  <button type="button" class="bmc-item-card bmc-item-card-compact" @click="openBmcDetail('cost_structure', item)">
+                    <div class="bmc-item-row">
+                      <span class="bmc-item-name" x-text="getBmcItemLabel('cost_structure', item)"></span>
+                      <span class="status-badge small" :class="getBmcStatusClass(getBmcStatus('cost_structure', item))" x-show="getBmcStatus('cost_structure', item)" x-text="getBmcStatus('cost_structure', item)"></span>
+                    </div>
+                    <p class="bmc-item-preview" x-text="getBmcItemPreview('cost_structure', item)"></p>
+                    <div class="bmc-meta-grid">
+                      <template x-for="meta in getBmcMetaLines('cost_structure', item)" :key="meta.label">
+                        <div class="bmc-meta-chip"><span x-text="meta.label"></span><strong x-text="meta.value"></strong></div>
+                      </template>
+                    </div>
+                  </button>
+                </template>
+                <div class="bmc-empty" x-show="getBmcFilteredItems('cost_structure').length === 0">No cost data matches the current filters.</div>
+              </div>
+            </div>
+
+            <div class="bmc-block bmc-revenue">
+              <div class="bmc-block-header">
+                <div>
+                  <span class="bmc-block-title">Revenue Streams</span>
+                  <p class="bmc-block-summary" x-text="getBmcSectionSummary('revenue_streams')"></p>
+                </div>
+                <span class="bmc-block-count" x-text="getBmcBlockItems('revenue_streams').length"></span>
+              </div>
+              <div class="bmc-block-actions">
+                <button class="filter-pill" @click="bmcFocus = 'revenue_streams'">Focus</button>
+              </div>
+              <div class="bmc-block-items bmc-block-items-rich">
+                <template x-for="item in getBmcTopItems('revenue_streams', 6)" :key="item.rowIndex || JSON.stringify(item)">
+                  <button type="button" class="bmc-item-card bmc-item-card-compact" @click="openBmcDetail('revenue_streams', item)">
+                    <div class="bmc-item-row">
+                      <span class="bmc-item-name" x-text="getBmcItemLabel('revenue_streams', item)"></span>
+                      <span class="status-badge small" :class="getBmcStatusClass(getBmcStatus('revenue_streams', item))" x-show="getBmcStatus('revenue_streams', item)" x-text="getBmcStatus('revenue_streams', item)"></span>
+                    </div>
+                    <p class="bmc-item-preview" x-text="getBmcItemPreview('revenue_streams', item)"></p>
+                    <div class="bmc-meta-grid">
+                      <template x-for="meta in getBmcMetaLines('revenue_streams', item)" :key="meta.label">
+                        <div class="bmc-meta-chip"><span x-text="meta.label"></span><strong x-text="meta.value"></strong></div>
+                      </template>
+                    </div>
+                  </button>
+                </template>
+                <div class="bmc-empty" x-show="getBmcFilteredItems('revenue_streams').length === 0">No revenue data matches the current filters.</div>
+              </div>
+            </div>
+
+            <div class="bmc-block bmc-metrics-block">
+              <div class="bmc-block-header">
+                <div>
+                  <span class="bmc-block-title">Key Metrics</span>
+                  <p class="bmc-block-summary" x-text="getBmcSectionSummary('metrics')"></p>
+                </div>
+                <span class="bmc-block-count" x-text="getBmcBlockItems('metrics').length"></span>
+              </div>
+              <div class="bmc-block-actions">
+                <button class="filter-pill" @click="bmcFocus = 'metrics'">Focus</button>
+              </div>
+              <div class="bmc-block-items bmc-block-items-rich">
+                <template x-for="item in getBmcTopItems('metrics', 6)" :key="item.rowIndex || JSON.stringify(item)">
+                  <button type="button" class="bmc-item-card bmc-item-card-compact" @click="openBmcDetail('metrics', item)">
+                    <div class="bmc-item-row">
+                      <span class="bmc-item-name" x-text="getBmcItemLabel('metrics', item)"></span>
+                      <span class="status-badge small" :class="getBmcStatusClass(getBmcStatus('metrics', item))" x-show="getBmcStatus('metrics', item)" x-text="getBmcStatus('metrics', item)"></span>
+                    </div>
+                    <p class="bmc-item-preview" x-text="getBmcItemPreview('metrics', item)"></p>
+                    <div class="bmc-meta-grid">
+                      <template x-for="meta in getBmcMetaLines('metrics', item)" :key="meta.label">
+                        <div class="bmc-meta-chip"><span x-text="meta.label"></span><strong x-text="meta.value"></strong></div>
+                      </template>
+                    </div>
+                  </button>
+                </template>
+                <div class="bmc-empty" x-show="getBmcFilteredItems('metrics').length === 0">No metrics data matches the current filters.</div>
+              </div>
+            </div>
+
+            <div class="bmc-block bmc-platforms-block">
+              <div class="bmc-block-header">
+                <div>
+                  <span class="bmc-block-title">Platforms</span>
+                  <p class="bmc-block-summary" x-text="getBmcSectionSummary('platforms')"></p>
+                </div>
+                <span class="bmc-block-count" x-text="getBmcBlockItems('platforms').length"></span>
+              </div>
+              <div class="bmc-block-actions">
+                <button class="filter-pill" @click="bmcFocus = 'platforms'">Focus</button>
+              </div>
+              <div class="bmc-block-items bmc-block-items-rich">
+                <template x-for="item in getBmcTopItems('platforms', 6)" :key="item.rowIndex || JSON.stringify(item)">
+                  <button type="button" class="bmc-item-card bmc-item-card-compact" @click="openBmcDetail('platforms', item)">
+                    <div class="bmc-item-row">
+                      <span class="bmc-item-name" x-text="getBmcItemLabel('platforms', item)"></span>
+                      <span class="status-badge small" :class="getBmcStatusClass(getBmcStatus('platforms', item))" x-show="getBmcStatus('platforms', item)" x-text="getBmcStatus('platforms', item)"></span>
+                    </div>
+                    <p class="bmc-item-preview" x-text="getBmcItemPreview('platforms', item)"></p>
+                    <div class="bmc-meta-grid">
+                      <template x-for="meta in getBmcMetaLines('platforms', item)" :key="meta.label">
+                        <div class="bmc-meta-chip"><span x-text="meta.label"></span><strong x-text="meta.value"></strong></div>
+                      </template>
+                    </div>
+                  </button>
+                </template>
+                <div class="bmc-empty" x-show="getBmcFilteredItems('platforms').length === 0">No platform data matches the current filters.</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </template>
+
+      <!-- BMC Item Detail Panel -->
+      <div class="detail-panel" x-show="bmcDetailItem" x-cloak>
+        <div class="detail-panel-header">
+          <div>
+            <span class="detail-kicker">Canvas Detail</span>
+            <h3 x-text="getBmcDetailTitle()"></h3>
+          </div>
+          <button class="btn-ghost btn-sm" @click="bmcDetailItem = null; bmcDetailKey = ''" aria-label="Close detail panel">Close</button>
+        </div>
+        <div class="detail-panel-body">
+          <template x-if="bmcDetailItem">
+            <div>
+              <template x-if="getBmcRelatedItems().length > 0">
+                <div class="detail-related">
+                  <div class="detail-related-header">
+                    <span class="detail-related-title">Linked Records</span>
+                    <span class="detail-related-note">Jump across the canvas</span>
+                  </div>
+                  <div class="detail-related-list">
+                    <template x-for="related in getBmcRelatedItems()" :key="related.blockKey + ':' + (related.item.rowIndex || related.name)">
+                      <button type="button" class="detail-related-item" @click="openBmcRelatedItem(related)">
+                        <span class="detail-related-kicker" x-text="related.section"></span>
+                        <span class="detail-related-name" x-text="related.name"></span>
+                        <span class="status-badge small detail-related-status" :class="getBmcStatusClass(related.status)" x-show="related.status" x-text="related.status"></span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+              </template>
+              <template x-for="[key, value] in Object.entries(bmcDetailItem || {}).filter(([k,v]) => k !== 'rowIndex' && v !== null && v !== undefined && v !== '')" :key="key">
+                <div class="detail-row">
+                  <span class="detail-label" x-text="key.replace(/_/g, ' ')"></span>
+                  <span class="detail-value" x-text="typeof value === 'object' ? JSON.stringify(value) : String(value)"></span>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+      <!-- Overlay to close detail panel -->
+      <div x-show="bmcDetailItem" @click="bmcDetailItem = null; bmcDetailKey = ''" style="position:fixed;inset:0;z-index:49;" x-cloak></div>

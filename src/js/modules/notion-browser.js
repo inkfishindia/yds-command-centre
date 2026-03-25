@@ -210,6 +210,38 @@ export function createNotionBrowserModule() {
       return Object.entries(props).filter(([, value]) => value != null && value !== '' && !(Array.isArray(value) && value.length === 0));
     },
 
+    getDetailSections() {
+      if (!this.detailPanel?.properties) return { header: [], dates: [], meta: [], content: [], relations: [] };
+      const props = this.detailPanel.properties;
+      const entries = this.getPropertyEntries(props);
+
+      const headerFields = ['Status', 'Stage', 'Priority', 'Health', 'Type'];
+      const metaFields = ['Owner', 'Assigned To', 'Assigned', 'Created', 'Last edited time', 'Created time'];
+      const dateFields = ['Due Date', 'Due', 'Start Date', 'End Date', 'Date'];
+
+      const header = [];
+      const dates = [];
+      const meta = [];
+      const content = [];
+      const relations = [];
+
+      for (const [key, val] of entries) {
+        const formatted = this.formatPropertyValue(val);
+        if (formatted === null || formatted === undefined || formatted === '' || formatted === '—') continue;
+
+        const item = { key, value: formatted, raw: val };
+
+        if (headerFields.some(f => key.includes(f))) header.push(item);
+        else if (dateFields.some(f => key.includes(f))) dates.push(item);
+        else if (metaFields.some(f => key.includes(f))) meta.push(item);
+        else if (val && val.type === 'relation') relations.push(item);
+        else if (typeof formatted === 'string' && formatted.length > 100) content.push(item);
+        else meta.push(item);
+      }
+
+      return { header, dates, meta, content, relations };
+    },
+
     formatDate(val) {
       if (!val) return '—';
       const raw = typeof val === 'object' && val.start ? val.start : String(val);

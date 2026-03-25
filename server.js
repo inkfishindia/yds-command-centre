@@ -6,6 +6,8 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const config = require('./server/config');
 
+const { authGate, loginRoute } = require('./server/middleware/auth-gate');
+
 const app = express();
 const SLOW_REQUEST_THRESHOLD_MS = 250;
 
@@ -40,6 +42,12 @@ app.use(compression({ filter: (req, res) => {
   return compression.filter(req, res);
 }}));
 app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false }));
+
+// Password gate — enabled when ACCESS_PASSWORD env var is set
+app.post('/login', loginRoute);
+app.use(authGate);
+
 app.use((req, res, next) => {
   const start = process.hrtime.bigint();
   const originalEnd = res.end;
@@ -90,6 +98,8 @@ app.use('/api/ai-team', require('./server/routes/ai-team'));
 app.use('/api/bmc', require('./server/routes/bmc'));
 app.use('/api/crm', require('./server/routes/crm'));
 app.use('/api/overview', require('./server/routes/overview'));
+app.use('/api/ops', require('./server/routes/ops'));
+app.use('/api/competitor-intel', require('./server/routes/competitor-intel'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -102,20 +112,37 @@ app.get('/api/health', (req, res) => {
 });
 
 // Static file serving — Alpine.js frontend from public/
-app.use(express.static(path.join(__dirname, 'public')));
+// Cache JS/CSS for 1 hour (assets are rebuilt on deploy); HTML always revalidates.
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    } else if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  },
+}));
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Start
-app.listen(config.PORT, () => {
-  console.log(`\n  YDS Command Centre running at http://localhost:${config.PORT}\n`);
-  if (!config.ANTHROPIC_API_KEY) {
-    console.log('  WARNING: ANTHROPIC_API_KEY not set — chat will not work');
-  }
-  if (!config.NOTION_TOKEN) {
-    console.log('  WARNING: NOTION_TOKEN not set — dashboard will show empty data');
-  }
-  console.log('');
-});
+// Vercel uses module.exports; local dev uses app.listen()
+if (process.env.VERCEL) {
+  module.exports = app;
+} else {
+  app.listen(config.PORT, () => {
+    console.log(`\n  YDS Command Centre running at http://localhost:${config.PORT}\n`);
+    if (!config.ANTHROPIC_API_KEY) {
+      console.log('  WARNING: ANTHROPIC_API_KEY not set — chat will not work');
+    }
+    if (!config.NOTION_TOKEN) {
+      console.log('  WARNING: NOTION_TOKEN not set — dashboard will show empty data');
+    }
+    console.log('');
+
+    // Pre-warm ops sales cache so the 5s aggregation runs at startup, not on first request
+    const opsService = require('./server/services/ops-service');
+    opsService.warmCaches();
+  });
+}

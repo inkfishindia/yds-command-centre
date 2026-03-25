@@ -8,13 +8,17 @@ export function createBmcModule() {
     bmcSearch: '',
     bmcFilter: 'highlights',
     bmcFocus: '',
+    bmcLastRefresh: null,
 
     async loadBmc() {
       const signal = this.beginRequest('bmc');
       this.bmcLoading = true;
       try {
         const res = await fetch('/api/bmc', { signal });
-        if (res.ok) this.bmc = await res.json();
+        if (res.ok) {
+          this.bmc = await res.json();
+          this.bmcLastRefresh = new Date();
+        }
       } catch (err) {
         if (this.isAbortError(err)) return;
         console.error('BMC load error:', err);
@@ -192,15 +196,15 @@ export function createBmcModule() {
       const text = String(value).toLowerCase();
       if (!text) return '';
       if (text.includes('risk') || text.includes('critical') || text.includes('kill') || text.includes('high') || text.includes('p0')) {
-        return 'bmc-pill-danger';
+        return 'danger';
       }
       if (text.includes('valid') || text.includes('active') || text.includes('ready') || text.includes('track')) {
-        return 'bmc-pill-success';
+        return 'success';
       }
       if (text.includes('emerging') || text.includes('warning') || text.includes('medium') || text.includes('at risk')) {
-        return 'bmc-pill-warn';
+        return 'warning';
       }
-      return 'bmc-pill-neutral';
+      return 'neutral';
     },
 
     getBmcSectionSummary(blockKey) {
@@ -237,6 +241,99 @@ export function createBmcModule() {
         { label: 'Revenue Streams', value: totalRev, note: 'ways the model earns' },
         { label: 'Partners', value: totalPartners, note: 'external dependencies' },
       ];
+    },
+
+    getBmcRefreshLabel() {
+      if (!this.bmcLastRefresh) return '';
+      return `Updated ${this.formatRelativeTime(this.bmcLastRefresh)}`;
+    },
+
+    getBmcAreaStatus() {
+      const blocks = ['segments', 'flywheels', 'revenue_streams', 'cost_structure', 'partners', 'business_units'];
+      const riskyCount = blocks.reduce((count, blockKey) => {
+        return count + this.getBmcBlockItems(blockKey).filter((item) => this.getBmcStatusClass(this.getBmcStatus(blockKey, item)) === 'danger').length;
+      }, 0);
+
+      if (riskyCount >= 4) return { tone: 'critical', label: 'Needs Strategic Attention' };
+      if (riskyCount >= 1) return { tone: 'warning', label: 'Mixed Signals' };
+      return { tone: 'healthy', label: 'Strategically Coherent' };
+    },
+
+    getBmcPriorityCards() {
+      const riskySegments = this.getBmcBlockItems('segments')
+        .filter((item) => this.getBmcStatusClass(this.getBmcStatus('segments', item)) === 'danger')
+        .slice(0, 3)
+        .map((item) => ({
+          name: this.getBmcItemLabel('segments', item),
+          meta: this.getBmcStatus('segments', item) || this.getBmcItemPreview('segments', item),
+        }));
+
+      const riskyRevenue = this.getBmcBlockItems('revenue_streams')
+        .filter((item) => this.getBmcStatusClass(this.getBmcStatus('revenue_streams', item)) !== 'success')
+        .slice(0, 3)
+        .map((item) => ({
+          name: this.getBmcItemLabel('revenue_streams', item),
+          meta: this.getBmcStatus('revenue_streams', item) || this.getBmcItemPreview('revenue_streams', item),
+        }));
+
+      const coreFlywheels = this.getBmcTopItems('flywheels', 3).map((item) => ({
+        name: this.getBmcItemLabel('flywheels', item),
+        meta: this.getBmcItemPreview('flywheels', item) || this.getBmcStatus('flywheels', item),
+      }));
+
+      return [
+        {
+          id: 'segments',
+          title: 'Segment Risk',
+          label: 'Customer segments showing validation or positioning risk.',
+          value: String(riskySegments.length),
+          tone: riskySegments.length >= 2 ? 'critical' : riskySegments.length === 1 ? 'warning' : 'healthy',
+          items: riskySegments.length ? riskySegments : [{ name: 'No critical segment signals', meta: 'Current segment set looks stable.' }],
+        },
+        {
+          id: 'revenue',
+          title: 'Revenue Pressure',
+          label: 'Revenue streams that need review or clearer validation.',
+          value: String(riskyRevenue.length),
+          tone: riskyRevenue.length >= 2 ? 'warning' : 'healthy',
+          items: riskyRevenue.length ? riskyRevenue : [{ name: 'Revenue model signals healthy', meta: 'No major stream flagged right now.' }],
+        },
+        {
+          id: 'flywheels',
+          title: 'Core Flywheels',
+          label: 'The motions currently anchoring the business model.',
+          value: String(coreFlywheels.length),
+          tone: 'healthy',
+          items: coreFlywheels.length ? coreFlywheels : [{ name: 'No flywheels loaded', meta: 'Connect the BMC source to populate this view.' }],
+        },
+      ];
+    },
+
+    getBmcFocusList() {
+      const primaryFlywheel = this.getBmcSpotlight('flywheels');
+      const leadSegment = this.getBmcSpotlight('segments');
+      const revenueItem = this.getBmcBlockItems('revenue_streams')[0];
+
+      return [
+        primaryFlywheel && {
+          title: `Refine ${primaryFlywheel.title}`,
+          detail: primaryFlywheel.status || primaryFlywheel.preview || 'Review the primary value proposition motion.',
+          action: () => { this.bmcFocus = 'flywheels'; },
+          tone: this.getBmcStatusClass(primaryFlywheel.status) === 'danger' ? 'critical' : 'healthy',
+        },
+        leadSegment && {
+          title: `Validate ${leadSegment.title}`,
+          detail: leadSegment.status || leadSegment.preview || 'Check segment truth, validation, and messaging fit.',
+          action: () => { this.bmcFocus = 'segments'; },
+          tone: this.getBmcStatusClass(leadSegment.status) === 'danger' ? 'warning' : 'healthy',
+        },
+        revenueItem && {
+          title: `Inspect ${this.getBmcItemLabel('revenue_streams', revenueItem)}`,
+          detail: this.getBmcStatus('revenue_streams', revenueItem) || this.getBmcItemPreview('revenue_streams', revenueItem),
+          action: () => { this.bmcFocus = 'revenue_streams'; },
+          tone: this.getBmcStatusClass(this.getBmcStatus('revenue_streams', revenueItem)) === 'danger' ? 'critical' : 'warning',
+        },
+      ].filter(Boolean);
     },
 
     getBmcSpotlight(blockKey) {

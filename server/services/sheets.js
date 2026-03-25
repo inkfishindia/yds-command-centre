@@ -108,8 +108,9 @@ async function getPipelineData() {
 
     const leads = parseRows(rows);
 
-    const b2bLeads = leads.filter(l => (l.flow_type || '').toLowerCase().includes('b2b'));
-    const dsLeads  = leads.filter(l => (l.flow_type || '').toLowerCase().includes('drop'));
+    // Actual sheet column is "channel" (values: "B2B", etc.), not "flow_type"
+    const b2bLeads = leads.filter(l => (l.channel || '').toLowerCase() === 'b2b');
+    const otherLeads = leads.filter(l => (l.channel || '').toLowerCase() !== 'b2b' && (l.channel || '') !== '');
 
     const countByStage = (items) => {
       const stages = {};
@@ -118,6 +119,15 @@ async function getPipelineData() {
         stages[stage] = (stages[stage] || 0) + 1;
       });
       return Object.entries(stages).map(([name, count]) => ({ name, count }));
+    };
+
+    const countByStatus = (items) => {
+      const statuses = {};
+      items.forEach(l => {
+        const status = l.status || 'Unknown';
+        statuses[status] = (statuses[status] || 0) + 1;
+      });
+      return Object.entries(statuses).map(([name, count]) => ({ name, count }));
     };
 
     // SLA breach: lead not contacted within 2 hours of creation
@@ -134,16 +144,20 @@ async function getPipelineData() {
 
     return {
       available: true,
+      totalLeads: leads.length,
       b2b: {
         stages: countByStage(b2bLeads),
-        totalActive: b2bLeads.length,
-        slaBreaches: slaBreaches.filter(l => (l.flow_type || '').toLowerCase().includes('b2b')).length,
+        statuses: countByStatus(b2bLeads),
+        totalActive: b2bLeads.filter(l => l.status === 'Active' || l.status === 'New' || l.status === 'Qualified').length,
+        total: b2bLeads.length,
+        slaBreaches: slaBreaches.filter(l => (l.channel || '').toLowerCase() === 'b2b').length,
       },
-      dropship: {
-        stages: countByStage(dsLeads),
-        totalActive: dsLeads.length,
-        slaBreaches: slaBreaches.filter(l => (l.flow_type || '').toLowerCase().includes('drop')).length,
+      other: {
+        stages: countByStage(otherLeads),
+        statuses: countByStatus(otherLeads),
+        total: otherLeads.length,
       },
+      statusBreakdown: countByStatus(leads),
       totalSlaBreaches: slaBreaches.length,
       timestamp: new Date().toISOString(),
     };
@@ -231,6 +245,14 @@ const SPREADSHEET_KEYS = {
   EXECUTION: 'EXECUTION',
   APP_LOGGING: 'APP_LOGGING',
   BMC: 'BMC',
+  CRM_CORE: 'CRM_CORE',
+  CRM_CONFIG: 'CRM_CONFIG',
+  CRM_FLOWS: 'CRM_FLOWS',
+  OPS_INVENTORY: 'OPS_INVENTORY',
+  OPS_SALES: 'OPS_SALES',
+  OPS_PRODUCTS: 'OPS_PRODUCTS',
+  OPS_WAREHOUSE: 'OPS_WAREHOUSE',
+  COMPETITOR_INTEL: 'COMPETITOR_INTEL',
 };
 
 // Maps spreadsheet keys to config env var values
@@ -240,6 +262,14 @@ function getSpreadsheetId(spreadsheetKey) {
     EXECUTION: config.EXECUTION_SPREADSHEET_ID,
     APP_LOGGING: config.APP_LOGGING_SPREADSHEET_ID,
     BMC: config.BMC_SPREADSHEET_ID,
+    CRM_CORE: config.GOOGLE_SHEETS_ID,
+    CRM_CONFIG: config.CRM_CONFIG_SPREADSHEET_ID,
+    CRM_FLOWS: config.CRM_FLOWS_SPREADSHEET_ID,
+    OPS_INVENTORY: config.OPS_INVENTORY_SPREADSHEET_ID,
+    OPS_SALES: config.OPS_SALES_SPREADSHEET_ID,
+    OPS_PRODUCTS: config.OPS_PRODUCTS_SPREADSHEET_ID,
+    OPS_WAREHOUSE: config.OPS_WAREHOUSE_SPREADSHEET_ID,
+    COMPETITOR_INTEL: config.COMPETITOR_INTEL_SPREADSHEET_ID,
   };
   return map[spreadsheetKey] || '';
 }
@@ -266,6 +296,27 @@ const SHEET_REGISTRY = {
   // App Logging
   LOGIN: { spreadsheetKey: 'APP_LOGGING', sheetName: 'Login', gid: '288121377' },
   BRAIN_DUMP: { spreadsheetKey: 'APP_LOGGING', sheetName: 'BrainDump', gid: '0' },
+  // CRM Core (GOOGLE_SHEETS_ID)
+  CRM_LEADS: { spreadsheetKey: 'CRM_CORE', sheetName: 'Leads' },
+  CRM_LEAD_FLOWS: { spreadsheetKey: 'CRM_CORE', sheetName: 'LEAD_FLOWS' },
+  CRM_FLOW_DETAILS: { spreadsheetKey: 'CRM_CORE', sheetName: 'FLOW_DETAILS' },
+  CRM_ACCOUNTS: { spreadsheetKey: 'CRM_CORE', sheetName: 'Accounts' },
+  CRM_PARTNER_LIFECYCLE: { spreadsheetKey: 'CRM_CORE', sheetName: 'PARTNER_LIFECYCLE' },
+  CRM_SOURCES: { spreadsheetKey: 'CRM_CORE', sheetName: 'Sources' },
+  CRM_SYSTEM_USERS: { spreadsheetKey: 'CRM_CORE', sheetName: 'SYSTEM_USERS' },
+  // CRM Config
+  CRM_SLA_RULES: { spreadsheetKey: 'CRM_CONFIG', sheetName: 'SLA_RULES' },
+  CRM_ROUTING_RULES: { spreadsheetKey: 'CRM_CONFIG', sheetName: 'ROUTING_RULES' },
+  CRM_STAGE_PROMPTS: { spreadsheetKey: 'CRM_CONFIG', sheetName: 'STAGE_PROMPTS' },
+  CRM_SUGGESTED_ACTIONS: { spreadsheetKey: 'CRM_CONFIG', sheetName: 'SUGGESTED_NEXT_ACTIONS' },
+  CRM_MESSAGE_TEMPLATES: { spreadsheetKey: 'CRM_CONFIG', sheetName: 'MESSAGE_TEMPLATES' },
+  CRM_FLOW_TYPE_CONFIG: { spreadsheetKey: 'CRM_CONFIG', sheetName: 'FLOW_TYPE_CONFIG' },
+  CRM_PRODUCT_RANGE: { spreadsheetKey: 'CRM_CONFIG', sheetName: 'Product Range' },
+  CRM_APP_SETTINGS: { spreadsheetKey: 'CRM_CONFIG', sheetName: 'APP_SETTINGS' },
+  // CRM Flows
+  CRM_LEAD_TO_ACCOUNT: { spreadsheetKey: 'CRM_FLOWS', sheetName: 'LEAD_TO_ACCOUNT_MAP' },
+  CRM_STORE: { spreadsheetKey: 'CRM_FLOWS', sheetName: 'Store' },
+  CRM_B2B: { spreadsheetKey: 'CRM_FLOWS', sheetName: 'B2B' },
   // Business Model Canvas
   BMC_SEGMENTS: { spreadsheetKey: 'BMC', sheetName: 'segments', gid: '1306312699' },
   BMC_BUSINESS_UNITS: { spreadsheetKey: 'BMC', sheetName: 'business_units', gid: '1781583811' },
@@ -278,6 +329,37 @@ const SHEET_REGISTRY = {
   BMC_HUBS: { spreadsheetKey: 'BMC', sheetName: 'hubs', gid: '906330339' },
   BMC_PARTNERS: { spreadsheetKey: 'BMC', sheetName: 'partners', gid: '898629063' },
   BMC_METRICS: { spreadsheetKey: 'BMC', sheetName: 'metrics', gid: '439308533' },
+  // Ops - Inventory
+  OPS_PRODUCT_TYPES: { spreadsheetKey: 'OPS_INVENTORY', sheetName: 'Product Type' },
+  OPS_PRODUCT_CLASSIFICATION: { spreadsheetKey: 'OPS_INVENTORY', sheetName: 'Product Classification' },
+  OPS_PRODUCTS_INVENTORY: { spreadsheetKey: 'OPS_INVENTORY', sheetName: 'Products Inventory' },
+  OPS_VENDORS: { spreadsheetKey: 'OPS_INVENTORY', sheetName: 'Vendors' },
+  OPS_PO_LIST: { spreadsheetKey: 'OPS_INVENTORY', sheetName: 'PO_List' },
+  OPS_WAREHOUSE_PRODUCTS: { spreadsheetKey: 'OPS_INVENTORY', sheetName: 'Warehouse products' },
+  // Ops - Sales
+  OPS_SALES_ORDERS: { spreadsheetKey: 'OPS_SALES', sheetName: 'Sales- Orders + Products' },
+  OPS_SALES_PRODUCT_CLASS: { spreadsheetKey: 'OPS_SALES', sheetName: 'Product Classifciation' },
+  // Ops - Products
+  OPS_PRODUCT_VARIANTS: { spreadsheetKey: 'OPS_PRODUCTS', sheetName: 'Product Variants' },
+  OPS_PRODUCT_TYPE_MASTER: { spreadsheetKey: 'OPS_PRODUCTS', sheetName: 'Product Type' },
+  // Ops - Warehouse
+  OPS_WAREHOUSE_ZONES: { spreadsheetKey: 'OPS_WAREHOUSE', sheetName: 'Warehouse Master' },
+  OPS_WAREHOUSE_BINS: { spreadsheetKey: 'OPS_WAREHOUSE', sheetName: 'Bin Location Master (Main Sheet)' },
+  OPS_WAREHOUSE_COLORS: { spreadsheetKey: 'OPS_WAREHOUSE', sheetName: 'Color Code Master' },
+  OPS_PRODUCT_CODE_MASTER: { spreadsheetKey: 'OPS_WAREHOUSE', sheetName: 'Product Code Master' },
+  // Competitor Intelligence
+  CI_COMPETITORS: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Competitors_Master' },
+  CI_ANALYSIS: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Competitor analysis' },
+  CI_POSITIONING: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Competitor_Positioning' },
+  CI_NOTES: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Competitor_Notes' },
+  CI_CAPABILITIES: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Competitor_Capabilities' },
+  CI_UX_PRODUCT: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Competitor_UX_Product' },
+  CI_MESSAGING: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Competitor_Messaging' },
+  CI_SWOT: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Competitor_SWOT' },
+  CI_PHILOSOPHY: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Copy of Competitor_Philosophy' },
+  CI_MOMENTS: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Copy of Competitor_MomentsOfTruth' },
+  CI_STEAL_ADAPT: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Copy of Competitor_StealAdaptAvoid' },
+  CI_WATCHLIST: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Copy of Competitor_Watchlist' },
 };
 
 // ── Read/Write Client ──────────────────────────────────────────────────────────

@@ -2,129 +2,119 @@
 
 const express = require('express');
 const router = express.Router();
-const sheetsService = require('../services/sheets');
 const crmService = require('../services/crm-service');
 
 /**
  * GET /api/crm
- * Aggregated CRM summary — pipeline stats from existing pipeline + people from sheets registry
+ * Aggregated CRM overview — pipeline stats, lead stats, team, flow stats
  */
 router.get('/', async (req, res) => {
   try {
     res.json(await crmService.getOverview());
   } catch (err) {
-    console.error('CRM summary error:', err);
+    console.error('CRM overview error:', err);
     res.status(500).json({ error: 'Failed to load CRM data' });
   }
 });
 
 /**
- * GET /api/crm/people
- * Team/people data from the PEOPLE sheet, hydrated (resolves manager_id)
+ * GET /api/crm/leads
+ * Leads from CRM_LEADS sheet with optional filters and pagination
+ * Query: status, category, search, page, limit
  */
-router.get('/people', async (req, res) => {
+router.get('/leads', async (req, res) => {
   try {
-    res.json(await crmService.getPeople());
-  } catch (err) {
-    console.error('CRM people error:', err.message);
-    res.status(500).json({ error: 'Failed to load people data' });
-  }
-});
-
-/**
- * GET /api/crm/projects
- * Projects from the PROJECTS sheet, hydrated (resolves owner, business unit)
- */
-router.get('/projects', async (req, res) => {
-  try {
-    res.json(await crmService.getProjects({
+    res.json(await crmService.getLeads({
       status: req.query.status,
-      owner: req.query.owner,
+      category: req.query.category,
+      search: req.query.search,
+      page: req.query.page,
+      limit: req.query.limit,
     }));
   } catch (err) {
-    console.error('CRM projects error:', err.message);
-    res.status(500).json({ error: 'Failed to load projects data' });
+    console.error('CRM leads error:', err.message);
+    res.status(500).json({ error: 'Failed to load leads' });
   }
 });
 
 /**
- * GET /api/crm/tasks
- * Tasks from the TASKS sheet, hydrated (resolves assignee, project name)
+ * GET /api/crm/leads/:id
+ * Single lead with all associated flows
  */
-router.get('/tasks', async (req, res) => {
+router.get('/leads/:id', async (req, res) => {
   try {
-    res.json(await crmService.getTasks({
-      status: req.query.status,
-      assignee: req.query.assignee,
-      project: req.query.project,
-    }));
-  } catch (err) {
-    console.error('CRM tasks error:', err.message);
-    res.status(500).json({ error: 'Failed to load tasks data' });
-  }
-});
-
-/**
- * GET /api/crm/campaigns
- * Campaigns from the Execution spreadsheet CAMPAIGNS sheet
- */
-router.get('/campaigns', async (req, res) => {
-  try {
-    res.json(await crmService.getCampaigns({ status: req.query.status }));
-  } catch (err) {
-    console.error('CRM campaigns error:', err.message);
-    res.status(500).json({ error: 'Failed to load campaigns data' });
-  }
-});
-
-/**
- * GET /api/crm/business-units
- * Business units from Strategy spreadsheet, hydrated
- */
-router.get('/business-units', async (req, res) => {
-  try {
-    res.json(await crmService.getBusinessUnits());
-  } catch (err) {
-    console.error('CRM business-units error:', err.message);
-    res.status(500).json({ error: 'Failed to load business units' });
-  }
-});
-
-/**
- * PATCH /api/crm/tasks/:rowIdx
- * Update a task row (status, assignee, priority, etc.)
- */
-router.patch('/tasks/:rowIdx', async (req, res) => {
-  const rowIndex = parseInt(req.params.rowIdx, 10);
-  if (isNaN(rowIndex) || rowIndex < 2) {
-    return res.status(400).json({ error: 'rowIdx must be an integer >= 2' });
-  }
-  if (!req.body || typeof req.body !== 'object') {
-    return res.status(400).json({ error: 'Request body must be a JSON object' });
-  }
-  try {
-    const result = await sheetsService.updateRow('TASKS', rowIndex, req.body);
+    const result = await crmService.getLead(req.params.id);
+    if (result.reason === 'not_found') {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
     res.json(result);
   } catch (err) {
-    console.error('CRM task update error:', err.message);
-    res.status(500).json({ error: 'Failed to update task' });
+    console.error('CRM lead detail error:', err.message);
+    res.status(500).json({ error: 'Failed to load lead' });
   }
 });
 
 /**
- * POST /api/crm/tasks
- * Create a new task
+ * GET /api/crm/flows
+ * All lead flows enriched with lead name, optional filters
+ * Query: status, stage, owner, channel, priority, search
  */
-router.post('/tasks', async (req, res) => {
-  if (!req.body || typeof req.body !== 'object') {
-    return res.status(400).json({ error: 'Request body must be a JSON object' });
-  }
+router.get('/flows', async (req, res) => {
   try {
-    const result = await sheetsService.appendRow('TASKS', req.body);
-    res.status(201).json(result);
+    res.json(await crmService.getFlows({
+      status: req.query.status,
+      stage: req.query.stage,
+      owner: req.query.owner,
+      channel: req.query.channel,
+      priority: req.query.priority,
+      search: req.query.search,
+    }));
   } catch (err) {
-    console.error('CRM task create error:', err.message);
-    res.status(500).json({ error: 'Failed to create task' });
+    console.error('CRM flows error:', err.message);
+    res.status(500).json({ error: 'Failed to load flows' });
+  }
+});
+
+/**
+ * GET /api/crm/flows/:id
+ * Single flow with lead, details, and suggested actions
+ */
+router.get('/flows/:id', async (req, res) => {
+  try {
+    const result = await crmService.getFlow(req.params.id);
+    if (result.reason === 'not_found') {
+      return res.status(404).json({ error: 'Flow not found' });
+    }
+    res.json(result);
+  } catch (err) {
+    console.error('CRM flow detail error:', err.message);
+    res.status(500).json({ error: 'Failed to load flow' });
+  }
+});
+
+/**
+ * GET /api/crm/team
+ * System users with flow count stats
+ */
+router.get('/team', async (req, res) => {
+  try {
+    res.json(await crmService.getTeam());
+  } catch (err) {
+    console.error('CRM team error:', err.message);
+    res.status(500).json({ error: 'Failed to load team data' });
+  }
+});
+
+/**
+ * GET /api/crm/config
+ * CRM config tables: SLA rules, routing rules, flow type config, message templates
+ */
+router.get('/config', async (req, res) => {
+  try {
+    res.json(await crmService.getConfig());
+  } catch (err) {
+    console.error('CRM config error:', err.message);
+    res.status(500).json({ error: 'Failed to load CRM config' });
   }
 });
 
