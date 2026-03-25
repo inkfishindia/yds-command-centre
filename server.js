@@ -25,6 +25,46 @@ app.use(compression({ filter: (req, res) => {
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
 
+app.use('/api', (req, res, next) => {
+  if (req.method !== 'GET') return next();
+
+  const requestPath = req.path || '';
+  const shortCachePaths = [
+    '/overview',
+    '/ceo-dashboard',
+    '/notion/dashboard',
+    '/notion/action-queue',
+    '/notion/morning-brief',
+    '/sheets/pipeline',
+    '/crm',
+    '/ops',
+    '/marketing-ops',
+    '/tech-team',
+  ];
+  const mediumCachePaths = [
+    '/skills',
+    '/notebooks',
+  ];
+
+  if (requestPath.startsWith('/chat') || requestPath === '/health') {
+    res.setHeader('Cache-Control', 'no-store');
+    return next();
+  }
+
+  if (shortCachePaths.some((prefix) => requestPath === prefix || requestPath.startsWith(`${prefix}/`))) {
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
+    return next();
+  }
+
+  if (mediumCachePaths.some((prefix) => requestPath === prefix || requestPath.startsWith(`${prefix}/`))) {
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=60');
+    return next();
+  }
+
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
+
 // Password gate — enabled when ACCESS_PASSWORD env var is set
 app.post('/login', loginRoute);
 app.use(authGate);
@@ -81,6 +121,7 @@ app.use('/api/crm', require('./server/routes/crm'));
 app.use('/api/overview', require('./server/routes/overview'));
 app.use('/api/ops', require('./server/routes/ops'));
 app.use('/api/competitor-intel', require('./server/routes/competitor-intel'));
+app.use('/api/ceo-dashboard', require('./server/routes/ceo-dashboard'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -104,7 +145,15 @@ app.use(express.static(path.join(__dirname, 'public'), {
   },
 }));
 
+app.get(['/ceo', '/ceo/*'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'ceo', 'index.html'));
+});
+
 app.get('*', (req, res) => {
+  if (req.hostname && req.hostname.startsWith('ceo.')) {
+    res.sendFile(path.join(__dirname, 'public', 'ceo', 'index.html'));
+    return;
+  }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 

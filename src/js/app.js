@@ -276,7 +276,8 @@ function app() {
         }
       });
 
-      // Auto-load overview on start, prefetch dashboard in background
+      // Auto-load overview on start. Keep other views lazy so initial load
+      // only fetches the active surface instead of warming hidden tabs.
       if (window.innerWidth <= 768) {
         this.commitmentsView = 'list';
       }
@@ -284,14 +285,7 @@ function app() {
       // available globally (many views call openDetailPanel on click).
       this._ensureModule('notion');
       this._ensureModule('overview');
-      this.loadOverview().then(() => {
-        // Prefetch dashboard data after overview settles so Dash view is instant
-        setTimeout(() => {
-          this._loadPartial('dashboard').then(() => this.loadDashboard()).then(() => {
-            this.startDashboardAutoRefresh();
-          });
-        }, 2000);
-      });
+      this.loadOverview();
 
       // Auto-refresh active view every 5 minutes
       this.refreshIntervalId = setInterval(() => {

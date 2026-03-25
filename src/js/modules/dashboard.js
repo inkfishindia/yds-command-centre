@@ -57,20 +57,34 @@ export function createDashboardModule() {
         this.dashboardLoading = true;
         this.briefLoading = true;
       }
-      // Fire pipeline and action queue in parallel — morning brief is bundled with dashboard
-      this.loadPipeline();
-      this.loadActionQueue();
       try {
-        const res = await fetch('/api/notion/dashboard', { signal });
-        if (res.ok) {
-          this.dashboard = await res.json();
+        const [dashboardRes, pipelineRes, actionQueueRes] = await Promise.allSettled([
+          fetch('/api/notion/dashboard', { signal }),
+          fetch('/api/sheets/pipeline', { signal }),
+          fetch('/api/notion/action-queue', { signal }),
+        ]);
+
+        if (dashboardRes.status === 'fulfilled' && dashboardRes.value.ok) {
+          this.dashboard = await dashboardRes.value.json();
           this.upcomingCommitments = this.dashboard.upcoming || [];
           this.morningBrief = this.dashboard.morningBrief || null;
           this.lastRefresh = new Date();
-          // New zone state from enhanced endpoint
           this.teamWorkload = this.dashboard.teamWorkload || [];
           this.recentActivity = this.dashboard.recentActivity || null;
           this.runNotificationChecks?.('dashboard');
+        }
+
+        if (pipelineRes.status === 'fulfilled' && pipelineRes.value.ok) {
+          this.pipeline = await pipelineRes.value.json();
+        } else if (pipelineRes.status === 'rejected' && !this.isAbortError(pipelineRes.reason)) {
+          console.warn('Pipeline load failed:', pipelineRes.reason?.message || pipelineRes.reason);
+        }
+
+        if (actionQueueRes.status === 'fulfilled' && actionQueueRes.value.ok) {
+          this.actionQueue = await actionQueueRes.value.json();
+          this.runNotificationChecks?.('action-queue');
+        } else if (actionQueueRes.status === 'rejected' && !this.isAbortError(actionQueueRes.reason)) {
+          console.error('Action queue failed:', actionQueueRes.reason);
         }
       } catch (err) {
         if (this.isAbortError(err)) return;

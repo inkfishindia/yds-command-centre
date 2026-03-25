@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YDS CEO Dashboard</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="ceo-body">
+  <a href="#ceo-main" class="skip-link">Skip to CEO dashboard</a>
+
+  <header class="header">
+    <div class="logo">YDS CEO <span class="logo-accent">7-Panel Dashboard</span></div>
+    <div class="header-right">
+      <span id="ceoLastUpdated">Loading…</span>
+      <button class="btn-secondary btn-sm" id="ceoRefreshBtn" type="button">Refresh</button>
+      <button class="btn-primary btn-sm" id="ceoForgeBtn" type="button">Document Forge</button>
+    </div>
+  </header>
+
+  <main id="ceo-main" class="ceo-page">
+    <section class="mktops-hero mktops-hero--healthy ceo-hero" id="ceoHero">
+      <div class="mktops-hero-copy">
+        <div class="mktops-hero-kicker">Separate Executive Surface</div>
+        <h1 class="mktops-hero-title">CEO operating layer</h1>
+        <p class="mktops-hero-text">One connected command view for executive pressure, today’s decisions, Colin’s workspace, strategic context, and output generation.</p>
+      </div>
+      <div class="mktops-hero-status">
+        <span class="mktops-hero-status-label">Surface</span>
+        <span class="mktops-hero-status-value" id="ceoHeroStatus">Booting</span>
+      </div>
+    </section>
+
+    <section class="ceo-pulse-strip" aria-labelledby="pulse-heading">
+      <div class="ceo-section-head">
+        <h2 id="pulse-heading">Pulse Bar</h2>
+      </div>
+      <div class="ceo-pulse-grid" id="ceoPulseGrid"></div>
+    </section>
+
+    <section class="ceo-grid">
+      <aside class="ceo-column">
+        <section class="org-col-panel">
+          <div class="ceo-section-head">
+            <h2>Dan&apos;s Today</h2>
+            <span class="pill pill-blue" id="ceoTodayMeta">Live</span>
+          </div>
+          <div id="ceoTodayContent" class="ceo-stack"></div>
+        </section>
+      </aside>
+
+      <section class="ceo-column ceo-column--wide">
+        <section class="org-col-panel">
+          <div class="ceo-section-head">
+            <h2>System Map</h2>
+            <span class="pill">Cross-functional</span>
+          </div>
+          <div id="ceoSystemMap"></div>
+        </section>
+
+        <section class="org-col-panel">
+          <div class="ceo-section-head">
+            <h2>Strategic Layer</h2>
+            <div class="ceo-tab-row" id="ceoStrategicTabs"></div>
+          </div>
+          <div id="ceoStrategicPanel"></div>
+        </section>
+      </section>
+
+      <aside class="ceo-column">
+        <section class="org-col-panel">
+          <div class="ceo-section-head">
+            <h2>Colin&apos;s Workspace</h2>
+            <span class="pill pill-purple">Ops Memory</span>
+          </div>
+          <div id="ceoWorkspaceContent" class="ceo-stack"></div>
+        </section>
+      </aside>
+    </section>
+
+    <section class="org-col-panel ceo-velocity-panel">
+      <div class="ceo-section-head">
+        <h2>Velocity &amp; Meta</h2>
+        <span class="pill pill-amber">Bottom Strip</span>
+      </div>
+      <div class="ceo-velocity-grid" id="ceoVelocityGrid"></div>
+    </section>
+  </main>
+
+  <aside class="ceo-forge-drawer" id="ceoForgeDrawer" aria-hidden="true">
+    <div class="ceo-forge-header">
+      <div>
+        <div class="ceo-forge-kicker">Panel 7</div>
+        <h2>Document Forge</h2>
+      </div>
+      <button class="btn-ghost btn-sm" id="ceoForgeClose" type="button">Close</button>
+    </div>
+    <p class="ceo-forge-copy">The forge is staged as a dedicated executive tool surface. The action cards below are wired as the next execution layer on top of the new subdomain page.</p>
+    <div id="ceoForgeTools" class="ceo-forge-grid"></div>
+  </aside>
+  <div class="ceo-overlay" id="ceoForgeOverlay" hidden></div>
+
+  <script src="/ceo/app.js" defer></script>
+</body>
+</html>
