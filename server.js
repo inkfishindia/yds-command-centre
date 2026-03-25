@@ -11,36 +11,9 @@ const { authGate, loginRoute } = require('./server/middleware/auth-gate');
 const app = express();
 const SLOW_REQUEST_THRESHOLD_MS = 250;
 
-// ── CORS whitelist ────────────────────────────────────────────────────────────
-// Allow only explicit origins. In dev, defaults to localhost only.
-// Add extra origins via ALLOWED_ORIGINS env var (comma-separated).
-const allowedOrigins = new Set([
-  'http://localhost:3000',
-  `http://localhost:${config.PORT}`,
-]);
-// On Vercel, auto-allow the deployment URL
-if (process.env.VERCEL_URL) {
-  allowedOrigins.add(`https://${process.env.VERCEL_URL}`);
-}
-if (process.env.ALLOWED_ORIGINS) {
-  for (const origin of process.env.ALLOWED_ORIGINS.split(',')) {
-    const trimmed = origin.trim();
-    if (trimmed) allowedOrigins.add(trimmed);
-  }
-}
-app.use(cors({
-  origin(origin, callback) {
-    // Allow same-origin / non-browser requests (origin is undefined for server-to-server)
-    if (!origin || allowedOrigins.has(origin)) {
-      return callback(null, true);
-    }
-    // On Vercel, allow any *.vercel.app preview URLs
-    if (origin && origin.endsWith('.vercel.app')) {
-      return callback(null, true);
-    }
-    callback(new Error(`CORS: origin not allowed — ${origin}`));
-  },
-}));
+// ── CORS ─────────────────────────────────────────────────────────────────────
+// App serves its own frontend — allow same-origin. Password gate protects access.
+app.use(cors());
 app.use(helmet({
   contentSecurityPolicy: false, // Alpine.js requires inline eval via x-data attributes
 }));
