@@ -18,6 +18,10 @@ const allowedOrigins = new Set([
   'http://localhost:3000',
   `http://localhost:${config.PORT}`,
 ]);
+// On Vercel, auto-allow the deployment URL
+if (process.env.VERCEL_URL) {
+  allowedOrigins.add(`https://${process.env.VERCEL_URL}`);
+}
 if (process.env.ALLOWED_ORIGINS) {
   for (const origin of process.env.ALLOWED_ORIGINS.split(',')) {
     const trimmed = origin.trim();
@@ -28,6 +32,10 @@ app.use(cors({
   origin(origin, callback) {
     // Allow same-origin / non-browser requests (origin is undefined for server-to-server)
     if (!origin || allowedOrigins.has(origin)) {
+      return callback(null, true);
+    }
+    // On Vercel, allow any *.vercel.app preview URLs
+    if (origin && origin.endsWith('.vercel.app')) {
       return callback(null, true);
     }
     callback(new Error(`CORS: origin not allowed — ${origin}`));
