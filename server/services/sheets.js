@@ -29,6 +29,20 @@ function isConfigured() {
   return !!(config.GOOGLE_SERVICE_ACCOUNT_KEY && config.GOOGLE_SHEETS_ID);
 }
 
+/**
+ * Build GoogleAuth options — supports both a file path (local dev) and
+ * an inline JSON string (Vercel / cloud deploy).
+ */
+function authOptions(scopes) {
+  const key = config.GOOGLE_SERVICE_ACCOUNT_KEY;
+  if (!key) return null;
+  // If it starts with '{' it's inline JSON; otherwise treat as file path
+  if (key.trimStart().startsWith('{')) {
+    return { credentials: JSON.parse(key), scopes };
+  }
+  return { keyFile: key, scopes };
+}
+
 let sheetsClient = null;
 
 function getClient() {
@@ -36,13 +50,10 @@ function getClient() {
   if (sheetsClient) return sheetsClient;
 
   try {
-    // Lazy-require googleapis so the module loads cleanly even if the
-    // package is not installed (it will be installed by npm install googleapis).
     const { google } = require('googleapis');
-    const auth = new google.auth.GoogleAuth({
-      keyFile: config.GOOGLE_SERVICE_ACCOUNT_KEY,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-    });
+    const opts = authOptions(['https://www.googleapis.com/auth/spreadsheets.readonly']);
+    if (!opts) return null;
+    const auth = new google.auth.GoogleAuth(opts);
     sheetsClient = google.sheets({ version: 'v4', auth });
     return sheetsClient;
   } catch (err) {
@@ -184,10 +195,9 @@ async function getStrategyCascade() {
   let client;
   try {
     const { google } = require('googleapis');
-    const auth = new google.auth.GoogleAuth({
-      keyFile: config.GOOGLE_SERVICE_ACCOUNT_KEY,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-    });
+    const opts = authOptions(['https://www.googleapis.com/auth/spreadsheets.readonly']);
+    if (!opts) return { available: false, reason: 'not_configured' };
+    const auth = new google.auth.GoogleAuth(opts);
     client = google.sheets({ version: 'v4', auth });
   } catch (err) {
     console.warn('[sheets] getStrategyCascade auth init error:', err.message);
@@ -371,10 +381,9 @@ function getReadWriteClient() {
   if (rwClient) return rwClient;
   try {
     const { google } = require('googleapis');
-    const auth = new google.auth.GoogleAuth({
-      keyFile: config.GOOGLE_SERVICE_ACCOUNT_KEY,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
+    const opts = authOptions(['https://www.googleapis.com/auth/spreadsheets']);
+    if (!opts) return null;
+    const auth = new google.auth.GoogleAuth(opts);
     rwClient = google.sheets({ version: 'v4', auth });
     return rwClient;
   } catch (err) {
