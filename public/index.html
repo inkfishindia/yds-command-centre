@@ -8,8 +8,9 @@
   <link rel="stylesheet" href="/css/styles.css">
   <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.2.3/dist/purify.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.475.0"></script>
 </head>
-<body x-data="app()" x-init="init()">
+<body x-data="app()" x-init="init(); $nextTick(() => lucide && lucide.createIcons && lucide.createIcons())">
 
   <!-- Skip to main content (keyboard accessibility) -->
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -24,8 +25,8 @@
       <button class="cmd-trigger" @click="toggleCmdPalette()" :title="getShortcutTooltip('Command Palette', 'palette')">
         <span class="cmd-trigger-key">&#8984;K</span>
       </button>
-      <button class="header-alert-btn" @click="openNotificationSettingsPanel()" title="Notification settings">
-        <span aria-hidden="true">🔔</span>
+      <button class="header-alert-btn" @click="openNotificationSettingsPanel()" title="Notification settings" aria-label="Notification settings">
+        <i data-lucide="bell" aria-hidden="true" style="width:16px;height:16px;stroke-width:2"></i>
         <span class="header-alert-dot" x-show="notificationSettings.enabled && notificationPermission === 'granted'" x-cloak></span>
         <span class="header-alert-count" x-show="getUnreadNotificationCount() > 0" x-text="getUnreadNotificationCount()" x-cloak></span>
       </button>
@@ -88,24 +89,24 @@
       <!-- Command group -->
       <div class="nav-group" x-data="{ collapsed: false }">
         <button class="nav-group-header" data-domain="command" @click="collapsed = !collapsed" :title="sidebarExpanded ? '' : 'Command'">
-          <span class="nav-group-emoji">🎯</span>
+          <span class="nav-group-emoji" aria-hidden="true">🎯</span>
           <span class="nav-group-label" x-show="sidebarExpanded">Command</span>
           <span class="nav-group-badge" x-show="collapsed && getBadgeCount('command') > 0" x-text="getBadgeCount('command')" x-cloak></span>
           <svg class="nav-chevron" :class="!collapsed && 'nav-chevron-open'" x-show="sidebarExpanded" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
         </button>
         <div class="nav-group-items" x-show="!collapsed" x-transition.duration.150ms>
           <button class="nav-btn" :class="view === 'chat' && 'nav-active'" @click="view = 'chat'" aria-label="Chat" :aria-current="view === 'chat' ? 'page' : false" :title="getShortcutTooltip('Chat', 'chat')">
-            <span class="nav-icon-emoji">💬</span>
+            <span class="nav-icon-emoji" aria-hidden="true">💬</span>
             <span class="nav-label" x-show="sidebarExpanded">Chat</span>
           </button>
           <button class="nav-btn" :class="view === 'dashboard' && 'nav-active'" @click="view = 'dashboard'; loadDashboard()" aria-label="Dashboard" :aria-current="view === 'dashboard' ? 'page' : false" :title="getShortcutTooltip('Dashboard', 'dashboard')">
-            <span class="nav-icon-emoji">📊</span>
+            <span class="nav-icon-emoji" aria-hidden="true">📊</span>
             <span class="nav-label" x-show="sidebarExpanded">Dashboard</span>
             <span class="nav-badge nav-badge-danger" x-show="dashboard && dashboard.overdue && dashboard.overdue.length > 0" x-text="dashboard.overdue.length" x-cloak></span>
             <span class="nav-health-dot" :class="(dashboard?.overdue?.length || 0) > 0 ? 'dot-danger' : 'dot-success'" x-show="dashboard" x-cloak></span>
           </button>
           <button class="nav-btn" :class="view === 'actionQueue' && 'nav-active'" @click="view = 'actionQueue'; loadActionQueue()" aria-label="Action Queue" :aria-current="view === 'actionQueue' ? 'page' : false" :title="getShortcutTooltip('Action Queue', 'queue')">
-            <span class="nav-icon-emoji">⚡</span>
+            <span class="nav-icon-emoji" aria-hidden="true">⚡</span>
             <span class="nav-label" x-show="sidebarExpanded">Action Queue</span>
             <span class="nav-badge" x-show="actionQueue && actionQueue.dansQueueCount > 0" x-text="actionQueue?.dansQueueCount" x-cloak></span>
             <span class="nav-health-dot" :class="(actionQueue?.dansQueueCount || 0) === 0 ? 'dot-success' : 'dot-warning'" x-show="actionQueue" x-cloak></span>
@@ -116,26 +117,26 @@
       <!-- Operations group -->
       <div class="nav-group" x-data="{ collapsed: false }">
         <button class="nav-group-header" data-domain="operations" @click="collapsed = !collapsed" :title="sidebarExpanded ? '' : 'Operations'">
-          <span class="nav-group-emoji">🔧</span>
+          <span class="nav-group-emoji" aria-hidden="true">🔧</span>
           <span class="nav-group-label" x-show="sidebarExpanded">Operations</span>
           <span class="nav-group-badge" x-show="collapsed && getBadgeCount('operations') > 0" x-text="getBadgeCount('operations')" x-cloak></span>
           <svg class="nav-chevron" :class="!collapsed && 'nav-chevron-open'" x-show="sidebarExpanded" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
         </button>
         <div class="nav-group-items" x-show="!collapsed" x-transition.duration.150ms>
           <button class="nav-btn" :class="view === 'projects' && 'nav-active'" @click="openNavigationTarget('projects')" aria-label="Projects" :aria-current="view === 'projects' ? 'page' : false" :title="getShortcutTooltip('Projects', 'projects')">
-            <span class="nav-icon-emoji">📁</span>
+            <span class="nav-icon-emoji" aria-hidden="true">📁</span>
             <span class="nav-label" x-show="sidebarExpanded">Projects</span>
           </button>
           <button class="nav-btn" :class="view === 'commitments' && 'nav-active'" @click="openNavigationTarget('commitments')" aria-label="Commitments" :aria-current="view === 'commitments' ? 'page' : false">
-            <span class="nav-icon-emoji">✅</span>
+            <span class="nav-icon-emoji" aria-hidden="true">✅</span>
             <span class="nav-label" x-show="sidebarExpanded">Commitments</span>
           </button>
           <button class="nav-btn" :class="view === 'registry' && 'nav-active'" @click="openNavigationTarget('registry')" aria-label="Registry" :aria-current="view === 'registry' ? 'page' : false" :title="getShortcutTooltip('Registry', 'registry')">
-            <span class="nav-icon-emoji">🗂️</span>
+            <span class="nav-icon-emoji" aria-hidden="true">🗂️</span>
             <span class="nav-label" x-show="sidebarExpanded">Registry</span>
           </button>
           <button class="nav-btn" :class="view === 'team' && 'nav-active'" @click="openNavigationTarget('team')" aria-label="Team" :aria-current="view === 'team' ? 'page' : false" :title="getShortcutTooltip('Team', 'team')">
-            <span class="nav-icon-emoji">👥</span>
+            <span class="nav-icon-emoji" aria-hidden="true">👥</span>
             <span class="nav-label" x-show="sidebarExpanded">Team</span>
             <span class="nav-badge nav-badge-warn" x-show="getOverloadedCount() > 0" x-text="getOverloadedCount()" x-cloak></span>
           </button>
@@ -145,24 +146,24 @@
       <!-- Growth group -->
       <div class="nav-group" x-data="{ collapsed: false }">
         <button class="nav-group-header" data-domain="growth" @click="collapsed = !collapsed" :title="sidebarExpanded ? '' : 'Growth'">
-          <span class="nav-group-emoji">📈</span>
+          <span class="nav-group-emoji" aria-hidden="true">📈</span>
           <span class="nav-group-label" x-show="sidebarExpanded">Growth</span>
           <span class="nav-group-badge" x-show="collapsed && getBadgeCount('growth') > 0" x-text="getBadgeCount('growth')" x-cloak></span>
           <svg class="nav-chevron" :class="!collapsed && 'nav-chevron-open'" x-show="sidebarExpanded" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
         </button>
         <div class="nav-group-items" x-show="!collapsed" x-transition.duration.150ms>
           <button class="nav-btn" :class="view === 'marketingOps' && 'nav-active'" @click="openNavigationTarget('marketingOps')" aria-label="Marketing Ops" :aria-current="view === 'marketingOps' ? 'page' : false" :title="getShortcutTooltip('Marketing Ops', 'marketingOps')">
-            <span class="nav-icon-emoji">📣</span>
+            <span class="nav-icon-emoji" aria-hidden="true">📣</span>
             <span class="nav-label" x-show="sidebarExpanded">Marketing Ops</span>
             <span class="nav-badge" x-show="mktops?.stats?.blockedCampaigns?.length > 0" x-text="mktops?.stats?.blockedCampaigns?.length" x-cloak></span>
             <span class="nav-health-dot" :class="(mktops?.stats?.blockedCampaigns?.length || 0) > 0 ? 'dot-danger' : 'dot-success'" x-show="mktops" x-cloak></span>
           </button>
           <button class="nav-btn" :class="view === 'crm' && 'nav-active'" @click="openNavigationTarget('crm')" aria-label="CRM" :aria-current="view === 'crm' ? 'page' : false" :title="getShortcutTooltip('CRM', 'crm')">
-            <span class="nav-icon-emoji">🤝</span>
+            <span class="nav-icon-emoji" aria-hidden="true">🤝</span>
             <span class="nav-label" x-show="sidebarExpanded">CRM</span>
           </button>
           <button class="nav-btn" :class="view === 'ops' && 'nav-active'" @click="openNavigationTarget('ops')" aria-label="Inventory &amp; Sales" :aria-current="view === 'ops' ? 'page' : false">
-            <span class="nav-icon-emoji">📦</span>
+            <span class="nav-icon-emoji" aria-hidden="true">📦</span>
             <span class="nav-label" x-show="sidebarExpanded">Inventory</span>
             <span class="nav-health-dot" :class="(ops?.stockHealth?.outOfStock || 0) > 0 ? 'dot-danger' : 'dot-success'" x-show="ops" x-cloak></span>
           </button>
@@ -172,27 +173,27 @@
       <!-- Strategy group -->
       <div class="nav-group" x-data="{ collapsed: false }">
         <button class="nav-group-header" data-domain="strategy" @click="collapsed = !collapsed" :title="sidebarExpanded ? '' : 'Strategy'">
-          <span class="nav-group-emoji">🧭</span>
+          <span class="nav-group-emoji" aria-hidden="true">🧭</span>
           <span class="nav-group-label" x-show="sidebarExpanded">Strategy</span>
           <span class="nav-group-badge" x-show="collapsed && getBadgeCount('strategy') > 0" x-text="getBadgeCount('strategy')" x-cloak></span>
           <svg class="nav-chevron" :class="!collapsed && 'nav-chevron-open'" x-show="sidebarExpanded" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
         </button>
         <div class="nav-group-items" x-show="!collapsed" x-transition.duration.150ms>
           <button class="nav-btn" :class="view === 'bmc' && 'nav-active'" @click="openNavigationTarget('bmc')" aria-label="Business Model Canvas" :aria-current="view === 'bmc' ? 'page' : false" :title="getShortcutTooltip('Business Model Canvas', 'bmc')">
-            <span class="nav-icon-emoji">🧩</span>
+            <span class="nav-icon-emoji" aria-hidden="true">🧩</span>
             <span class="nav-label" x-show="sidebarExpanded">BMC</span>
           </button>
           <button class="nav-btn" :class="view === 'decisions' && 'nav-active'" @click="view = 'decisions'; loadDecisions()" aria-label="Decisions" :aria-current="view === 'decisions' ? 'page' : false" :title="getShortcutTooltip('Decision Log', 'decisions')">
-            <span class="nav-icon-emoji">⚖️</span>
+            <span class="nav-icon-emoji" aria-hidden="true">⚖️</span>
             <span class="nav-label" x-show="sidebarExpanded">Decisions</span>
             <span class="nav-badge" x-show="dashboard && dashboard.recentDecisions && dashboard.recentDecisions.length > 0" x-text="dashboard?.recentDecisions?.length" x-cloak></span>
           </button>
           <button class="nav-btn" :class="view === 'docs' && 'nav-active'" @click="openNavigationTarget('docs')" aria-label="Documents" :aria-current="view === 'docs' ? 'page' : false" :title="getShortcutTooltip('Documents', 'docs')">
-            <span class="nav-icon-emoji">📄</span>
+            <span class="nav-icon-emoji" aria-hidden="true">📄</span>
             <span class="nav-label" x-show="sidebarExpanded">Documents</span>
           </button>
           <button class="nav-btn" :class="view === 'knowledge' && 'nav-active'" @click="view = 'knowledge'; loadNotebooks()" aria-label="Knowledge" :aria-current="view === 'knowledge' ? 'page' : false" :title="getShortcutTooltip('Knowledge Base', 'knowledge')">
-            <span class="nav-icon-emoji">📚</span>
+            <span class="nav-icon-emoji" aria-hidden="true">📚</span>
             <span class="nav-label" x-show="sidebarExpanded">Knowledge</span>
           </button>
         </div>
@@ -201,28 +202,28 @@
       <!-- Systems group -->
       <div class="nav-group" x-data="{ collapsed: false }">
         <button class="nav-group-header" data-domain="systems" @click="collapsed = !collapsed" :title="sidebarExpanded ? '' : 'Systems'">
-          <span class="nav-group-emoji">💻</span>
+          <span class="nav-group-emoji" aria-hidden="true">💻</span>
           <span class="nav-group-label" x-show="sidebarExpanded">Systems</span>
           <span class="nav-group-badge" x-show="collapsed && getBadgeCount('systems') > 0" x-text="getBadgeCount('systems')" x-cloak></span>
           <svg class="nav-chevron" :class="!collapsed && 'nav-chevron-open'" x-show="sidebarExpanded" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
         </button>
         <div class="nav-group-items" x-show="!collapsed" x-transition.duration.150ms>
           <button class="nav-btn" :class="view === 'techTeam' && 'nav-active'" @click="openNavigationTarget('techTeam')" aria-label="Tech Team" :aria-current="view === 'techTeam' ? 'page' : false" :title="getShortcutTooltip('Tech Team', 'techTeam')">
-            <span class="nav-icon-emoji">⚙️</span>
+            <span class="nav-icon-emoji" aria-hidden="true">⚙️</span>
             <span class="nav-label" x-show="sidebarExpanded">Tech Team</span>
             <span class="nav-badge" x-show="techTeam?.stats?.blocked > 0" x-text="techTeam?.stats?.blocked" x-cloak></span>
             <span class="nav-health-dot" :class="(techTeam?.stats?.blocked || 0) > 0 ? 'dot-danger' : 'dot-success'" x-show="techTeam" x-cloak></span>
           </button>
           <button class="nav-btn" :class="view === 'factory' && 'nav-active'" @click="openNavigationTarget('factory')" aria-label="Factory" :aria-current="view === 'factory' ? 'page' : false">
-            <span class="nav-icon-emoji">🏭</span>
+            <span class="nav-icon-emoji" aria-hidden="true">🏭</span>
             <span class="nav-label" x-show="sidebarExpanded">Factory</span>
           </button>
           <button class="nav-btn" :class="view === 'notion' && 'nav-active'" @click="openNavigationTarget('notion')" aria-label="Notion browser" :aria-current="view === 'notion' ? 'page' : false" :title="getShortcutTooltip('Notion', 'notion')">
-            <span class="nav-icon-emoji">📋</span>
+            <span class="nav-icon-emoji" aria-hidden="true">📋</span>
             <span class="nav-label" x-show="sidebarExpanded">Notion</span>
           </button>
           <button class="nav-btn" :class="view === 'overview' && 'nav-active'" @click="openNavigationTarget('overview')" aria-label="Overview" :aria-current="view === 'overview' ? 'page' : false">
-            <span class="nav-icon-emoji">🔭</span>
+            <span class="nav-icon-emoji" aria-hidden="true">🔭</span>
             <span class="nav-label" x-show="sidebarExpanded">Overview</span>
           </button>
         </div>
@@ -1209,9 +1210,28 @@
           <div class="view-header-actions"></div>
         </div>
         <div class="docs-tabs">
+          <button class="tab-btn" :class="docsTab === 'outputs' && 'tab-active'" @click="docsTab = 'outputs'">Outputs</button>
           <button class="tab-btn" :class="docsTab === 'briefings' && 'tab-active'" @click="docsTab = 'briefings'">Briefings</button>
           <button class="tab-btn" :class="docsTab === 'decisions' && 'tab-active'" @click="docsTab = 'decisions'">Decisions</button>
           <button class="tab-btn" :class="docsTab === 'weekly-reviews' && 'tab-active'" @click="docsTab = 'weekly-reviews'">Weekly Reviews</button>
+        </div>
+        <div class="docs-review-bar" x-show="docsTab === 'outputs'">
+          <div class="docs-review-pills">
+            <span class="metric-pill" x-text="(docsReviewSummary.total || 0) + ' Total'"></span>
+            <span class="metric-pill danger" x-text="(docsReviewSummary.pending || 0) + ' Pending'"></span>
+            <span class="metric-pill" x-text="(docsReviewSummary.approved || 0) + ' Approved'"></span>
+            <span class="metric-pill" x-text="(docsReviewSummary['needs-edit'] || 0) + ' Needs Edit'"></span>
+          </div>
+          <div class="docs-review-filters">
+            <input class="input docs-filter-input" x-model="docsSearch" placeholder="Search outputs or docs..." />
+            <select class="filter-select" x-model="docsStatusFilter">
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="needs-edit">Needs Edit</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
         </div>
         <template x-if="docsLoading">
           <div class="skeleton-stack">
@@ -1222,19 +1242,28 @@
         </template>
         <template x-if="!docsLoading && !activeDoc">
           <div>
-            <template x-if="(documents[docsTab] || []).length === 0">
+            <template x-if="getVisibleDocuments().length === 0">
               <div class="empty-state">
                 <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 <span class="empty-state-title">No documents yet</span>
                 <span class="empty-state-subtitle">Use /brief, /decide, or /review in chat to generate them</span>
               </div>
             </template>
-            <div class="doc-list">
-              <template x-for="doc in (documents[docsTab] || [])" :key="doc.name">
-                <button class="doc-item" @click="openDocument(docsTab, doc.name)" style="cursor:pointer;">
-                  <span class="doc-name" x-text="doc.name"></span>
-                  <span class="doc-date" x-text="new Date(doc.modified).toLocaleDateString()"></span>
-                </button>
+            <div class="doc-list doc-list-grid">
+              <template x-for="doc in getVisibleDocuments()" :key="doc.path || doc.name">
+                <article class="doc-card">
+                  <button class="doc-item doc-item-card" @click="openDocument(docsTab, doc.name)" style="cursor:pointer;">
+                    <span class="doc-name" x-text="doc.name"></span>
+                    <span class="doc-date" x-text="new Date(doc.modified).toLocaleDateString()"></span>
+                    <span class="pill" :class="getDocsStatusClass(doc.status)" x-text="doc.status || 'pending'"></span>
+                  </button>
+                  <div class="doc-card-actions" x-show="docsTab === 'outputs'">
+                    <button class="btn-ghost btn-sm" @click="openOutputDrawer(docsTab, doc.name, doc.name)">Drawer</button>
+                    <button class="btn-primary btn-sm" @click="reviewDocument(doc, 'approved')">Approve</button>
+                    <button class="btn-ghost btn-sm" @click="reviewDocument(doc, 'needs-edit')">Needs Edit</button>
+                    <button class="btn-ghost btn-sm" @click="reviewDocument(doc, 'rejected')">Reject</button>
+                  </div>
+                </article>
               </template>
             </div>
           </div>
@@ -1244,9 +1273,96 @@
             <div class="doc-viewer-header">
               <button class="btn btn-small" @click="activeDoc = null">&larr; Back</button>
               <span class="doc-viewer-title" x-text="activeDoc.filename"></span>
+              <span class="pill" :class="getDocsStatusClass(activeDoc.status)" x-text="activeDoc.status || 'pending'"></span>
               <button class="btn btn-small" @click="discussDocument(activeDoc)" :disabled="streaming">Discuss with Colin</button>
             </div>
-            <div class="doc-content" x-html="renderMarkdown(activeDoc.content)"></div>
+            <div class="doc-detail-layout">
+              <aside class="doc-detail-sidebar">
+                <div class="doc-detail-card">
+                  <div class="doc-detail-label">Category</div>
+                  <div class="doc-detail-value" x-text="activeDoc.category || 'unknown'"></div>
+                </div>
+                <div class="doc-detail-card">
+                  <div class="doc-detail-label">Path</div>
+                  <div class="doc-detail-value doc-detail-path" x-text="activeDoc.path || '—'"></div>
+                </div>
+                <div class="doc-detail-card">
+                  <div class="doc-detail-label">Review Status</div>
+                  <div class="doc-detail-value" x-text="activeDoc.status || 'pending'"></div>
+                  <div class="doc-detail-muted" x-text="activeDoc.reviewedAt ? ('Updated ' + new Date(activeDoc.reviewedAt).toLocaleString()) : 'Not reviewed yet'"></div>
+                </div>
+                <div class="doc-detail-card" x-show="activeDoc.category === 'outputs'">
+                  <div class="doc-detail-label">Actions</div>
+                  <div class="doc-card-actions">
+                    <button class="btn-primary btn-sm" @click="reviewActiveDocument('approved')">Approve</button>
+                    <button class="btn-ghost btn-sm" @click="reviewActiveDocument('needs-edit')">Needs Edit</button>
+                    <button class="btn-ghost btn-sm" @click="reviewActiveDocument('rejected')">Reject</button>
+                  </div>
+                </div>
+                <div class="doc-detail-card" x-show="activeDoc.reviewerNote">
+                  <div class="doc-detail-label">Reviewer Note</div>
+                  <div class="doc-detail-value" x-text="activeDoc.reviewerNote"></div>
+                </div>
+                <div class="doc-detail-card" x-show="activeDoc.relatedContext && ((activeDoc.relatedContext.owners || []).length || (activeDoc.relatedContext.focusAreas || []).length || (activeDoc.relatedContext.projects || []).length || (activeDoc.relatedContext.decisions || []).length || (activeDoc.relatedContext.views || []).length)">
+                  <div class="doc-detail-label">Linked Context</div>
+                  <div class="doc-context-block" x-show="(activeDoc.relatedContext?.owners || []).length">
+                    <div class="doc-detail-muted">Owners</div>
+                    <div class="table-inline-actions">
+                      <template x-for="owner in (activeDoc.relatedContext?.owners || [])" :key="'doc-owner-' + owner.name">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'owner', name: owner.name })" x-text="owner.name"></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="doc-context-block" x-show="(activeDoc.relatedContext?.focusAreas || []).length">
+                    <div class="doc-detail-muted">Focus Areas</div>
+                    <div class="table-inline-actions">
+                      <template x-for="area in (activeDoc.relatedContext?.focusAreas || [])" :key="'doc-area-' + area.name">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'focus-area', name: area.name })" x-text="area.name"></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="doc-context-block" x-show="(activeDoc.relatedContext?.projects || []).length">
+                    <div class="doc-detail-muted">Projects</div>
+                    <div class="table-inline-actions">
+                      <template x-for="project in (activeDoc.relatedContext?.projects || [])" :key="'doc-project-' + project.name">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'project', name: project.name })" x-text="project.name"></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="doc-context-block" x-show="(activeDoc.relatedContext?.decisions || []).length">
+                    <div class="doc-detail-muted">Decisions</div>
+                    <div class="table-inline-actions">
+                      <template x-for="decision in (activeDoc.relatedContext?.decisions || [])" :key="'doc-decision-' + decision.title">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'decision', title: decision.title })" x-text="decision.title"></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="doc-context-block" x-show="(activeDoc.relatedContext?.views || []).length">
+                    <div class="doc-detail-muted">Areas</div>
+                    <div class="table-inline-actions">
+                      <template x-for="viewLink in (activeDoc.relatedContext?.views || [])" :key="'doc-view-' + viewLink.id">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'view', id: viewLink.id })" x-text="viewLink.label"></button>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+                <div class="doc-detail-card">
+                  <div class="doc-detail-label">History</div>
+                  <template x-if="(activeDoc.history || []).length === 0">
+                    <div class="doc-detail-muted">No review history yet.</div>
+                  </template>
+                  <div class="doc-history-list">
+                    <template x-for="(entry, idx) in (activeDoc.history || [])" :key="idx">
+                      <div class="doc-history-item">
+                        <span class="pill" :class="getDocsStatusClass(entry.status)" x-text="entry.status"></span>
+                        <span class="doc-detail-muted" x-text="new Date(entry.reviewedAt).toLocaleString()"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </aside>
+              <div class="doc-content" x-html="renderMarkdown(activeDoc.content)"></div>
+            </div>
           </div>
         </template>
       </div>
@@ -3352,33 +3468,133 @@
   </div>
 
   <!-- Mobile bottom nav (visible ≤768px, replaces collapsed sidebar) -->
-  <nav class="mobile-nav" x-cloak>
+  <nav class="mobile-nav" x-cloak aria-label="Primary navigation">
+
+    <!-- Overview tab -->
+    <button class="mobile-nav-btn" :class="view === 'overview' && 'mobile-nav-active'" @click="openNavigationTarget('overview')" aria-label="Overview">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="22" height="22" aria-hidden="true"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h3a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h3a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+      <span>Overview</span>
+    </button>
+
+    <!-- Dashboard tab -->
     <button class="mobile-nav-btn" :class="view === 'dashboard' && 'mobile-nav-active'" @click="view = 'dashboard'; loadDashboard()" aria-label="Dashboard">
-      <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm9 0a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1V4zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zm9 0a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-3z"/></svg>
+      <svg viewBox="0 0 20 20" fill="currentColor" width="22" height="22" aria-hidden="true"><path d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm9 0a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1V4zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zm9 0a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-3z"/></svg>
       <span>Dash</span>
     </button>
-    <button class="mobile-nav-btn" :class="view === 'actionQueue' && 'mobile-nav-active'" @click="view = 'actionQueue'; loadActionQueue()" aria-label="Action Queue">
-      <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path fill-rule="evenodd" d="M3 4a1 1 0 000 2h14a1 1 0 100-2H3zm0 4a1 1 0 000 2h14a1 1 0 100-2H3zm0 4a1 1 0 000 2h8a1 1 0 100-2H3zm0 4a1 1 0 000 2h4a1 1 0 100-2H3z" clip-rule="evenodd"/></svg>
-      <span>Queue</span>
-      <span class="mobile-nav-badge" x-show="actionQueue && actionQueue.dansQueueCount > 0" x-text="actionQueue?.dansQueueCount" aria-hidden="true"></span>
-    </button>
-    <button class="mobile-nav-btn" :class="view === 'techTeam' && 'mobile-nav-active'" @click="openNavigationTarget('techTeam')" aria-label="Tech">
-      &lt;/&gt;
-      <span>Tech</span>
-    </button>
-    <button class="mobile-nav-btn" :class="view === 'marketingOps' && 'mobile-nav-active'" @click="openNavigationTarget('marketingOps')" aria-label="Marketing">
-      <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0114 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L7.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 016 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.789l1.599.799L10 4.323V3a1 1 0 011-1z" clip-rule="evenodd"/></svg>
-      <span>Mktg</span>
-    </button>
+
+    <!-- Chat tab -->
     <button class="mobile-nav-btn" :class="view === 'chat' && 'mobile-nav-active'" @click="view = 'chat'" aria-label="Chat">
-      <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v6a2 2 0 01-2 2H6l-4 4V5z"/></svg>
+      <svg viewBox="0 0 20 20" fill="currentColor" width="22" height="22" aria-hidden="true"><path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v6a2 2 0 01-2 2H6l-4 4V5z"/></svg>
       <span>Chat</span>
     </button>
-    <button class="mobile-nav-btn" :class="view === 'team' && 'mobile-nav-active'" @click="openNavigationTarget('team')" aria-label="Team">
-      <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zm5 2a2 2 0 11-4 0 2 2 0 014 0zm-4 7a4 4 0 00-8 0v1h8v-1z"/></svg>
-      <span>Team</span>
+
+    <!-- Projects tab -->
+    <button class="mobile-nav-btn" :class="view === 'projects' && 'mobile-nav-active'" @click="openNavigationTarget('projects')" aria-label="Projects">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="22" height="22" aria-hidden="true"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+      <span>Projects</span>
     </button>
+
+    <!-- More tab — opens drawer -->
+    <button class="mobile-nav-btn" :class="mobileDrawerOpen && 'mobile-nav-active'" @click="toggleMobileDrawer()" aria-label="More navigation" :aria-expanded="mobileDrawerOpen">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="22" height="22" aria-hidden="true"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+      <span>More</span>
+    </button>
+
   </nav>
+
+  <!-- Mobile drawer backdrop -->
+  <div class="mobile-drawer-backdrop" :class="mobileDrawerOpen && 'open'" @click="closeMobileDrawer()" x-cloak aria-hidden="true"></div>
+
+  <!-- Mobile drawer -->
+  <aside class="mobile-drawer" :class="mobileDrawerOpen && 'open'" x-cloak role="dialog" aria-label="Navigation menu" :aria-hidden="!mobileDrawerOpen" @keydown.escape.window="closeMobileDrawer()">
+
+    <div class="mobile-drawer-header">
+      <span class="mobile-drawer-title">Navigation</span>
+      <button class="mobile-drawer-close" @click="closeMobileDrawer()" aria-label="Close navigation menu">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
+    </div>
+
+    <!-- Command group -->
+    <div class="mobile-drawer-section">
+      <span class="mobile-drawer-section-label">Command</span>
+      <button class="mobile-drawer-nav-btn" :class="view === 'chat' && 'drawer-active'" @click="view = 'chat'; closeMobileDrawer()" aria-label="Chat">
+        <span class="mobile-drawer-icon" aria-hidden="true">C</span>Chat
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'dashboard' && 'drawer-active'" @click="view = 'dashboard'; loadDashboard(); closeMobileDrawer()" aria-label="Dashboard">
+        <span class="mobile-drawer-icon" aria-hidden="true">D</span>Dashboard
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'actionQueue' && 'drawer-active'" @click="view = 'actionQueue'; loadActionQueue(); closeMobileDrawer()" aria-label="Action Queue">
+        <span class="mobile-drawer-icon" aria-hidden="true">Q</span>Action Queue
+      </button>
+    </div>
+
+    <!-- Operations group -->
+    <div class="mobile-drawer-section">
+      <span class="mobile-drawer-section-label">Operations</span>
+      <button class="mobile-drawer-nav-btn" :class="view === 'projects' && 'drawer-active'" @click="openNavigationTarget('projects'); closeMobileDrawer()" aria-label="Projects">
+        <span class="mobile-drawer-icon" aria-hidden="true">P</span>Projects
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'commitments' && 'drawer-active'" @click="openNavigationTarget('commitments'); closeMobileDrawer()" aria-label="Commitments">
+        <span class="mobile-drawer-icon" aria-hidden="true">✓</span>Commitments
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'registry' && 'drawer-active'" @click="openNavigationTarget('registry'); closeMobileDrawer()" aria-label="Registry">
+        <span class="mobile-drawer-icon" aria-hidden="true">R</span>Registry
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'team' && 'drawer-active'" @click="openNavigationTarget('team'); closeMobileDrawer()" aria-label="Team">
+        <span class="mobile-drawer-icon" aria-hidden="true">T</span>Team
+      </button>
+    </div>
+
+    <!-- Growth group -->
+    <div class="mobile-drawer-section">
+      <span class="mobile-drawer-section-label">Growth</span>
+      <button class="mobile-drawer-nav-btn" :class="view === 'marketingOps' && 'drawer-active'" @click="openNavigationTarget('marketingOps'); closeMobileDrawer()" aria-label="Marketing Ops">
+        <span class="mobile-drawer-icon" aria-hidden="true">M</span>Marketing Ops
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'crm' && 'drawer-active'" @click="openNavigationTarget('crm'); closeMobileDrawer()" aria-label="CRM">
+        <span class="mobile-drawer-icon" aria-hidden="true">$</span>CRM
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'ops' && 'drawer-active'" @click="openNavigationTarget('ops'); closeMobileDrawer()" aria-label="Inventory">
+        <span class="mobile-drawer-icon" aria-hidden="true">I</span>Inventory
+      </button>
+    </div>
+
+    <!-- Strategy group -->
+    <div class="mobile-drawer-section">
+      <span class="mobile-drawer-section-label">Strategy</span>
+      <button class="mobile-drawer-nav-btn" :class="view === 'bmc' && 'drawer-active'" @click="openNavigationTarget('bmc'); closeMobileDrawer()" aria-label="Business Model Canvas">
+        <span class="mobile-drawer-icon" aria-hidden="true">B</span>BMC
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'decisions' && 'drawer-active'" @click="view = 'decisions'; loadDecisions(); closeMobileDrawer()" aria-label="Decisions">
+        <span class="mobile-drawer-icon" aria-hidden="true">⚖</span>Decisions
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'docs' && 'drawer-active'" @click="openNavigationTarget('docs'); closeMobileDrawer()" aria-label="Documents">
+        <span class="mobile-drawer-icon" aria-hidden="true">▤</span>Documents
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'knowledge' && 'drawer-active'" @click="view = 'knowledge'; loadNotebooks(); closeMobileDrawer()" aria-label="Knowledge">
+        <span class="mobile-drawer-icon" aria-hidden="true">K</span>Knowledge
+      </button>
+    </div>
+
+    <!-- Systems group -->
+    <div class="mobile-drawer-section">
+      <span class="mobile-drawer-section-label">Systems</span>
+      <button class="mobile-drawer-nav-btn" :class="view === 'techTeam' && 'drawer-active'" @click="openNavigationTarget('techTeam'); closeMobileDrawer()" aria-label="Tech Team">
+        <span class="mobile-drawer-icon" aria-hidden="true">⚙</span>Tech Team
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'factory' && 'drawer-active'" @click="openNavigationTarget('factory'); closeMobileDrawer()" aria-label="Factory">
+        <span class="mobile-drawer-icon" aria-hidden="true">F</span>Factory
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'notion' && 'drawer-active'" @click="openNavigationTarget('notion'); closeMobileDrawer()" aria-label="Notion">
+        <span class="mobile-drawer-icon" aria-hidden="true">N</span>Notion
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'overview' && 'drawer-active'" @click="openNavigationTarget('overview'); closeMobileDrawer()" aria-label="Overview">
+        <span class="mobile-drawer-icon" aria-hidden="true">⌂</span>Overview
+      </button>
+    </div>
+
+  </aside>
 
   <!-- Toast Notifications -->
   <div class="toast-container" x-show="toasts.length > 0" x-cloak>
@@ -3424,27 +3640,131 @@
       <!-- Loaded content -->
       <template x-if="!drawerLoading && drawerData">
         <div>
-          <!-- Properties section -->
-          <div class="detail-drawer-section">
-            <template x-for="[key, prop] in Object.entries(drawerData.properties || {})" :key="key">
-              <div class="detail-drawer-field" x-show="getDrawerProp(key) !== null && getDrawerProp(key) !== ''">
-                <span class="detail-drawer-field-label" x-text="key"></span>
-                <span class="detail-drawer-field-value" x-text="typeof getDrawerProp(key) === 'object' ? JSON.stringify(getDrawerProp(key)) : getDrawerProp(key)"></span>
+          <template x-if="drawerType === 'output'">
+            <div>
+              <div class="detail-drawer-section">
+                <div class="detail-drawer-field">
+                  <span class="detail-drawer-field-label">Category</span>
+                  <span class="detail-drawer-field-value" x-text="drawerData.category || 'output'"></span>
+                </div>
+                <div class="detail-drawer-field">
+                  <span class="detail-drawer-field-label">Path</span>
+                  <span class="detail-drawer-field-value detail-drawer-mono" x-text="drawerData.path || '—'"></span>
+                </div>
+                <div class="detail-drawer-field">
+                  <span class="detail-drawer-field-label">Review Status</span>
+                  <span class="detail-drawer-field-value" x-text="drawerData.status || 'pending'"></span>
+                </div>
+                <div class="detail-drawer-field" x-show="drawerData.reviewedAt">
+                  <span class="detail-drawer-field-label">Reviewed</span>
+                  <span class="detail-drawer-field-value" x-text="new Date(drawerData.reviewedAt).toLocaleString()"></span>
+                </div>
+                <div class="detail-drawer-field" x-show="drawerData.reviewerNote">
+                  <span class="detail-drawer-field-label">Reviewer Note</span>
+                  <span class="detail-drawer-field-value" x-text="drawerData.reviewerNote"></span>
+                </div>
               </div>
-            </template>
-          </div>
 
-          <!-- Related items -->
-          <template x-if="drawerRelated.length > 0">
-            <div class="detail-drawer-section" style="margin-top: 16px;">
-              <h3 class="detail-drawer-section-heading">Related</h3>
-              <template x-for="rel in drawerRelated" :key="rel.id">
-                <button class="detail-drawer-field detail-drawer-field--link" @click="openDrawer(rel.type || 'page', rel.id, rel.title)">
-                  <span class="detail-drawer-field-label" x-text="rel.database || 'Related'"></span>
-                  <span class="detail-drawer-field-value" x-text="rel.title"></span>
-                </button>
+              <div class="detail-drawer-section">
+                <h3 class="detail-drawer-section-heading">Actions</h3>
+                <div class="doc-card-actions">
+                  <button class="btn-primary btn-sm" @click="reviewDrawerOutput('approved')">Approve</button>
+                  <button class="btn-ghost btn-sm" @click="reviewDrawerOutput('needs-edit')">Needs Edit</button>
+                  <button class="btn-ghost btn-sm" @click="reviewDrawerOutput('rejected')">Reject</button>
+                  <button class="btn-ghost btn-sm" @click="openDocument(drawerData.category, drawerData.filename); closeDrawer();">Open Full View</button>
+                </div>
+              </div>
+
+              <template x-if="drawerData.relatedContext && ((drawerData.relatedContext.owners || []).length || (drawerData.relatedContext.focusAreas || []).length || (drawerData.relatedContext.projects || []).length || (drawerData.relatedContext.decisions || []).length || (drawerData.relatedContext.views || []).length)">
+                <div class="detail-drawer-section">
+                  <h3 class="detail-drawer-section-heading">Linked Context</h3>
+                  <div class="doc-context-block" x-show="(drawerData.relatedContext?.owners || []).length">
+                    <div class="detail-drawer-field-label">Owners</div>
+                    <div class="table-inline-actions">
+                      <template x-for="owner in (drawerData.relatedContext?.owners || [])" :key="'drawer-owner-' + owner.name">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'owner', name: owner.name }); closeDrawer();" x-text="owner.name"></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="doc-context-block" x-show="(drawerData.relatedContext?.focusAreas || []).length">
+                    <div class="detail-drawer-field-label">Focus Areas</div>
+                    <div class="table-inline-actions">
+                      <template x-for="area in (drawerData.relatedContext?.focusAreas || [])" :key="'drawer-area-' + area.name">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'focus-area', name: area.name }); closeDrawer();" x-text="area.name"></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="doc-context-block" x-show="(drawerData.relatedContext?.projects || []).length">
+                    <div class="detail-drawer-field-label">Projects</div>
+                    <div class="table-inline-actions">
+                      <template x-for="project in (drawerData.relatedContext?.projects || [])" :key="'drawer-project-' + project.name">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'project', name: project.name }); closeDrawer();" x-text="project.name"></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="doc-context-block" x-show="(drawerData.relatedContext?.decisions || []).length">
+                    <div class="detail-drawer-field-label">Decisions</div>
+                    <div class="table-inline-actions">
+                      <template x-for="decision in (drawerData.relatedContext?.decisions || [])" :key="'drawer-decision-' + decision.title">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'decision', title: decision.title }); closeDrawer();" x-text="decision.title"></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="doc-context-block" x-show="(drawerData.relatedContext?.views || []).length">
+                    <div class="detail-drawer-field-label">Areas</div>
+                    <div class="table-inline-actions">
+                      <template x-for="viewLink in (drawerData.relatedContext?.views || [])" :key="'drawer-view-' + viewLink.id">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'view', id: viewLink.id }); closeDrawer();" x-text="viewLink.label"></button>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <template x-if="(drawerData.history || []).length > 0">
+                <div class="detail-drawer-section">
+                  <h3 class="detail-drawer-section-heading">History</h3>
+                  <template x-for="(entry, idx) in (drawerData.history || [])" :key="idx">
+                    <div class="detail-drawer-field">
+                      <span class="detail-drawer-field-label" x-text="entry.status"></span>
+                      <span class="detail-drawer-field-value" x-text="new Date(entry.reviewedAt).toLocaleString()"></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+
+              <template x-if="drawerData.content">
+                <div class="detail-content doc-content" x-html="renderMarkdown(drawerData.content)"></div>
               </template>
             </div>
+          </template>
+
+          <template x-if="drawerType !== 'output'">
+          <!-- Properties section -->
+            <div>
+              <div class="detail-drawer-section">
+                <template x-for="[key, prop] in Object.entries(drawerData.properties || {})" :key="key">
+                  <div class="detail-drawer-field" x-show="getDrawerProp(key) !== null && getDrawerProp(key) !== ''">
+                    <span class="detail-drawer-field-label" x-text="key"></span>
+                    <span class="detail-drawer-field-value" x-text="typeof getDrawerProp(key) === 'object' ? JSON.stringify(getDrawerProp(key)) : getDrawerProp(key)"></span>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Related items -->
+              <template x-if="drawerRelated.length > 0">
+                <div class="detail-drawer-section" style="margin-top: 16px;">
+                  <h3 class="detail-drawer-section-heading">Related</h3>
+                  <template x-for="rel in drawerRelated" :key="rel.id">
+                    <button class="detail-drawer-field detail-drawer-field--link" @click="openDrawer(rel.type || 'page', rel.id, rel.title)">
+                      <span class="detail-drawer-field-label" x-text="rel.database || 'Related'"></span>
+                      <span class="detail-drawer-field-value" x-text="rel.title"></span>
+                    </button>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
           </template>
         </div>
       </template>

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>YDS CEO Dashboard</title>
   <link rel="stylesheet" href="/css/styles.css">
+  <script src="https://unpkg.com/lucide@0.475.0"></script>
 </head>
 <body class="ceo-body">
   <a href="#ceo-main" class="skip-link">Skip to CEO dashboard</a>
@@ -17,6 +18,7 @@
     <div class="header-right">
       <span id="ceoLastUpdated">Loading…</span>
       <button class="btn-secondary btn-sm" id="ceoRefreshBtn" type="button">Refresh</button>
+      <button class="btn-secondary btn-sm" id="ceoBriefBtn" type="button">Generate Brief</button>
       <button class="btn-primary btn-sm" id="ceoForgeBtn" type="button">Document Forge</button>
     </div>
   </header>
@@ -34,7 +36,11 @@
       </div>
     </section>
 
-    <section class="ceo-summary-strip" id="ceoSummaryStrip"></section>
+    <section class="ceo-summary-strip" id="ceoSummaryStrip" role="region" aria-label="Summary strip"></section>
+
+    <section class="ceo-attention-rail" id="ceoAttentionRail" role="region" aria-label="Attention items requiring action"></section>
+
+    <section class="ceo-modes" id="ceoModes" role="region" aria-label="Dashboard mode filter"></section>
 
     <nav class="ceo-section-nav" aria-label="CEO sections">
       <a href="#pulse-heading" class="ceo-section-link">Pulse</a>

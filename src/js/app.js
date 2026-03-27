@@ -51,6 +51,7 @@ function app() {
     // Navigation
     view: 'overview',
     sidebarExpanded: localStorage.getItem('sidebarExpanded') !== 'false',
+    mobileDrawerOpen: false,
     globalContext: { owner: '', focusArea: '', mode: '' },
     showNotificationSettings: false,
     notificationModalTab: 'center',
@@ -156,7 +157,7 @@ function app() {
     // team
     teamData: [], teamLoading: false,
     // documents
-    documents: { briefings: [], decisions: [], 'weekly-reviews': [] }, docsTab: 'briefings', docsLoading: false, activeDoc: null,
+    documents: { outputs: [], briefings: [], decisions: [], 'weekly-reviews': [] }, docsTab: 'outputs', docsLoading: false, activeDoc: null,
     // notion-browser (detailPanel is used globally by many views via openDetailPanel)
     detailPanel: null, quickNoteText: '', quickNoteSaving: false,
     notionDatabases: [], notionKeyPages: [], notionLoading: false, notionCurrentDb: null, notionCurrentPage: null, notionRecords: [], notionBreadcrumb: [],
@@ -340,6 +341,14 @@ function app() {
       } catch (err) {
         console.warn('Initial route parsing failed:', err);
       }
+    },
+
+    toggleMobileDrawer() {
+      this.mobileDrawerOpen = !this.mobileDrawerOpen;
+    },
+
+    closeMobileDrawer() {
+      this.mobileDrawerOpen = false;
     },
 
     beginRequest(key) {
@@ -529,6 +538,52 @@ function app() {
       }
       await this.openNavigationTarget('projects');
       this.showInfo(`Opened Projects for ${areaName}`);
+    },
+
+    async openProjectByName(projectName) {
+      if (!projectName) return;
+      this._ensureModule('projects');
+      if (!Array.isArray(this.projects) || this.projects.length === 0) {
+        await this.loadProjects();
+      }
+      const normalized = String(projectName).trim().toLowerCase();
+      const project = (this.projects || []).find((entry) => String(entry.Name || '').trim().toLowerCase() === normalized);
+      await this.openNavigationTarget('projects');
+      if (project?.id) {
+        this.expandedProject = project.id;
+        return;
+      }
+      this.showInfo(`Opened Projects for ${projectName}`);
+    },
+
+    async openDecisionContext(title) {
+      if (!title) return;
+      await this.openNavigationTarget('decisions');
+      this.decisionSearch = title;
+      this.expandedDecision = null;
+    },
+
+    async openDocumentContextLink(link) {
+      if (!link || typeof link !== 'object') return;
+      if (link.type === 'owner') {
+        await this.openOwnerContext(link.name);
+        return;
+      }
+      if (link.type === 'focus-area') {
+        await this.openFocusAreaByName(link.name);
+        return;
+      }
+      if (link.type === 'project') {
+        await this.openProjectByName(link.name);
+        return;
+      }
+      if (link.type === 'decision') {
+        await this.openDecisionContext(link.title || link.name);
+        return;
+      }
+      if (link.type === 'view') {
+        await this.openNavigationTarget(link.id || 'docs');
+      }
     },
 
     async applyGlobalOwnerFilter(ownerName = this.globalContext.owner) {

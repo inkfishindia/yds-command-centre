@@ -13,6 +13,12 @@ describe('CEO Dashboard Service — exports', () => {
     const service = require('../server/services/ceo-dashboard-service');
     assert.equal(typeof service.clearCache, 'function');
   });
+
+  it('exports review and brief actions', () => {
+    const service = require('../server/services/ceo-dashboard-service');
+    assert.equal(typeof service.setReviewStatus, 'function');
+    assert.equal(typeof service.createExecutiveBrief, 'function');
+  });
 });
 
 describe('CEO Dashboard Route — module loads', () => {
@@ -91,7 +97,7 @@ describe('CEO Dashboard Service — response shape', () => {
       stats: { inProgress: 4, blocked: 1, p0Bugs: 0 },
     });
 
-    opsService.getSummary = async () => ({
+    opsService.getOverview = async () => ({
       summary: { lowStockCount: 2, pendingPoCount: 3, criticalStockCount: 0 },
     });
 
@@ -110,6 +116,8 @@ describe('CEO Dashboard Service — response shape', () => {
   });
 
   it('includes the expected top-level sections', () => {
+    assert.ok(Array.isArray(payload.modes));
+    assert.ok(Array.isArray(payload.attentionRail));
     assert.ok(payload.pulseBar);
     assert.ok(payload.today);
     assert.ok(payload.workspace);

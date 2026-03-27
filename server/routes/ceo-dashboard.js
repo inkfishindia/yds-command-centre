@@ -29,4 +29,28 @@ router.post('/forge', async (req, res) => {
   }
 });
 
+router.post('/review', async (req, res) => {
+  try {
+    const { path, status, note } = req.body || {};
+    if (!path || !status) {
+      return res.status(400).json({ error: 'path and status are required' });
+    }
+    const result = await ceoDashboardService.setReviewStatus({ path, status, note });
+    return res.json({ ok: true, review: result });
+  } catch (err) {
+    console.error('CEO review error:', err);
+    return res.status(500).json({ error: 'Failed to update review state' });
+  }
+});
+
+router.post('/brief', async (req, res) => {
+  try {
+    const result = await ceoDashboardService.createExecutiveBrief();
+    return res.status(201).json(result);
+  } catch (err) {
+    console.error('CEO brief error:', err);
+    return res.status(500).json({ error: 'Failed to create executive brief' });
+  }
+});
+
 module.exports = router;

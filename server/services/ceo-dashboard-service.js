@@ -18,6 +18,7 @@ const DATA_DIR = path.join(ROOT_DIR, 'data', 'sessions');
 const CLAUDE_DIR = path.join(ROOT_DIR, '.claude');
 const OUTPUTS_DIR = path.join(ROOT_DIR, 'outputs');
 const KNOWLEDGE_DIR = path.join(ROOT_DIR, 'knowledge');
+const REVIEW_STATE_PATH = path.join(DATA_DIR, 'ceo-review-state.json');
 
 let ceoDashboardCache = null;
 
@@ -281,6 +282,7 @@ function summarizeMorningBrief(brief) {
 }
 
 async function getOutputsSummary() {
+  const reviewState = await getReviewState();
   const exists = await fileExists(OUTPUTS_DIR);
   if (!exists) {
     return {
@@ -317,7 +319,9 @@ async function getOutputsSummary() {
       type,
       createdAt: stat ? stat.mtime.toISOString() : null,
       path: path.relative(ROOT_DIR, filePath),
-      status: 'pending',
+      status: reviewState[path.relative(ROOT_DIR, filePath)]?.status || 'pending',
+      reviewerNote: reviewState[path.relative(ROOT_DIR, filePath)]?.note || '',
+      reviewedAt: reviewState[path.relative(ROOT_DIR, filePath)]?.reviewedAt || null,
     };
   });
 
@@ -328,6 +332,36 @@ async function getOutputsSummary() {
     strategicDocs: allItems.filter((item) => ['roadmap', 'audit', 'doc'].includes(item.type)).slice(0, 8),
     handoffs: allItems.filter((item) => item.type === 'handoff').slice(0, 5),
   };
+}
+
+async function getReviewState() {
+  try {
+    return JSON.parse(await fs.readFile(REVIEW_STATE_PATH, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+async function setReviewStatus({ path: itemPath, status, note = '' }) {
+  const current = await getReviewState();
+  const previous = current[itemPath] || {};
+  const entry = {
+    status,
+    note,
+    reviewedAt: new Date().toISOString(),
+  };
+  const history = Array.isArray(previous.history) ? previous.history.slice() : [];
+  history.unshift({
+    status,
+    note,
+    reviewedAt: entry.reviewedAt,
+  });
+  entry.history = history.slice(0, 20);
+  current[itemPath] = entry;
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(REVIEW_STATE_PATH, JSON.stringify(current, null, 2), 'utf8');
+  clearCache();
+  return entry;
 }
 
 function sanitizeFilenamePart(value) {
@@ -381,6 +415,42 @@ async function createForgeDraft({ toolId, title, topic, notes }) {
     path: path.relative(ROOT_DIR, filePath),
     title: title || topic || titleFromFilename(filePath),
     toolId,
+  };
+}
+
+async function createExecutiveBrief() {
+  const payload = await getCeoDashboardPayload();
+  await fs.mkdir(OUTPUTS_DIR, { recursive: true });
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const filePath = path.join(OUTPUTS_DIR, `${timestamp}-ceo-daily-brief.md`);
+
+  const content = [
+    '# CEO Daily Brief',
+    '',
+    `Generated: ${new Date().toISOString()}`,
+    '',
+    '## Attention Rail',
+    ...(payload.attentionRail || []).map((item) => `- ${item.title}: ${item.detail}`),
+    '',
+    '## Dan Today',
+    ...(payload.today?.decisionsToValidate || []).slice(0, 5).map((item) => `- Decision: ${item.title}`),
+    ...(payload.today?.delegationAlerts || []).slice(0, 5).map((item) => `- Delegation: ${item.title}`),
+    '',
+    '## Strategic Signals',
+    ...(payload.strategic?.sections || []).slice(0, 3).map((section) => `- ${section.title}`),
+    '',
+    '## Velocity',
+    `- Avg days overdue: ${payload.velocity?.avgDaysOverdue || 0}`,
+    `- Review queue: ${payload.forge?.reviewQueueCount || 0}`,
+    '',
+  ].join('\n');
+
+  await fs.writeFile(filePath, content, 'utf8');
+  clearCache();
+  return {
+    ok: true,
+    path: path.relative(ROOT_DIR, filePath),
+    title: 'CEO Daily Brief',
   };
 }
 
@@ -619,6 +689,64 @@ function buildVelocity({ dashboard, decisionsNeedingRationale, teamWorkload, kno
   };
 }
 
+function buildAttentionRail({ actionQueue, dashboard, outputsSummary, knowledgeStaleness, decisionsNeedingRationale }) {
+  const items = [];
+  const overdueCount = Array.isArray(dashboard?.overdue) ? dashboard.overdue.length : 0;
+
+  if ((actionQueue?.dansQueueCount || 0) > 0) {
+    items.push({
+      id: 'waiting-on-dan',
+      title: 'Waiting on Dan',
+      detail: `${actionQueue.dansQueueCount} executive items need a call`,
+      tone: 'warning',
+      targetView: 'actionQueue',
+      mode: 'today',
+    });
+  }
+  if (overdueCount > 0) {
+    items.push({
+      id: 'overdue',
+      title: 'Overdue Commitments',
+      detail: `${overdueCount} items are dragging the system`,
+      tone: overdueCount > 5 ? 'critical' : 'warning',
+      targetView: 'commitments',
+      mode: 'risk',
+    });
+  }
+  if ((outputsSummary.reviewQueue || []).length > 0) {
+    items.push({
+      id: 'review-queue',
+      title: 'Review Queue',
+      detail: `${outputsSummary.reviewQueue.length} drafts are waiting for review`,
+      tone: 'warning',
+      targetView: 'docs',
+      mode: 'review',
+    });
+  }
+  if (decisionsNeedingRationale.length > 0) {
+    items.push({
+      id: 'decision-pressure',
+      title: 'Decision Pressure',
+      detail: `${decisionsNeedingRationale.length} decisions still need rationale`,
+      tone: 'warning',
+      targetView: 'decisions',
+      mode: 'today',
+    });
+  }
+  const stalest = (knowledgeStaleness || []).find((item) => item.status === 'stale');
+  if (stalest) {
+    items.push({
+      id: 'knowledge-stale',
+      title: 'Knowledge Stale',
+      detail: `${stalest.title} is ${stalest.ageDays} days old`,
+      tone: 'warning',
+      targetView: 'dashboard',
+      mode: 'strategy',
+    });
+  }
+  return items.slice(0, 5);
+}
+
 async function getCeoDashboardPayload() {
   const cached = getFreshCache();
   if (cached) return cached;
@@ -726,12 +854,26 @@ async function getCeoDashboardPayload() {
       availableOnSubdomain: true,
       preferredHostHint: 'ceo.<your-domain>',
     },
+    modes: [
+      { id: 'all', label: 'All Systems', description: 'Full executive surface' },
+      { id: 'today', label: 'Run Today', description: 'Decisions, calendar, and delegations' },
+      { id: 'risk', label: 'Review Risks', description: 'Overdue work, stale knowledge, system drag' },
+      { id: 'review', label: 'Clear Review', description: 'Outputs and approvals waiting on you' },
+      { id: 'strategy', label: 'Strategic Layer', description: 'Long-range context and synthesis' },
+    ],
     heroMetrics: [
       { id: 'waiting', label: 'Waiting on Dan', value: actionQueue.dansQueueCount || 0, tone: (actionQueue.dansQueueCount || 0) > 0 ? 'warning' : 'healthy' },
       { id: 'review', label: 'Review Queue', value: outputsSummary.reviewQueue.length, tone: outputsSummary.reviewQueue.length > 0 ? 'warning' : 'healthy' },
       { id: 'decisions', label: 'Decisions Pending', value: decisionsNeedingRationale.length, tone: decisionsNeedingRationale.length > 0 ? 'warning' : 'healthy' },
       { id: 'focus', label: 'Focus Areas', value: focusAreas.length, tone: 'healthy' },
     ],
+    attentionRail: buildAttentionRail({
+      actionQueue,
+      dashboard,
+      outputsSummary,
+      knowledgeStaleness,
+      decisionsNeedingRationale,
+    }),
     pulseBar: {
       focusAreaHealth: focusAreas.slice(0, 7).map((item) => ({
         id: item.id,
@@ -901,5 +1043,7 @@ function clearCache() {
 module.exports = {
   getCeoDashboardPayload,
   createForgeDraft,
+  createExecutiveBrief,
+  setReviewStatus,
   clearCache,
 };

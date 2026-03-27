@@ -39,6 +39,26 @@ export function createDetailDrawerModule() {
       }
     },
 
+    async openOutputDrawer(category, filename, title) {
+      this.drawerOpen = true;
+      this.drawerTitle = title || filename || 'Output';
+      this.drawerType = 'output';
+      this.drawerData = null;
+      this.drawerLoading = true;
+      this.drawerRelated = [];
+
+      try {
+        const res = await fetch(`/api/documents/${category}/${encodeURIComponent(filename)}`);
+        if (!res.ok) throw new Error('Failed to load output');
+        this.drawerData = await res.json();
+      } catch {
+        this.showError('Failed to load output');
+        this.drawerOpen = false;
+      } finally {
+        this.drawerLoading = false;
+      }
+    },
+
     closeDrawer() {
       this.drawerOpen = false;
       // Clear data after animation completes
@@ -91,6 +111,25 @@ export function createDetailDrawerModule() {
       if (!dateStr) return '—';
       const d = new Date(dateStr);
       return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    },
+
+    async reviewDrawerOutput(status) {
+      if (this.drawerType !== 'output' || !this.drawerData?.path || !status) return;
+      try {
+        const res = await fetch('/api/documents/review', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ path: this.drawerData.path, status }),
+        });
+        if (!res.ok) throw new Error('Review update failed');
+        const current = this.drawerData;
+        await this.openOutputDrawer(current.category, current.filename, current.filename);
+        if (typeof this.loadDocuments === 'function') {
+          this.loadDocuments();
+        }
+      } catch (err) {
+        this.showError(err.message || 'Failed to update output');
+      }
     },
   };
 }

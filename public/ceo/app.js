@@ -4,6 +4,7 @@
   const state = {
     payload: null,
     strategicIndex: 0,
+    mode: 'all',
   };
 
   const els = {
@@ -11,6 +12,8 @@
     hero: document.getElementById('ceoHero'),
     heroStatus: document.getElementById('ceoHeroStatus'),
     summaryStrip: document.getElementById('ceoSummaryStrip'),
+    attentionRail: document.getElementById('ceoAttentionRail'),
+    modes: document.getElementById('ceoModes'),
     pulseGrid: document.getElementById('ceoPulseGrid'),
     todayContent: document.getElementById('ceoTodayContent'),
     todayMeta: document.getElementById('ceoTodayMeta'),
@@ -23,6 +26,7 @@
     forgeTools: document.getElementById('ceoForgeTools'),
     forgeOverlay: document.getElementById('ceoForgeOverlay'),
     refreshBtn: document.getElementById('ceoRefreshBtn'),
+    briefBtn: document.getElementById('ceoBriefBtn'),
     forgeBtn: document.getElementById('ceoForgeBtn'),
     forgeClose: document.getElementById('ceoForgeClose'),
     forgeForm: document.getElementById('ceoForgeForm'),
@@ -133,6 +137,35 @@
     );
   }
 
+  function renderModes(payload) {
+    els.modes.setAttribute('aria-label', 'Dashboard view filter');
+    els.modes.innerHTML = renderList(
+      payload.modes,
+      (mode) => `
+        <button class="btn-ghost btn-sm ${mode.id === state.mode ? 'ceo-tab-active' : ''}" type="button" data-ceo-mode="${escapeHtml(mode.id)}" title="${escapeHtml(mode.description)}" aria-label="${escapeHtml(mode.label)}: ${escapeHtml(mode.description)}" aria-pressed="${mode.id === state.mode ? 'true' : 'false'}">
+          ${escapeHtml(mode.label)}
+        </button>
+      `,
+      'No modes available.',
+    );
+  }
+
+  function renderAttentionRail(payload) {
+    els.attentionRail.innerHTML = renderList(
+      payload.attentionRail,
+      (item) => `
+        <article class="ceo-attention-card ceo-attention-card--${escapeHtml(item.tone)}" data-mode-card="${escapeHtml(item.mode || 'all')}">
+          <div>
+            <strong>${escapeHtml(item.title)}</strong>
+            <div class="ceo-muted">${escapeHtml(item.detail)}</div>
+          </div>
+          ${renderJumpLink(item, 'Open')}
+        </article>
+      `,
+      'No executive alerts right now.',
+    );
+  }
+
   function renderPulse(payload) {
     const pulse = payload.pulseBar || {};
     const focusAreas = renderList(
@@ -233,7 +266,7 @@
     );
 
     els.todayContent.innerHTML = `
-      <section class="ceo-subsection">
+      <section class="ceo-subsection" data-mode-section="today review">
         <div class="ceo-subhead-row">
           <h3>Morning Brief</h3>
           <span class="pill pill-blue">${escapeHtml(morningBrief.source || 'Live')}</span>
@@ -242,7 +275,7 @@
         ${briefSections}
       </section>
 
-      <section class="ceo-subsection">
+      <section class="ceo-subsection" data-mode-section="review">
         <div class="ceo-subhead-row">
           <h3>Review Queue</h3>
           <span class="pill">${escapeHtml(String(today.reviewQueue?.length || 0))}</span>
@@ -254,11 +287,13 @@
               <div>
                 <strong>${escapeHtml(item.title)}</strong>
                 <div class="ceo-muted">${escapeHtml(item.type)} · ${escapeHtml(formatDate(item.createdAt))}</div>
+                <div class="ceo-muted">Status: ${escapeHtml(item.status || 'pending')}${item.reviewedAt ? ` · ${escapeHtml(formatDate(item.reviewedAt))}` : ''}</div>
               </div>
               <div class="ceo-chip-row">
                 <a class="btn-ghost btn-sm" href="/?view=docs">Open</a>
-                <span class="pill pill-blue">Approve</span>
-                <span class="pill">Edit</span>
+                <button class="btn-primary btn-sm" type="button" data-review-action="approved" data-review-path="${escapeHtml(item.path)}">Approve</button>
+                <button class="btn-ghost btn-sm" type="button" data-review-action="needs-edit" data-review-path="${escapeHtml(item.path)}">Needs Edit</button>
+                <button class="btn-danger btn-sm" type="button" data-review-action="rejected" data-review-path="${escapeHtml(item.path)}">Reject</button>
               </div>
             </article>
           `,
@@ -266,7 +301,7 @@
         )}
       </section>
 
-      <section class="ceo-subsection">
+      <section class="ceo-subsection" data-mode-section="today">
         <div class="ceo-subhead-row">
           <h3>Brain Dump Inbox</h3>
           <span class="pill pill-purple">${escapeHtml(String(today.brainDumpInbox?.length || 0))}</span>
@@ -283,7 +318,7 @@
         )}
       </section>
 
-      <section class="ceo-subsection">
+      <section class="ceo-subsection" data-mode-section="today risk">
         <div class="ceo-subhead-row">
           <h3>Decisions To Validate</h3>
           <span class="pill pill-amber">${escapeHtml(String(today.decisionsToValidate?.length || 0))}</span>
@@ -306,7 +341,7 @@
         )}
       </section>
 
-      <section class="ceo-subsection">
+      <section class="ceo-subsection" data-mode-section="today">
         <div class="ceo-subhead-row">
           <h3>Calendar</h3>
           <span class="pill ${today.calendar?.available ? 'pill-green' : 'pill-amber'}">${today.calendar?.available ? 'Connected' : 'Pending'}</span>
@@ -330,7 +365,7 @@
         )}
       </section>
 
-      <section class="ceo-subsection">
+      <section class="ceo-subsection" data-mode-section="today risk">
         <div class="ceo-subhead-row">
           <h3>Delegation Alerts</h3>
           <span class="pill pill-purple">${escapeHtml(String(today.delegationAlerts?.length || 0))}</span>
@@ -415,7 +450,7 @@
     const workspace = payload.workspace || {};
 
     els.workspaceContent.innerHTML = `
-      <section class="ceo-subsection">
+      <section class="ceo-subsection" data-mode-section="all">
         <div class="ceo-subhead-row">
           <h3>Active Agents</h3>
           <span class="pill">${escapeHtml(String(workspace.activeAgents?.length || 0))}</span>
@@ -435,7 +470,7 @@
         )}
       </section>
 
-      <section class="ceo-subsection">
+      <section class="ceo-subsection" data-mode-section="all">
         <div class="ceo-subhead-row">
           <h3>Recent Actions</h3>
           <span class="pill pill-green">${escapeHtml(String(workspace.recentActions?.length || 0))}</span>
@@ -456,7 +491,7 @@
         )}
       </section>
 
-      <section class="ceo-subsection">
+      <section class="ceo-subsection" data-mode-section="today">
         <div class="ceo-subhead-row">
           <h3>Session Handoff</h3>
           <span class="pill pill-purple">${escapeHtml(workspace.sessionHandoff?.lastSession || 'Current')}</span>
@@ -481,7 +516,7 @@
         </div>
       </section>
 
-      <section class="ceo-subsection">
+      <section class="ceo-subsection" data-mode-section="review">
         <div class="ceo-subhead-row">
           <h3>Pending Outputs</h3>
           <span class="pill">${escapeHtml(String(workspace.pendingOutputs?.length || 0))}</span>
@@ -501,7 +536,7 @@
         )}
       </section>
 
-      <section class="ceo-subsection">
+      <section class="ceo-subsection" data-mode-section="risk strategy">
         <div class="ceo-subhead-row">
           <h3>Knowledge Staleness</h3>
           <span class="pill pill-amber">${escapeHtml(String(workspace.knowledgeStaleness?.length || 0))}</span>
@@ -521,7 +556,7 @@
         )}
       </section>
 
-      <section class="ceo-subsection">
+      <section class="ceo-subsection" data-mode-section="all">
         <div class="ceo-subhead-row">
           <h3>Memory Updates</h3>
           <span class="pill">${escapeHtml(String(workspace.memoryUpdates?.length || 0))}</span>
@@ -533,7 +568,7 @@
         )}
       </section>
 
-      <section class="ceo-subsection">
+      <section class="ceo-subsection" data-mode-section="strategy">
         <div class="ceo-subhead-row">
           <h3>About Colin</h3>
           <span class="pill pill-blue">Operating Rules</span>
@@ -581,7 +616,7 @@
     );
 
     els.strategicPanel.innerHTML = `
-      <div class="ceo-strategic-grid">
+      <div class="ceo-strategic-grid" data-mode-section="strategy">
         <section class="ceo-subcard">
           <div class="ceo-subhead-row">
             <h3>${escapeHtml(active.title)}</h3>
@@ -664,6 +699,21 @@
     );
   }
 
+  function applyModeVisibility() {
+    const sections = document.querySelectorAll('[data-mode-section]');
+    sections.forEach((section) => {
+      const modes = String(section.getAttribute('data-mode-section') || 'all').split(/\s+/).filter(Boolean);
+      const visible = state.mode === 'all' || modes.includes(state.mode) || modes.includes('all');
+      section.hidden = !visible;
+    });
+
+    const cards = document.querySelectorAll('[data-mode-card]');
+    cards.forEach((card) => {
+      const mode = card.getAttribute('data-mode-card') || 'all';
+      card.hidden = !(state.mode === 'all' || state.mode === mode);
+    });
+  }
+
   function render(payload) {
     state.payload = payload;
 
@@ -678,12 +728,16 @@
 
     renderPulse(payload);
     renderSummary(payload);
+    renderAttentionRail(payload);
+    renderModes(payload);
     renderToday(payload);
     renderSystemMap(payload);
     renderWorkspace(payload);
     renderStrategicTabs(payload);
     renderVelocity(payload);
     renderForge(payload);
+    applyModeVisibility();
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
   }
 
   function setLoadingState(message) {
@@ -745,6 +799,53 @@
     }
   }
 
+  async function createExecutiveBrief() {
+    els.briefBtn.disabled = true;
+    els.lastUpdated.textContent = 'Generating executive brief…';
+    try {
+      const response = await fetch('/api/ceo-dashboard/brief', { method: 'POST', headers: { Accept: 'application/json' } });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      els.lastUpdated.textContent = `Brief saved to ${payload.path}`;
+      await loadDashboard();
+    } catch (err) {
+      console.error('CEO brief create failed:', err);
+      els.lastUpdated.textContent = `Brief failed: ${err.message}`;
+    } finally {
+      els.briefBtn.disabled = false;
+    }
+  }
+
+  async function submitReviewAction(status, itemPath, triggerBtn) {
+    if (!status || !itemPath) return;
+
+    const originalText = triggerBtn ? triggerBtn.textContent : null;
+    if (triggerBtn) {
+      triggerBtn.disabled = true;
+      triggerBtn.classList.add('btn-loading');
+      triggerBtn.textContent = 'Saving…';
+    }
+
+    try {
+      const response = await fetch('/api/ceo-dashboard/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ path: itemPath, status }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      await loadDashboard();
+    } catch (err) {
+      console.error('CEO review update failed:', err);
+      els.lastUpdated.textContent = `Review update failed: ${err.message}`;
+      if (triggerBtn) {
+        triggerBtn.disabled = false;
+        triggerBtn.classList.remove('btn-loading');
+        triggerBtn.textContent = originalText;
+      }
+    }
+  }
+
   function openForge() {
     els.forgeDrawer.classList.add('is-open');
     els.forgeDrawer.setAttribute('aria-hidden', 'false');
@@ -763,9 +864,26 @@
       state.strategicIndex = Number(tabButton.getAttribute('data-strategic-index')) || 0;
       renderStrategicTabs(state.payload);
     }
+
+    const modeButton = event.target.closest('[data-ceo-mode]');
+    if (modeButton) {
+      state.mode = modeButton.getAttribute('data-ceo-mode') || 'all';
+      renderModes(state.payload || { modes: [] });
+      applyModeVisibility();
+    }
+
+    const reviewButton = event.target.closest('[data-review-action]');
+    if (reviewButton) {
+      submitReviewAction(
+        reviewButton.getAttribute('data-review-action'),
+        reviewButton.getAttribute('data-review-path'),
+        reviewButton,
+      );
+    }
   });
 
   els.refreshBtn.addEventListener('click', loadDashboard);
+  els.briefBtn.addEventListener('click', createExecutiveBrief);
   els.forgeBtn.addEventListener('click', openForge);
   els.forgeClose.addEventListener('click', closeForge);
   els.forgeOverlay.addEventListener('click', closeForge);
