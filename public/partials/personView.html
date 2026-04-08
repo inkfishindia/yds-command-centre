@@ -1,0 +1,91 @@
+        <div class="person-view-header focus-area-header">
+          <button class="view-back-btn" @click="openNavigationTarget('team')">&#8592; Team</button>
+          <template x-if="personDetail && personDetail.person">
+            <span>
+              <span class="person-view-name" x-text="personDetail.person.Name || personDetail.person.name || ''"></span>
+              <span class="focus-area-header-role" x-text="' — ' + (personDetail.person.Function || personDetail.person.Role || '')"></span>
+            </span>
+          </template>
+          <template x-if="personLoading && !personDetail">
+            <span class="focus-area-header-name" style="color: var(--text-muted);">Loading...</span>
+          </template>
+          <template x-if="personDetail && personDetail.metrics">
+            <span class="capacity-badge" :class="getCapacityLabel(personDetail.metrics)" x-text="getCapacityLabel(personDetail.metrics).charAt(0).toUpperCase() + getCapacityLabel(personDetail.metrics).slice(1)"></span>
+          </template>
+        </div>
+
+        <template x-if="personLoading && !personDetail">
+          <div>
+            <div class="loading-skeleton skeleton-card" style="height: 72px; margin-bottom: 1rem;"></div>
+            <div class="loading-skeleton skeleton-card" style="height: 240px;"></div>
+          </div>
+        </template>
+
+        <template x-if="!personLoading && personDetail">
+          <div>
+            <template x-if="personDetail.metrics">
+              <div class="person-metrics">
+                <div class="person-metric-item">
+                  <div class="person-metric-number" x-text="personDetail.metrics.activeCount || 0"></div>
+                  <div class="person-metric-label">Active</div>
+                </div>
+                <div class="person-metric-sep"></div>
+                <div class="person-metric-item">
+                  <div class="person-metric-number" :class="(personDetail.metrics.overdueCount || 0) > 0 ? 'danger' : ''" x-text="personDetail.metrics.overdueCount || 0"></div>
+                  <div class="person-metric-label">Overdue</div>
+                </div>
+                <div class="person-metric-sep"></div>
+                <div class="person-metric-item">
+                  <div class="person-metric-number" :class="(personDetail.metrics.blockedCount || 0) > 0 ? 'warning' : ''" x-text="personDetail.metrics.blockedCount || 0"></div>
+                  <div class="person-metric-label">Blocked</div>
+                </div>
+                <div class="person-metric-sep"></div>
+                <div class="person-metric-item">
+                  <div class="person-metric-number" x-text="personDetail.metrics.doneCount || 0"></div>
+                  <div class="person-metric-label">Done</div>
+                </div>
+              </div>
+            </template>
+
+            <div class="fa-section">
+              <div class="fa-section-title">Commitments</div>
+              <template x-if="!personDetail.commitments || personDetail.commitments.length === 0">
+                <div class="empty-state--inline">No commitments found.</div>
+              </template>
+              <template x-if="personDetail.commitments && personDetail.commitments.length > 0">
+                <div style="overflow-x: auto;">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Due Date</th>
+                        <th>Focus Area</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="c in getSortedPersonCommitments(personDetail.commitments)" :key="c.id">
+                        <tr :class="c.isOverdue ? 'row-overdue' : ''" @click="openDetailPanel(c.id, c.Name)">
+                          <td>
+                            <span class="table-link" x-text="c.Name || '—'"></span>
+                          </td>
+                          <td><span class="status-badge small" :class="statusClass(c.Status)" x-text="c.Status || '—'"></span></td>
+                          <td><span class="status-badge small" :class="priorityClass(c.Priority)" x-text="c.Priority || '—'"></span></td>
+                          <td>
+                            <span x-text="formatDueDate(c)" :class="c.isOverdue ? 'overdue-label' : ''"></span>
+                          </td>
+                          <td style="font-size: 12px; color: var(--text-muted);" x-text="(c.focusAreaNames || []).join(', ') || '—'"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="!personLoading && !personDetail">
+          <div class="empty-state">Could not load person detail. The endpoint may not be available yet.</div>
+        </template>

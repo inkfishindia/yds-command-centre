@@ -1,0 +1,130 @@
+        <div class="focus-area-header">
+          <button class="view-back-btn" @click="view = 'dashboard'; loadDashboard()">&#8592; Dashboard</button>
+          <span class="focus-area-header-name" x-text="activeFocusArea ? (activeFocusArea.Name || activeFocusArea.name || '') : ''"></span>
+          <template x-if="activeFocusArea && (activeFocusArea.Health || activeFocusArea.health)">
+            <span class="status-badge" :class="statusClass(activeFocusArea.Health || activeFocusArea.health)" x-text="activeFocusArea.Health || activeFocusArea.health"></span>
+          </template>
+          <div class="focus-area-stats">
+            <template x-if="focusAreaDetail && focusAreaDetail.stats">
+              <span>
+                <span class="fa-stat" x-text="(focusAreaDetail.stats.openCount || 0) + ' Open'"></span>
+                <span class="fa-stat" :class="(focusAreaDetail.stats.overdueCount || 0) > 0 ? 'danger' : ''" x-text="(focusAreaDetail.stats.overdueCount || 0) + ' Overdue'"></span>
+                <span class="fa-stat" :class="(focusAreaDetail.stats.blockedCount || 0) > 0 ? 'warning' : ''" x-text="(focusAreaDetail.stats.blockedCount || 0) + ' Blocked'"></span>
+              </span>
+            </template>
+          </div>
+        </div>
+
+        <template x-if="focusAreaLoading">
+          <div>
+            <div class="loading-skeleton skeleton-card" style="height: 80px; margin-bottom: 1rem;"></div>
+            <div class="loading-skeleton skeleton-card" style="height: 200px; margin-bottom: 1rem;"></div>
+            <div class="loading-skeleton skeleton-card" style="height: 80px;"></div>
+          </div>
+        </template>
+
+        <template x-if="!focusAreaLoading && focusAreaDetail">
+          <div>
+            <div class="fa-section">
+              <div class="fa-section-title" x-text="'Projects (' + (focusAreaDetail.projects ? focusAreaDetail.projects.length : 0) + ')'"></div>
+              <template x-if="!focusAreaDetail.projects || focusAreaDetail.projects.length === 0">
+                <div class="empty-state--inline">No projects linked.</div>
+              </template>
+              <template x-if="focusAreaDetail.projects && focusAreaDetail.projects.length > 0">
+                <div class="fa-project-list">
+                  <template x-for="proj in focusAreaDetail.projects" :key="proj.id">
+                    <div class="fa-project-row">
+                      <span class="fa-project-name" x-text="proj.Name || proj.name || '—'"></span>
+                      <span class="status-badge small" :class="statusClass(proj.Status)" x-text="proj.Status || '—'"></span>
+                      <div class="table-inline-actions fa-project-owner">
+                        <template x-if="!(proj.ownerNames || []).length">
+                          <span>—</span>
+                        </template>
+                        <template x-for="owner in (proj.ownerNames || [])" :key="proj.id + '-' + owner">
+                          <button type="button" class="mini-action-btn" @click.stop="openOwnerContext(owner)" x-text="owner"></button>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+
+            <div class="fa-section">
+              <div class="fa-section-title">
+                Commitments
+                <template x-if="focusAreaDetail.commitments">
+                  <span x-text="' (' + focusAreaDetail.commitments.filter(c => c.Status !== 'Done' && c.Status !== 'Cancelled').length + ' open, ' + focusAreaDetail.commitments.filter(c => c.isOverdue).length + ' overdue)'"></span>
+                </template>
+              </div>
+              <template x-if="!focusAreaDetail.commitments || focusAreaDetail.commitments.length === 0">
+                <div class="empty-state--inline">No commitments.</div>
+              </template>
+              <template x-if="focusAreaDetail.commitments && focusAreaDetail.commitments.length > 0">
+                <div style="overflow-x: auto;">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Owner</th>
+                        <th>Due Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="c in focusAreaDetail.commitments" :key="c.id">
+                        <tr :class="c.isOverdue ? 'row-overdue' : ''" @click="openDetailPanel(c.id, c.Name)">
+                          <td>
+                            <span class="table-link" x-text="c.Name || '—'"></span>
+                          </td>
+                          <td><span class="status-badge small" :class="statusClass(c.Status)" x-text="c.Status || '—'"></span></td>
+                          <td><span class="status-badge small" :class="priorityClass(c.Priority)" x-text="c.Priority || '—'"></span></td>
+                          <td>
+                            <div class="table-inline-actions">
+                              <template x-if="!(c.assignedNames || []).length">
+                                <span>—</span>
+                              </template>
+                              <template x-for="owner in (c.assignedNames || [])" :key="c.id + '-' + owner">
+                                <button type="button" class="mini-action-btn" @click.stop="openOwnerContext(owner)" x-text="owner"></button>
+                              </template>
+                            </div>
+                          </td>
+                          <td>
+                            <span x-text="formatDueDate(c)" :class="c.isOverdue ? 'overdue-label' : ''"></span>
+                          </td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+            </div>
+
+            <div class="fa-section">
+              <div class="fa-section-title" x-text="'Decisions (' + (focusAreaDetail.decisions ? focusAreaDetail.decisions.length : 0) + ')'"></div>
+              <template x-if="!focusAreaDetail.decisions || focusAreaDetail.decisions.length === 0">
+                <div class="empty-state--inline">No decisions linked.</div>
+              </template>
+              <template x-if="focusAreaDetail.decisions && focusAreaDetail.decisions.length > 0">
+                <div class="fa-decisions-list">
+                  <template x-for="d in focusAreaDetail.decisions" :key="d.id">
+                    <div class="fa-decision-row">
+                      <span class="fa-decision-date" x-text="formatDate(d.Date || d.date)"></span>
+                      <span class="fa-decision-name" x-text="d.Name || d.name || '—'"></span>
+                      <div class="table-inline-actions fa-decision-owner">
+                        <template x-for="owner in (d.ownerNames || [])" :key="d.id + '-' + owner">
+                          <button type="button" class="mini-action-btn" @click.stop="openOwnerContext(owner)" x-text="owner"></button>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="!focusAreaLoading && !focusAreaDetail">
+          <div class="empty-state">Could not load focus area detail. The endpoint may not be available yet.</div>
+        </template>

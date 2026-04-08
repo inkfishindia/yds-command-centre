@@ -1,0 +1,95 @@
+        <div class="view-header-bar">
+          <div class="view-header-left">
+            <span class="view-header-emoji">⚖️</span>
+            <div class="view-header-text">
+              <h2 class="view-header-title">Decision Log</h2>
+              <span class="view-header-subtitle" x-text="getFilteredDecisions().length + ' decisions'"></span>
+            </div>
+          </div>
+          <div class="view-header-actions">
+            <button class="btn btn-small btn-primary" @click="showCreateDecision = true">+ Decision</button>
+          </div>
+        </div>
+        <template x-if="decisionsLoading">
+          <div class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+        </template>
+        <template x-if="!decisionsLoading">
+          <div>
+            <div class="decision-filters">
+              <input type="text" class="decision-search" placeholder="Search decisions..." x-model="decisionSearch" @input="expandedDecision = null">
+              <select class="decision-filter-select" x-model="decisionFocusArea" @change="expandedDecision = null" aria-label="Filter by focus area">
+                <option value="">All Focus Areas</option>
+                <template x-for="fa in getDecisionFilterOptions().focusAreas" :key="fa">
+                  <option :value="fa" x-text="fa"></option>
+                </template>
+              </select>
+              <select class="decision-filter-select" x-model="decisionOwner" @change="expandedDecision = null" aria-label="Filter by owner">
+                <option value="">All Owners</option>
+                <template x-for="owner in getDecisionFilterOptions().owners" :key="owner">
+                  <option :value="owner" x-text="owner"></option>
+                </template>
+              </select>
+              <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                <button class="filter-pill" :class="{'filter-pill-active': decisionDateRange === 'all'}" @click="decisionDateRange = 'all'; expandedDecision = null">All</button>
+                <button class="filter-pill" :class="{'filter-pill-active': decisionDateRange === 'month'}" @click="decisionDateRange = 'month'; expandedDecision = null">This Month</button>
+                <button class="filter-pill" :class="{'filter-pill-active': decisionDateRange === '3months'}" @click="decisionDateRange = '3months'; expandedDecision = null">Last 3 Months</button>
+                <button class="filter-pill" :class="{'filter-pill-active': decisionDateRange === 'week'}" @click="decisionDateRange = 'week'; expandedDecision = null">This Week</button>
+              </div>
+            </div>
+            <template x-if="getFilteredDecisions().length === 0">
+              <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <span class="empty-state-title">No decisions recorded</span>
+                <span class="empty-state-subtitle">Decisions logged via Colin will appear here</span>
+              </div>
+            </template>
+            <template x-if="getFilteredDecisions().length > 0">
+              <div class="decision-timeline">
+                <template x-for="group in getDecisionsByMonth()" :key="group.month">
+                  <div class="decision-month-group">
+                    <div class="decision-month-header">
+                      <span x-text="group.month"></span>
+                      <span class="decision-month-count" x-text="'— ' + group.count + (group.count === 1 ? ' decision' : ' decisions')"></span>
+                    </div>
+                    <template x-for="d in group.decisions" :key="d.id">
+                      <div class="decision-card" :class="{'decision-expanded': expandedDecision === d.id}">
+                        <div class="decision-header" @click="expandedDecision = expandedDecision === d.id ? null : d.id">
+                          <div class="decision-title" x-text="d.Name || 'Untitled'" @click.stop="openDetailPanel(d.id, d.Name)" style="cursor:pointer;"></div>
+                          <div class="decision-meta">
+                            <span class="decision-date" x-text="formatDate(d.Date)"></span>
+                            <span class="decision-owner" x-text="d.Owner || '—'"></span>
+                          </div>
+                          <svg class="decision-chevron" :class="{'rotated': expandedDecision === d.id}" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+                        </div>
+                        <div class="decision-body" x-show="expandedDecision === d.id" x-transition.duration.200ms>
+                          <template x-if="d.Context">
+                            <div class="decision-field"><div class="decision-field-label">Context</div><div class="decision-field-value" x-text="d.Context"></div></div>
+                          </template>
+                          <template x-if="d.Decision">
+                            <div class="decision-field"><div class="decision-field-label">Decision</div><div class="decision-field-value" x-text="d.Decision"></div></div>
+                          </template>
+                          <template x-if="d.Rationale">
+                            <div class="decision-field"><div class="decision-field-label">Rationale</div><div class="decision-field-value" x-text="d.Rationale"></div></div>
+                          </template>
+                          <template x-if="d['Risks Accepted']">
+                            <div class="decision-field decision-risk"><div class="decision-field-label">Risks Accepted</div><div class="decision-field-value" x-text="d['Risks Accepted']"></div></div>
+                          </template>
+                          <template x-if="d['Alternatives Considered']">
+                            <div class="decision-field"><div class="decision-field-label">Alternatives Considered</div><div class="decision-field-value" x-text="d['Alternatives Considered']"></div></div>
+                          </template>
+                          <div class="decision-actions">
+                            <button class="btn btn-sm" @click.stop="openDetailPanel(d.id, d.Name)">View Full Page</button>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>

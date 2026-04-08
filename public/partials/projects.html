@@ -1,0 +1,120 @@
+        <div class="view-header-bar">
+          <div class="view-header-left">
+            <span class="view-header-emoji">📁</span>
+            <div class="view-header-text">
+              <h2 class="view-header-title">Projects</h2>
+              <span class="view-header-subtitle" x-text="getFilteredProjects().length + ' projects'"></span>
+            </div>
+          </div>
+          <div class="view-header-actions"></div>
+        </div>
+        <div class="filter-bar" style="padding: 8px 20px 0;">
+          <button class="filter-pill" :class="{'filter-pill-active': projectsFilter === ''}" @click="projectsFilter = ''">All</button>
+          <button class="filter-pill" :class="{'filter-pill-active': projectsFilter === 'Active'}" @click="projectsFilter = 'Active'">Active</button>
+          <button class="filter-pill" :class="{'filter-pill-active': projectsFilter === 'On Hold'}" @click="projectsFilter = 'On Hold'">On Hold</button>
+          <button class="filter-pill" :class="{'filter-pill-active': projectsFilter === 'Done'}" @click="projectsFilter = 'Done'">Done</button>
+          <button class="filter-pill" :class="{'filter-pill-active': projectsFilter === 'Cancelled'}" @click="projectsFilter = 'Cancelled'">Cancelled</button>
+        </div>
+        <div class="filter-bar" style="padding: 4px 20px 8px;">
+          <button class="filter-pill" :class="{'filter-pill-active': projectsTypeFilter === ''}" @click="projectsTypeFilter = ''">All Types</button>
+          <button class="filter-pill filter-pill-mission" :class="{'filter-pill-active': projectsTypeFilter === 'Mission Brief'}" @click="projectsTypeFilter = 'Mission Brief'">Mission Brief</button>
+          <button class="filter-pill filter-pill-initiative" :class="{'filter-pill-active': projectsTypeFilter === 'Initiative'}" @click="projectsTypeFilter = 'Initiative'">Initiative</button>
+          <button class="filter-pill filter-pill-experiment" :class="{'filter-pill-active': projectsTypeFilter === 'Experiment'}" @click="projectsTypeFilter = 'Experiment'">Experiment</button>
+        </div>
+        <template x-if="projectsLoading">
+          <div class="projects-grid">
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+        </template>
+        <template x-if="!projectsLoading">
+          <div>
+            <template x-if="getFilteredProjects().length === 0">
+              <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                <span class="empty-state-title">No projects</span>
+                <span class="empty-state-subtitle">No projects match the current filters</span>
+              </div>
+            </template>
+            <div class="projects-grid">
+              <template x-for="p in getFilteredProjects()" :key="p.id">
+                <div class="project-card" :class="expandedProject === p.id && 'project-card-expanded'" @click="toggleProject(p.id)">
+                  <div class="project-card-header">
+                    <span class="status-badge small" :class="statusClass(p.Status)" x-text="p.Status || '—'"></span>
+                    <span class="status-badge small neutral" x-show="p.Type" x-text="p.Type || '—'"></span>
+                    <span class="status-badge small warning" x-show="isProjectStale(p) && p.Status === 'Active'" x-text="getProjectStaleDays(p) + 'd stale'" x-cloak></span>
+                  </div>
+                  <div class="project-card-title" x-text="p.Name || 'Untitled'" @click.stop="openDetailPanel(p.id, p.Name)" style="cursor:pointer;"></div>
+                  <div class="project-card-meta">
+                    <template x-if="p.Owner && Array.isArray(p.Owner) && p.Owner.length">
+                      <div class="project-meta-row">
+                        <span class="meta-label">Owner</span>
+                        <span x-text="typeof p.Owner[0] === 'object' ? p.Owner[0].name : p.Owner[0]"></span>
+                      </div>
+                    </template>
+                    <template x-if="p['Focus Area'] && Array.isArray(p['Focus Area']) && p['Focus Area'].length">
+                      <div class="project-meta-row">
+                        <span class="meta-label">Focus</span>
+                        <span x-text="typeof p['Focus Area'][0] === 'object' ? p['Focus Area'][0].name : p['Focus Area'][0]"></span>
+                      </div>
+                    </template>
+                    <template x-if="p['AI Expert Panel'] && Array.isArray(p['AI Expert Panel']) && p['AI Expert Panel'].length">
+                      <div class="project-meta-row">
+                        <span class="meta-label">Experts</span>
+                        <span x-text="p['AI Expert Panel'].map(e => typeof e === 'object' ? e.name : e).join(', ')"></span>
+                      </div>
+                    </template>
+                  </div>
+                  <template x-if="p.totalCount > 0">
+                    <div class="project-progress">
+                      <div class="project-commitment-summary">
+                        <span x-text="p.openCount + ' open'"></span>
+                        <template x-if="p.overdueCount > 0">
+                          <span class="project-overdue-count" x-text="'· ' + p.overdueCount + ' overdue'"></span>
+                        </template>
+                        <span x-text="'· ' + p.doneCount + ' done'"></span>
+                      </div>
+                      <div class="project-progress-bar">
+                        <div class="project-progress-fill" :class="p.overdueCount > 0 && 'has-overdue'" :style="'width: ' + p.progressPercent + '%'"></div>
+                      </div>
+                    </div>
+                  </template>
+                  <div class="project-detail" x-show="expandedProject === p.id" x-transition.duration.200ms @click.stop>
+                    <template x-if="p.Audiences && Array.isArray(p.Audiences) && p.Audiences.length">
+                      <div class="project-audiences">
+                        <div class="project-detail-label">Audiences</div>
+                        <div class="project-tag-list">
+                          <template x-for="a in p.Audiences" :key="typeof a === 'object' ? a.id : a">
+                            <span class="project-tag" x-text="typeof a === 'object' ? a.name : a"></span>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="p.linkedCommitments && p.linkedCommitments.length > 0">
+                      <div class="project-commitments-list">
+                        <div class="project-detail-label" x-text="p.linkedCommitments.length + ' Commitments'"></div>
+                        <template x-for="c in p.linkedCommitments" :key="c.id">
+                          <div class="project-commitment-item">
+                            <span class="status-badge small" :class="statusClass(c.status)" x-text="c.status"></span>
+                            <span class="project-commitment-name" x-text="c.name"></span>
+                            <template x-if="c.dueDate">
+                              <span class="project-commitment-due" x-text="formatRelativeDate(c.dueDate)"></span>
+                            </template>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                    <template x-if="!p.linkedCommitments || p.linkedCommitments.length === 0">
+                      <div class="project-detail-empty">No linked commitments</div>
+                    </template>
+                    <button class="btn btn-small project-view-btn" @click.stop="viewProjectInNotion(p.id, p.Name)">View Full Page</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>

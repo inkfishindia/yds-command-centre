@@ -1,0 +1,96 @@
+        <div class="view-header-bar">
+          <div class="view-header-left">
+            <span class="view-header-emoji">🗂️</span>
+            <div class="view-header-text">
+              <h2 class="view-header-title">Registry</h2>
+              <span class="view-header-subtitle" x-text="registry ? getFilteredRegistry().length + ' of ' + registry.stats.total + ' projects' : 'Internal project registry'"></span>
+            </div>
+          </div>
+          <div class="view-header-actions"></div>
+        </div>
+        <template x-if="registry && registry.stats">
+          <div class="registry-stats">
+            <div class="reg-stat">
+              <div class="reg-stat-number" x-text="registry.stats.total"></div>
+              <div class="reg-stat-label">Projects</div>
+            </div>
+            <div class="reg-stat">
+              <div class="reg-stat-number" x-text="registry.stats.active"></div>
+              <div class="reg-stat-label">Active</div>
+            </div>
+            <div class="reg-stat">
+              <div class="reg-stat-number" x-text="registry.stats.totalAgents"></div>
+              <div class="reg-stat-label">Agents</div>
+            </div>
+            <div class="reg-stat">
+              <div class="reg-stat-number" x-text="registry.stats.totalSkills"></div>
+              <div class="reg-stat-label">Skills</div>
+            </div>
+          </div>
+        </template>
+        <div class="filter-bar" style="margin-bottom: 1rem;">
+          <button class="filter-pill" :class="{'filter-pill-active': registryFilter === ''}" @click="registryFilter = ''">All</button>
+          <button class="filter-pill" :class="{'filter-pill-active': registryFilter === 'active'}" @click="registryFilter = 'active'">Active</button>
+          <button class="filter-pill" :class="{'filter-pill-active': registryFilter === 'in-progress'}" @click="registryFilter = 'in-progress'">Building</button>
+          <button class="filter-pill" :class="{'filter-pill-active': registryFilter === 'back-burner'}" @click="registryFilter = 'back-burner'">Paused</button>
+          <button class="filter-pill" :class="{'filter-pill-active': registryFilter === 'not-started'}" @click="registryFilter = 'not-started'">Planned</button>
+        </div>
+        <div class="filter-bar" style="margin-bottom: 1rem;">
+          <button class="filter-pill" :class="{'filter-pill-active': registryTypeFilter === ''}" @click="registryTypeFilter = ''">All Types</button>
+          <button class="filter-pill" :class="{'filter-pill-active': registryTypeFilter === 'agent-system'}" @click="registryTypeFilter = 'agent-system'">AI Teams</button>
+          <button class="filter-pill" :class="{'filter-pill-active': registryTypeFilter === 'app'}" @click="registryTypeFilter = 'app'">Apps</button>
+          <button class="filter-pill" :class="{'filter-pill-active': registryTypeFilter === 'backend'}" @click="registryTypeFilter = 'backend'">Backend</button>
+          <button class="filter-pill" :class="{'filter-pill-active': registryTypeFilter === 'knowledge-base'}" @click="registryTypeFilter = 'knowledge-base'">Knowledge</button>
+          <button class="filter-pill" :class="{'filter-pill-active': registryTypeFilter === 'integration'}" @click="registryTypeFilter = 'integration'">Integration</button>
+        </div>
+        <template x-if="registryLoading">
+          <div class="registry-grid">
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+        </template>
+        <template x-if="!registryLoading && registry">
+          <div>
+            <template x-if="getFilteredRegistry().length === 0">
+              <div class="empty-state">No projects match the current filters.</div>
+            </template>
+            <div class="registry-grid">
+              <template x-for="p in getFilteredRegistry()" :key="p.slug">
+                <div class="reg-card" @click="registryExpanded = registryExpanded === p.slug ? null : p.slug">
+                  <div class="reg-card-header">
+                    <span class="reg-status-badge status-badge" :class="p.status === 'active' ? 'success' : p.status === 'in-progress' ? 'info' : p.status === 'back-burner' ? 'neutral' : p.status === 'not-started' ? 'warning' : 'neutral'" x-text="p.status === 'in-progress' ? 'Building' : p.status === 'back-burner' ? 'Paused' : p.status === 'not-started' ? 'Planned' : 'Active'"></span>
+                    <span class="reg-status-badge status-badge purple small" x-text="getRegistryTypeLabel(p.type)"></span>
+                  </div>
+                  <div class="reg-card-name" style="cursor:pointer;" @click.stop="openDetailPanel(p.slug, p.name)" x-text="p.name"></div>
+                  <div class="reg-card-desc" x-text="p.description"></div>
+                  <div class="reg-card-metrics" x-show="p.agent_count > 0 || p.skill_count > 0">
+                    <span x-show="p.agent_count > 0" x-text="p.agent_count + ' agents'"></span>
+                    <span x-show="p.skill_count > 0" x-text="p.skill_count + ' skills'"></span>
+                    <span x-show="p.command_count > 0" x-text="p.command_count + ' commands'"></span>
+                  </div>
+                  <div class="reg-card-activity">
+                    <span class="reg-activity-text" x-text="p.last_action"></span>
+                    <span class="reg-activity-date" x-text="p.last_action_date"></span>
+                  </div>
+                  <div class="reg-card-stack">
+                    <template x-for="tech in (p.tech_stack || [])" :key="tech">
+                      <span class="reg-tech-pill" x-text="tech"></span>
+                    </template>
+                  </div>
+                  <div class="reg-card-links" x-show="registryExpanded === p.slug" x-transition.duration.150ms @click.stop>
+                    <a class="reg-link" x-show="p.gdrive_path" :href="'https://drive.google.com/drive/search?q=' + encodeURIComponent(p.name)" target="_blank" rel="noopener">
+                      Open in Drive
+                    </a>
+                    <a class="reg-link" x-show="p.local_path" :href="'vscode://file' + encodeURI(p.local_path)" @click.stop>
+                      Open in VS Code
+                    </a>
+                    <a class="reg-link" x-show="p.github_repo" :href="'https://github.com/' + p.github_repo" target="_blank" rel="noopener">
+                      GitHub
+                    </a>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>

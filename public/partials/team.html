@@ -1,0 +1,111 @@
+        <div class="view-header-bar">
+          <div class="view-header-left">
+            <span class="view-header-emoji">👥</span>
+            <div class="view-header-text">
+              <h2 class="view-header-title">Team</h2>
+              <span class="view-header-subtitle" x-text="teamData.length + ' members'"></span>
+            </div>
+          </div>
+          <div class="view-header-actions"></div>
+        </div>
+        <template x-if="teamLoading">
+          <div class="team-grid">
+            <div class="loading-skeleton skeleton-card skeleton-team"></div>
+            <div class="loading-skeleton skeleton-card skeleton-team"></div>
+            <div class="loading-skeleton skeleton-card skeleton-team"></div>
+            <div class="loading-skeleton skeleton-card skeleton-team"></div>
+            <div class="loading-skeleton skeleton-card skeleton-team"></div>
+            <div class="loading-skeleton skeleton-card skeleton-team"></div>
+          </div>
+        </template>
+        <template x-if="!teamLoading && teamData.length === 0">
+          <div class="empty-state">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            <span class="empty-state-title">No team members found</span>
+            <span class="empty-state-subtitle">Team data will appear once loaded</span>
+          </div>
+        </template>
+        <template x-if="!teamLoading && teamData.length > 0">
+          <div>
+            <div class="team-metrics data-card-grid">
+              <div class="data-card accent">
+                <div class="data-card-value" x-text="getTeamMetrics().totalOpen"></div>
+                <div class="data-card-label">Total Open</div>
+              </div>
+              <div class="data-card" :class="getTeamMetrics().totalOverdue > 0 ? 'danger' : 'accent'">
+                <div class="data-card-value" x-text="getTeamMetrics().totalOverdue"></div>
+                <div class="data-card-label">Overdue</div>
+              </div>
+              <div class="data-card accent">
+                <div class="data-card-value" style="font-size:var(--font-size-md);font-weight:600;" x-text="getTeamMetrics().mostLoaded"></div>
+                <div class="data-card-label">Most Loaded</div>
+              </div>
+              <div class="data-card" :class="getTeamMetrics().unassigned > 0 ? 'warning' : 'accent'">
+                <div class="data-card-value" x-text="getTeamMetrics().unassigned"></div>
+                <div class="data-card-label">Unassigned</div>
+              </div>
+            </div>
+
+            <div class="team-mobile-stack">
+              <template x-for="person in getSortedTeamByWorkload()" :key="'mobile-' + person.id">
+                <button class="team-mobile-card" @click="openPersonView(person)">
+                  <div class="team-mobile-top">
+                    <div class="team-mobile-name-wrap">
+                      <span class="health-dot" :class="getHealthDotClass(person)"></span>
+                      <span class="avatar avatar-sm" :style="`background:${getAvatar(person.Name).color}`" x-text="getAvatar(person.Name).initials"></span>
+                      <span class="team-mobile-name" x-text="person.Name || 'Unknown'"></span>
+                    </div>
+                    <span class="team-mobile-load" x-text="person.activeCommitmentCount || 0"></span>
+                  </div>
+                  <div class="team-mobile-role" x-text="person.Function || person.Role || 'Team member'"></div>
+                  <div class="team-mobile-meta">
+                    <span x-text="(person.overdueCount || 0) > 0 ? person.overdueCount + ' overdue' : 'No overdue'"></span>
+                    <span x-show="(person.blockedCount || 0) > 0" x-text="person.blockedCount + ' blocked'"></span>
+                    <span x-show="(person.overdueCount || 0) >= 3 || (person.activeCommitmentCount || 0) >= 8">Overloaded</span>
+                  </div>
+                </button>
+              </template>
+            </div>
+
+            <div class="team-load-grid-wrap">
+              <table class="team-load-grid">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Load</th>
+                    <th style="text-align: right;">Active</th>
+                    <th style="text-align: right;">Overdue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="person in getSortedTeamByWorkload()" :key="person.id">
+                    <tr @click="openPersonView(person)" title="View person detail">
+                      <td>
+                        <div class="team-load-name-cell">
+                          <span class="health-dot" :class="getHealthDotClass(person)"></span>
+                          <span class="avatar avatar-sm" :style="`background:${getAvatar(person.Name).color}`" x-text="getAvatar(person.Name).initials"></span>
+                          <span x-text="person.Name || 'Unknown'"></span>
+                          <span class="team-role-label" x-text="person.Function || person.Role || ''"></span>
+                          <span class="status-badge danger small" x-show="(person.overdueCount || 0) >= 3 || (person.activeCommitmentCount || 0) >= 8" x-cloak>Overloaded</span>
+                          <span class="status-badge warning small" x-show="(person.blockedCount || 0) >= 2" x-text="person.blockedCount + ' blocked'" x-cloak></span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="load-bar-wrap">
+                          <div class="load-bar">
+                            <div class="load-bar-fill" :class="getLoadBarClass(person.activeCommitmentCount || 0)" :style="'width: ' + getWorkloadPercent(person.activeCommitmentCount || 0) + '%'"></div>
+                          </div>
+                          <span class="load-bar-count" x-text="person.activeCommitmentCount || 0"></span>
+                        </div>
+                      </td>
+                      <td style="text-align: right; font-family: var(--font-mono); font-size: 13px;" x-text="person.activeCommitmentCount || 0"></td>
+                      <td style="text-align: right;">
+                        <span class="status-badge small" :class="(person.overdueCount || 0) > 0 ? 'danger' : 'neutral'" x-text="(person.overdueCount || 0) > 0 ? person.overdueCount : '—'"></span>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>

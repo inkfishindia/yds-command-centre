@@ -1,0 +1,92 @@
+      <div class="view-header-bar">
+        <div class="view-header-left">
+          <svg class="view-header-svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+          <div class="view-header-text">
+            <h2 class="view-header-title">Claude Usage</h2>
+            <span class="view-header-subtitle" x-text="'Week: ' + getWeekLabel()"></span>
+          </div>
+        </div>
+        <div class="view-header-actions">
+          <button class="btn btn-small btn-ghost" @click="resetClaudeUsage()" aria-label="Reset this week">Reset week</button>
+        </div>
+      </div>
+
+      <div class="usage-stats-row">
+        <div class="usage-stat-card">
+          <span class="usage-stat-number" x-text="getWeeklySessions().length"></span>
+          <span class="usage-stat-label">Sessions this week</span>
+        </div>
+        <div class="usage-stat-card">
+          <span class="usage-stat-number" x-text="getWeeklyUsedPercent() + '%'"></span>
+          <span class="usage-stat-label">Capacity used <span class="usage-stat-sub" x-text="'of ' + claudeUsageMaxWeekly + '%'"></span></span>
+        </div>
+        <div class="usage-stat-card">
+          <span class="usage-stat-number" x-text="getSessionEquivalent(getWeeklyRemainingPercent())"></span>
+          <span class="usage-stat-label">Sessions remaining</span>
+        </div>
+      </div>
+
+      <div class="usage-progress-wrap">
+        <div class="usage-progress-bar" role="progressbar" :aria-valuenow="getWeeklyProgressPercent()" aria-valuemin="0" aria-valuemax="100">
+          <div class="usage-progress-fill" :class="getUsageProgressClass()" :style="'width:' + getWeeklyProgressPercent() + '%'"></div>
+        </div>
+        <div class="usage-progress-labels">
+          <span x-text="getWeeklyProgressPercent().toFixed(1) + '% used'"></span>
+          <span x-text="getWeeklyRemainingPercent() + '% remaining'"></span>
+        </div>
+      </div>
+
+      <div class="usage-form-card">
+        <h3 class="usage-section-title">Log a session</h3>
+        <div class="usage-form">
+          <div class="usage-form-field">
+            <label class="usage-form-label" for="usage-percent">Usage %</label>
+            <div class="usage-percent-input-row">
+              <input id="usage-percent" type="range" min="1" max="100" step="5" class="usage-slider" x-model.number="claudeUsageNewPercent" aria-label="Session usage percent">
+              <input type="number" min="1" max="100" class="usage-number-input" x-model.number="claudeUsageNewPercent" aria-label="Percent value">
+            </div>
+          </div>
+          <div class="usage-form-field usage-form-field--grow">
+            <label class="usage-form-label" for="usage-note">Note <span class="usage-form-optional">(optional)</span></label>
+            <input id="usage-note" type="text" class="usage-text-input" placeholder="e.g. command centre work" x-model="claudeUsageNewNote" @keydown.enter="addClaudeSession()" aria-label="Session note">
+          </div>
+          <button class="btn btn-primary usage-add-btn" @click="addClaudeSession()" aria-label="Log session">Add</button>
+        </div>
+      </div>
+
+      <div class="usage-log-card">
+        <h3 class="usage-section-title">This week's sessions</h3>
+        <template x-if="getWeeklySessions().length === 0">
+          <p class="usage-empty">No sessions logged this week.</p>
+        </template>
+        <template x-if="getWeeklySessions().length > 0">
+          <table class="usage-session-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Usage</th>
+                <th>Equivalent</th>
+                <th>Note</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="session in getWeeklySessions()" :key="session.id">
+                <tr>
+                  <td x-text="formatClaudeSessionDate(session.date)" class="usage-cell-muted"></td>
+                  <td>
+                    <span class="usage-pct-badge" x-text="session.percent + '%'"></span>
+                  </td>
+                  <td x-text="getSessionEquivalent(session.percent) + ' sessions'" class="usage-cell-muted"></td>
+                  <td x-text="session.note || '—'" class="usage-cell-note"></td>
+                  <td>
+                    <button class="usage-delete-btn" @click="removeClaudeSession(session.id)" aria-label="Remove session">
+                      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                    </button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </template>
+      </div>

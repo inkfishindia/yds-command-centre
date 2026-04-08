@@ -48,6 +48,16 @@
             "command": "echo '## Session Context'; cat data/sessions/handoff.md 2>/dev/null || echo 'No previous session state found.'; echo '---'; echo '## Recent Git Activity'; git log --oneline -5 2>/dev/null || echo 'Not a git repo'; echo '---'; echo '## Recent Dev Activity'; tail -7 data/sessions/activity-log.md 2>/dev/null || echo 'No activity log yet.'"
           }
         ]
+      },
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/cross-project-session-start.mjs",
+            "timeout": 5000
+          }
+        ]
       }
     ],
     "Stop": [
@@ -56,7 +66,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "Before stopping: 1) Update data/sessions/handoff.md with: what was built/fixed, key decisions, current state of server/frontend, what to do next. Keep under 80 lines. 2) Append ONE summary row to data/sessions/activity-log.md. Format: | YYYY-MM-DD HH:MM | agent-name (e.g. backend-builder, frontend-builder, lead) | verb phrase (e.g. Added CRM endpoint, Fixed SSE streaming, Refactored dashboard service) | 1-line detail of what changed and why | next action or — |. NEVER write 'unknown' or 'file-write' — describe the actual work done this session. If multiple agents worked, write one row per agent. 3) If any architectural or product decisions were made, append to data/sessions/decisions.md with: | # | date | decision | rationale | active |.",
+            "prompt": "If data/sessions/ exists: update handoff.md (under 150 lines) with: 1) What Was Accomplished — what you built/changed this session, 2) Key Decisions — choices made and why, 3) What To Do Next — pending work, blockers, next steps. Append new rows to decisions.md if any decisions were made (don't overwrite). Skip if data/sessions/ does not exist.",
             "model": "claude-haiku-4-5-20251001"
           }
         ]

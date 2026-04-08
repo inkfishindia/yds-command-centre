@@ -1,0 +1,108 @@
+        <div class="chat-main">
+          <!-- Messages -->
+          <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Conversation">
+            <template x-if="messages.length === 0">
+              <div class="welcome">
+                <div class="welcome-avatar">C</div>
+                <h2>Colin Bryar</h2>
+                <p class="welcome-title">Chief of Staff</p>
+                <p class="welcome-desc">Your strategic layer. Ask me anything, or trigger a skill from the sidebar.</p>
+                <div class="welcome-quick-actions">
+                  <button class="welcome-action" @click="inputText = 'What should I focus on today?'; sendMessage()">
+                    What should I focus on today?
+                  </button>
+                  <button class="welcome-action" @click="inputText = 'Give me a status update'; sendMessage()">
+                    Give me a status update
+                  </button>
+                  <button class="welcome-action" @click="inputText = 'What decisions need my attention?'; sendMessage()">
+                    Decisions needing attention
+                  </button>
+                </div>
+              </div>
+            </template>
+            <template x-for="(msg, i) in messages" :key="i">
+              <div class="message" :class="'msg-' + msg.role">
+                <div class="msg-label" x-text="msg.role === 'user' ? 'Dan' : 'Colin'"></div>
+                <div class="msg-body" x-html="msg.role === 'assistant' ? renderMarkdown(msg.content) : escapeHtml(msg.content)"></div>
+              </div>
+            </template>
+            <div class="message msg-assistant" x-show="streaming" x-cloak>
+              <div class="msg-label">Colin</div>
+              <div class="msg-body" x-show="streamingText !== ''" x-html="renderMarkdown(streamingText)"></div>
+              <div class="typing-indicator" x-show="streamingText === ''">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+            <div class="reconnecting-banner" x-show="reconnecting" x-cloak role="status" aria-live="polite">
+              Reconnecting...
+            </div>
+            <template x-for="(a, i) in pendingApprovals" :key="a.approvalId">
+              <div class="approval-card">
+                <div class="approval-header">
+                  <span x-text="a.resolving ? 'Processing...' : (a.expired ? 'Approval Expired' : 'Approval Required')"></span>
+                  <span class="approval-timer" :class="approvalTimerClass(a)" x-text="approvalTimerLabel(a)" x-show="!a.resolving" aria-live="polite"></span>
+                </div>
+                <div class="approval-tool" x-text="formatToolName(a.toolName)"></div>
+                <pre class="approval-details" aria-label="Proposed action details" x-text="JSON.stringify(a.toolInput, null, 2)"></pre>
+                <div class="approval-error" x-show="a.error" x-text="a.error"></div>
+                <div class="approval-actions">
+                  <button class="btn btn-approve" @click="resolveApproval(a.approvalId, true)" :disabled="a.resolving || a.expired">Approve</button>
+                  <button class="btn btn-reject" @click="resolveApproval(a.approvalId, false)" :disabled="a.resolving || a.expired">Reject</button>
+                </div>
+              </div>
+            </template>
+            <template x-if="activeTools.length > 0">
+              <div class="tool-indicator">
+                <template x-for="t in activeTools" :key="t.tool">
+                  <span class="tool-badge" x-text="formatToolName(t.tool)"></span>
+                </template>
+              </div>
+            </template>
+          </div>
+          <div class="chat-input-area">
+            <textarea
+              class="chat-input"
+              x-model="inputText"
+              @keydown.enter.prevent="if (!$event.shiftKey) sendMessage()"
+              @input="autoResize($event)"
+              placeholder="Message Colin..."
+              aria-label="Message Colin"
+              :disabled="streaming"
+              rows="1"
+              x-ref="chatInput"
+            ></textarea>
+            <button class="btn btn-send" @click="sendMessage()" :disabled="streaming || !inputText.trim()">
+              Send
+            </button>
+          </div>
+        </div>
+        <div class="chat-sidebar">
+          <h3 class="sidebar-title">Skills</h3>
+          <template x-for="skill in skills" :key="skill.name">
+            <button
+              class="skill-btn"
+              @click="triggerSkill(skill)"
+              :disabled="streaming"
+            >
+              <span class="skill-icon" x-text="skill.icon"></span>
+              <div class="skill-info">
+                <span class="skill-label" x-text="'/' + skill.name"></span>
+                <span class="skill-desc" x-text="skill.description"></span>
+              </div>
+            </button>
+          </template>
+          <h3 class="sidebar-title sidebar-section-gap">Experts</h3>
+          <template x-for="expert in experts" :key="expert.name">
+            <button
+              class="skill-btn skill-expert"
+              @click="routeToExpert(expert)"
+              :disabled="streaming"
+            >
+              <span class="skill-icon" x-text="expert.icon"></span>
+              <div class="skill-info">
+                <span class="skill-label" x-text="expert.name"></span>
+                <span class="skill-desc" x-text="expert.domain"></span>
+              </div>
+            </button>
+          </template>
+        </div>

@@ -1,0 +1,166 @@
+        <div class="view-header-bar">
+          <div class="view-header-left">
+            <span class="view-header-emoji">✅</span>
+            <div class="view-header-text">
+              <h2 class="view-header-title">Commitments</h2>
+              <span class="view-header-subtitle" x-text="getFilteredCommitments().length + ' tasks'"></span>
+            </div>
+          </div>
+          <div class="view-header-actions">
+            <button class="filter-pill" :class="{'filter-pill-active': commitmentsView === 'kanban'}" @click="commitmentsView = 'kanban'">Kanban</button>
+            <button class="filter-pill" :class="{'filter-pill-active': commitmentsView === 'list'}" @click="commitmentsView = 'list'">List</button>
+            <button class="btn btn-small btn-primary" @click="showCreateCommitment = true">+ Commitment</button>
+            <button class="btn btn-small btn-icon" @click="loadCommitments()" :class="commitmentsLoading && 'btn-spinning'">
+              <span class="refresh-icon">&#x21bb;</span> Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="commitment-filters" x-show="!commitmentsLoading && commitments.length > 0">
+          <select class="notion-filter-select" x-model="commitmentFilters.focusArea" @change="resetCommitmentsLimit()" aria-label="Filter by focus area">
+            <option value="">All Focus Areas</option>
+            <template x-for="fa in getCommitmentFilterOptions().focusAreas" :key="fa">
+              <option :value="fa" x-text="fa"></option>
+            </template>
+          </select>
+          <select class="notion-filter-select" x-model="commitmentFilters.person" @change="resetCommitmentsLimit()" aria-label="Filter by person">
+            <option value="">All People</option>
+            <template x-for="p in getCommitmentFilterOptions().people" :key="p">
+              <option :value="p" x-text="p"></option>
+            </template>
+          </select>
+          <select class="notion-filter-select" x-model="commitmentFilters.priority" @change="resetCommitmentsLimit()" aria-label="Filter by priority">
+            <option value="">All Priorities</option>
+            <template x-for="pr in getCommitmentFilterOptions().priorities" :key="pr">
+              <option :value="pr" x-text="pr"></option>
+            </template>
+          </select>
+          <select class="notion-filter-select" x-model="commitmentFilters.status" @change="resetCommitmentsLimit()" aria-label="Filter by status">
+            <option value="">All Statuses</option>
+            <option value="Not Started">Not Started</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Blocked">Blocked</option>
+            <option value="Done">Done</option>
+          </select>
+          <button class="btn btn-small" @click="commitmentFilters = { focusArea: '', person: '', priority: '', status: '' }; resetCommitmentsLimit()">Clear</button>
+        </div>
+
+        <template x-if="commitmentsLoading">
+          <div class="kanban-board">
+            <div class="kanban-column"><div class="loading-skeleton skeleton-card"></div></div>
+            <div class="kanban-column"><div class="loading-skeleton skeleton-card"></div></div>
+            <div class="kanban-column"><div class="loading-skeleton skeleton-card"></div></div>
+            <div class="kanban-column"><div class="loading-skeleton skeleton-card"></div></div>
+          </div>
+        </template>
+
+        <template x-if="!commitmentsLoading && commitments.length === 0">
+          <div class="empty-state">
+            <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            <span class="empty-state-title">No commitments found</span>
+            <span class="empty-state-subtitle">Try refreshing or adjusting filters</span>
+          </div>
+        </template>
+
+        <template x-if="!commitmentsLoading && commitments.length > 0 && commitmentsView === 'kanban'">
+          <div class="kanban-board">
+            <template x-for="col in ['Not Started', 'In Progress', 'Blocked', 'Done']" :key="col">
+              <div class="kanban-column">
+                <div class="kanban-column-header">
+                  <span x-text="col"></span>
+                  <span class="kanban-count" x-text="getCommitmentsByStatus(col).length"></span>
+                </div>
+                <template x-for="c in getCommitmentsByStatus(col)" :key="c.id">
+                  <div class="kanban-card" :class="{'kanban-overdue': isCommitmentOverdue(c)}"
+                       :data-priority="(c.Priority || 'unset').toLowerCase()"
+                       @click="openDetailPanel(c.id, c.Name)">
+                    <div class="kanban-card-name" x-text="c.Name || 'Untitled'"></div>
+                    <div class="kanban-card-meta">
+                      <template x-if="c.assignedNames && c.assignedNames.length">
+                        <div style="display:flex;gap:4px;align-items:center;" @click.stop="openPersonPicker(c.id, $event)" style="cursor:pointer;">
+                          <template x-for="name in c.assignedNames.slice(0, 2)" :key="name">
+                            <span class="avatar avatar-sm" :style="`background:${getAvatar(name).color}`" x-text="getAvatar(name).initials" :title="name"></span>
+                          </template>
+                          <span class="editable-badge editable-person" x-text="c.assignedNames.join(', ')"></span>
+                        </div>
+                      </template>
+                      <span x-show="!c.assignedNames || !c.assignedNames.length" class="editable-badge editable-person" @click.stop="openPersonPicker(c.id, $event)">Unassigned</span>
+                    </div>
+                    <div class="kanban-card-footer">
+                      <span class="status-badge small editable-badge" :class="priorityClass(c.Priority)" x-text="c.Priority || 'Unset'" x-show="c.Priority"
+                            @click.stop="openEditDropdown(c.id, 'Priority', $event)"></span>
+                      <span class="status-badge small neutral" x-show="c.Type && c.Type !== 'Unset'" x-text="c.Type"></span>
+                      <span class="kanban-due editable-badge" :class="{'kanban-overdue-text': isCommitmentOverdue(c)}"
+                            x-show="c['Due Date']"
+                            x-text="formatDate(c['Due Date'])"
+                            @click.stop="openDatePicker(c.id, $event)"></span>
+                    </div>
+                    <div class="inline-error"
+                         x-show="writeErrors[c.id + 'Status'] || writeErrors[c.id + 'Priority'] || writeErrors[c.id + 'dueDate'] || writeErrors[c.id + 'assignee']"
+                         x-text="writeErrors[c.id + 'Status'] || writeErrors[c.id + 'Priority'] || writeErrors[c.id + 'dueDate'] || writeErrors[c.id + 'assignee']"></div>
+                  </div>
+                </template>
+                <template x-if="getCommitmentsByStatus(col).length === 0">
+                  <div class="kanban-empty">No items</div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <template x-if="!commitmentsLoading && commitments.length > 0 && commitmentsView === 'list'">
+          <div>
+            <div class="commitments-pagination-info" x-show="getFilteredCommitmentsTotal() > 0">
+              Showing <span x-text="Math.min(commitmentsDisplayLimit, getFilteredCommitmentsTotal())"></span> of <span x-text="getFilteredCommitmentsTotal()"></span> commitments
+            </div>
+            <div class="commitments-mobile-list">
+              <template x-for="c in getFilteredCommitments()" :key="'mobile-' + c.id">
+                <button class="commitment-mobile-card" @click="openDetailPanel(c.id, c.Name)">
+                  <div class="commitment-mobile-top">
+                    <span class="commitment-mobile-name" x-text="c.Name || 'Untitled'"></span>
+                    <span class="status-badge small" :class="statusClass(c.Status)" x-text="c.Status || '—'"></span>
+                  </div>
+                  <div class="commitment-mobile-meta">
+                    <span x-text="c.assignedNames && c.assignedNames.length ? c.assignedNames.join(', ') : 'Unassigned'"></span>
+                    <span x-text="formatDate(c['Due Date'])"></span>
+                  </div>
+                  <div class="commitment-mobile-footer">
+                    <span class="status-badge small" :class="priorityClass(c.Priority)" x-text="c.Priority || 'Unset'"></span>
+                    <span class="commitment-mobile-due" :class="{'kanban-overdue-text': isCommitmentOverdue(c)}" x-text="isCommitmentOverdue(c) ? formatRelativeDate(c['Due Date']) : formatDate(c['Due Date'])"></span>
+                  </div>
+                </button>
+              </template>
+            </div>
+
+            <div class="table-wrap commitments-table-wrap">
+            <table class="data-table dash-table">
+              <thead>
+                <tr><th>Task</th><th>Owner</th><th>Status</th><th>Priority</th><th>Due</th></tr>
+              </thead>
+              <tbody>
+                <template x-for="c in getFilteredCommitments()" :key="c.id">
+                  <tr @click="openDetailPanel(c.id, c.Name)" :class="{'kanban-overdue-row': isCommitmentOverdue(c)}">
+                    <td><span class="table-link" x-text="c.Name || 'Untitled'"></span></td>
+                    <td><span class="editable-badge editable-person"
+                              x-text="c.assignedNames && c.assignedNames.length ? c.assignedNames.join(', ') : '—'"
+                              @click.stop="openPersonPicker(c.id, $event)"></span></td>
+                    <td><span class="status-badge small editable-badge" :class="statusClass(c.Status)" x-text="c.Status || '—'"
+                              @click.stop="openEditDropdown(c.id, 'Status', $event)"></span></td>
+                    <td><span class="status-badge small editable-badge" :class="priorityClass(c.Priority)" x-text="c.Priority || 'Unset'"
+                              @click.stop="openEditDropdown(c.id, 'Priority', $event)"></span></td>
+                    <td :class="{'kanban-overdue-text': isCommitmentOverdue(c)}"><span class="editable-badge"
+                              x-text="formatDate(c['Due Date'])"
+                              @click.stop="openDatePicker(c.id, $event)"></span></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+            </div>
+            <div class="commitments-load-more" x-show="commitmentsDisplayLimit < getFilteredCommitmentsTotal()">
+              <button class="btn btn-small" @click="loadMoreCommitments()">
+                Load more
+                <span x-text="'(' + Math.min(30, getFilteredCommitmentsTotal() - commitmentsDisplayLimit) + ' more)'"></span>
+              </button>
+            </div>
+          </div>
+        </template>

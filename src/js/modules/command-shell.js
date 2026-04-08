@@ -71,15 +71,20 @@ export function createCommandShellModule() {
 
     async openNavigationTarget(action) {
       // Load HTML partial for views that have been extracted to separate files
-      const partialViews = ['marketingOps', 'factory', 'ops', 'dashboard', 'bmc', 'techTeam'];
+      const partialViews = ['chat', 'overview', 'dashboard', 'actionQueue', 'focusArea', 'team', 'personView', 'docs', 'notion', 'knowledge', 'decisions', 'projects', 'registry', 'commitments', 'factory', 'marketingOps', 'techTeam', 'bmc', 'crm', 'ops', 'claude-usage'];
+      this.view = action;
+      this.tableSelectedRow = -1;
+      if (partialViews.includes(action)) {
+        await this.$nextTick();
+      }
+      // Ensure lazy module is initialized before Alpine binds injected partial DOM.
+      await this._ensureModule(action);
+      if (action === 'marketingOps') {
+        await this._ensureModule('competitor-intel');
+      }
       if (partialViews.includes(action)) {
         await this._loadPartial(action);
       }
-      // Ensure lazy module is initialized before setting the view so Alpine
-      // can bind to the module's state and methods without errors.
-      this._ensureModule(action);
-      this.view = action;
-      this.tableSelectedRow = -1;
       if (action === 'dashboard') {
         this.loadDashboard();
         this.startDashboardAutoRefresh?.();
@@ -95,11 +100,12 @@ export function createCommandShellModule() {
       else if (action === 'notion') this.loadNotion();
       else if (action === 'bmc') this.loadBmc();
       else if (action === 'crm') this.loadCrm();
-      else if (action === 'marketingOps') { this._ensureModule('competitor-intel'); this.loadMarketingOps(); }
+      else if (action === 'marketingOps') this.loadMarketingOps();
       else if (action === 'techTeam') this.loadTechTeam();
       else if (action === 'actionQueue') this.loadActionQueue();
       else if (action === 'factory' && !this.factoryConfig) this.loadFactoryConfig();
       else if (action === 'ops') this.loadOps();
+      else if (action === 'claude-usage') this.loadClaudeUsage();
     },
 
     openCmdPalette() {
@@ -338,7 +344,7 @@ export function createCommandShellModule() {
     },
 
     // Execute a result item — handles both new action-based items and legacy ref-based items
-    cmdExecuteResult(result) {
+    async cmdExecuteResult(result) {
       if (!result) return;
 
       // Track in recents (strip non-serialisable action function)
@@ -351,38 +357,38 @@ export function createCommandShellModule() {
 
       // Execute
       if (result.action) {
-        result.action();
+        await result.action();
       } else if (result.view) {
-        this.openNavigationTarget(result.view);
+        await this.openNavigationTarget(result.view);
       }
 
       this.closeCmdPalette();
     },
 
     // Legacy execute by index (keeps backward compat with getCmdResults)
-    cmdExecute(index) {
+    async cmdExecute(index) {
       const results = this.getCmdResults();
       const item = results[typeof index === 'number' ? index : this.cmdSelectedIndex];
       if (!item) {
         // If palette 2.0 is active, fall through to cmdResults
         const r2 = this.cmdResults[this.cmdSelectedIndex];
-        if (r2) this.cmdExecuteResult(r2);
+        if (r2) await this.cmdExecuteResult(r2);
         return;
       }
 
       if (item.action && typeof item.action === 'function') {
-        this.cmdExecuteResult(item);
+        await this.cmdExecuteResult(item);
         return;
       }
 
       if (item.action) {
-        this.openNavigationTarget(item.action);
+        await this.openNavigationTarget(item.action);
       } else if (item.dbRef) {
-        this._ensureModule('notion');
+        await this._ensureModule('notion');
         this.view = 'notion';
         this.openNotionDb(item.dbRef);
       } else if (item.pageRef) {
-        this._ensureModule('notion');
+        await this._ensureModule('notion');
         this.view = 'notion';
         this.openNotionPage(item.pageRef.id, item.pageRef.name);
       } else if (item.skillRef) {

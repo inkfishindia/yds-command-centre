@@ -1,0 +1,85 @@
+        <div class="view-header-bar">
+          <div class="view-header-left">
+            <span class="view-header-emoji">📚</span>
+            <div class="view-header-text">
+              <h2 class="view-header-title">Knowledge Base</h2>
+              <span class="view-header-subtitle" x-text="notebooks && notebooks.available ? getTotalFilteredNotebooks() + ' notebooks · ' + notebooks.stats.totalSources + ' sources' : 'Notebooks and reference material'"></span>
+            </div>
+          </div>
+          <div class="view-header-actions"></div>
+        </div>
+        <template x-if="notebooks && notebooks.stats">
+          <div class="kb-stats">
+            <div class="reg-stat">
+              <div class="reg-stat-number" x-text="notebooks.stats.totalNotebooks"></div>
+              <div class="reg-stat-label">Notebooks</div>
+            </div>
+            <div class="reg-stat">
+              <div class="reg-stat-number" x-text="notebooks.stats.totalSources"></div>
+              <div class="reg-stat-label">Sources</div>
+            </div>
+            <div class="reg-stat">
+              <div class="reg-stat-number" x-text="notebooks.stats.categories"></div>
+              <div class="reg-stat-label">Categories</div>
+            </div>
+            <div class="reg-stat">
+              <div class="reg-stat-number" x-text="notebooks.stats.shared"></div>
+              <div class="reg-stat-label">Shared</div>
+            </div>
+          </div>
+        </template>
+        <div class="kb-filters">
+          <input type="text" class="decision-search" placeholder="Search notebooks..." x-model="notebooksSearch">
+          <select class="decision-filter-select" x-model="notebooksCategory">
+            <option value="">All Categories</option>
+            <template x-if="notebooks && notebooks.categories">
+              <template x-for="c in notebooks.categories" :key="c.name">
+                <option :value="c.name" x-text="c.name + ' (' + c.notebooks.length + ')'"></option>
+              </template>
+            </template>
+          </select>
+          <span class="notion-result-count" x-show="notebooks && notebooks.lastUpdated" x-text="'Updated: ' + (notebooks?.lastUpdated || '')"></span>
+        </div>
+        <template x-if="notebooksLoading">
+          <div class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+        </template>
+        <template x-if="!notebooksLoading && notebooks && !notebooks.available">
+          <div class="empty-state">Notebook registry file not found. Ask the team to update the registry.</div>
+        </template>
+        <template x-if="!notebooksLoading && notebooks && notebooks.available">
+          <div>
+            <template x-if="getFilteredNotebooks().length === 0">
+              <div class="empty-state">No notebooks match the current filters.</div>
+            </template>
+            <template x-for="cat in getFilteredNotebooks()" :key="cat.name">
+              <div class="kb-category">
+                <div class="kb-category-header">
+                  <span x-text="cat.name"></span>
+                  <span class="kb-category-count" x-text="cat.notebooks.length + ' notebooks'"></span>
+                </div>
+                <div class="kb-grid">
+                  <template x-for="nb in cat.notebooks" :key="nb.id">
+                    <div class="kb-card" @click="notebooksExpanded = notebooksExpanded === nb.id ? null : nb.id">
+                      <div class="kb-card-header">
+                        <span class="kb-card-name" x-text="nb.name"></span>
+                        <span class="kb-source-badge" x-text="nb.sourceCount + ' src'"></span>
+                      </div>
+                      <span class="kb-shared-tag" x-show="nb.shared">Shared</span>
+                      <div class="kb-card-desc" :class="notebooksExpanded === nb.id && 'kb-card-desc-full'" x-text="nb.description"></div>
+                      <div class="kb-card-details" x-show="notebooksExpanded === nb.id" x-transition.duration.150ms>
+                        <code class="kb-card-id" x-text="nb.id"></code>
+                        <a class="reg-link" :href="'https://notebooklm.google.com/notebook/' + nb.id" target="_blank" rel="noopener" @click.stop>
+                          Open in NotebookLM
+                        </a>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>

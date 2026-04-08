@@ -1,0 +1,174 @@
+        <div class="view-header-bar">
+          <div class="view-header-left">
+            <span class="view-header-emoji">⚡</span>
+            <div class="view-header-text">
+              <h2 class="view-header-title">Action Queue</h2>
+              <span class="view-header-subtitle" x-text="actionQueue ? (actionQueue.dansQueueCount + actionQueue.runnersQueueCount) + ' items need attention' : 'Items needing attention'"></span>
+            </div>
+          </div>
+          <div class="view-header-actions queue-header-actions">
+            <div class="queue-tabs" x-show="window.innerWidth <= 768">
+              <button class="queue-tab" :class="queueTab === 'dan' && 'queue-tab-active'" @click="queueTab = 'dan'">
+                Dan
+                <span class="queue-tab-badge" x-show="actionQueue?.dansQueueCount > 0" x-text="actionQueue?.dansQueueCount"></span>
+              </button>
+              <button class="queue-tab" :class="queueTab === 'runner' && 'queue-tab-active'" @click="queueTab = 'runner'">
+                Runner
+                <span class="queue-tab-badge" x-show="actionQueue?.runnersQueueCount > 0" x-text="actionQueue?.runnersQueueCount"></span>
+              </button>
+            </div>
+            <button class="btn btn-small btn-icon" @click="loadActionQueue()" :class="actionQueueLoading && 'btn-spinning'" title="Refresh">
+              <span class="refresh-icon">&#x21bb;</span> Refresh
+            </button>
+          </div>
+        </div>
+
+        <template x-if="actionQueueLoading && !actionQueue">
+          <div class="queue-panels">
+            <div class="queue-panel">
+              <div class="queue-panel-header"><span class="queue-panel-title">Dan's Queue</span></div>
+              <div class="queue-panel-body">
+                <div class="loading-skeleton skeleton-card queue-skeleton-item"></div>
+                <div class="loading-skeleton skeleton-card queue-skeleton-item"></div>
+                <div class="loading-skeleton skeleton-card queue-skeleton-item"></div>
+              </div>
+            </div>
+            <div class="queue-panel">
+              <div class="queue-panel-header"><span class="queue-panel-title">Runner's Queue</span></div>
+              <div class="queue-panel-body">
+                <div class="loading-skeleton skeleton-card queue-skeleton-item"></div>
+                <div class="loading-skeleton skeleton-card queue-skeleton-item"></div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="actionQueue">
+          <div class="queue-panels">
+            <div class="queue-panel" x-show="queueTab === 'dan' || window.innerWidth > 768">
+              <div class="queue-panel-header">
+                <span class="queue-panel-title">Dan's Queue</span>
+                <span class="queue-panel-count" x-text="(actionQueue.dansQueueCount || 0) + ' items'"></span>
+              </div>
+              <div class="queue-panel-body">
+                <template x-if="!actionQueue.dansQueue || actionQueue.dansQueue.length === 0">
+                  <div class="empty-state">
+                    <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="empty-state-title">Queue clear</span>
+                    <span class="empty-state-subtitle">No items need your attention right now</span>
+                  </div>
+                </template>
+                <template x-for="item in (actionQueue.dansQueue || [])" :key="item.id">
+                  <div class="queue-item">
+                    <div class="queue-item-top">
+                      <span class="queue-item-name" @click="openDetailPanel(item.id, item.name)" style="cursor:pointer;" x-text="item.name || 'Untitled'"></span>
+                      <div class="queue-item-badges">
+                        <span class="status-badge small" x-show="item.status" :class="statusClass(item.status)" x-text="item.status"></span>
+                        <span class="status-badge small" x-show="item.priority" :class="priorityClass(item.priority)" x-text="item.priority"></span>
+                      </div>
+                    </div>
+                    <div class="queue-item-meta">
+                      <div class="table-inline-actions" x-show="item.focusAreaNames && item.focusAreaNames.length">
+                        <template x-for="name in (item.focusAreaNames || [])" :key="item.id + '-fa-' + name">
+                          <button type="button" class="mini-action-btn" @click.stop="openFocusAreaByName(name)" x-text="'FA: ' + name"></button>
+                        </template>
+                      </div>
+                      <span class="queue-item-due" :class="item.isOverdue ? 'overdue' : ''" x-show="item.dueDate" x-text="'Due: ' + formatDate(item.dueDate)"></span>
+                      <template x-if="item.assignedNames && item.assignedNames.length > 0">
+                        <div style="display:flex;gap:4px;align-items:center;">
+                          <template x-for="name in item.assignedNames.slice(0, 2)" :key="name">
+                            <span class="avatar avatar-sm" :style="`background:${getAvatar(name).color}`" x-text="getAvatar(name).initials" :title="name"></span>
+                          </template>
+                        </div>
+                      </template>
+                      <span class="queue-item-overdue-chip" x-show="item.isOverdue" x-text="item.daysOverdue + 'd overdue'"></span>
+                    </div>
+                    <template x-if="item.notes">
+                      <div class="queue-item-notes" x-text="item.notes"></div>
+                    </template>
+                    <div class="queue-item-actions">
+                      <button class="queue-action-btn done" @click="quickMarkDone(item)" title="Mark Done">Done</button>
+                      <button class="queue-action-btn snooze" @click="showSnoozeFor = (showSnoozeFor === item.id ? null : item.id); showReassignFor = null" title="Snooze">Snooze</button>
+                      <button class="queue-action-btn" @click="showReassignFor = (showReassignFor === item.id ? null : item.id); showSnoozeFor = null" title="Reassign">Reassign</button>
+                      <button class="btn-icon context-menu-trigger" @click.stop="openContextMenu($event, getCommitmentActions(item), item)" title="More actions" aria-label="More actions">&#8942;</button>
+                    </div>
+                    <div class="snooze-picker" x-show="showSnoozeFor === item.id" @click.stop>
+                      <button class="snooze-preset" @click="quickSnooze(item.id, getSnoozeDate('tomorrow'))">Tomorrow</button>
+                      <button class="snooze-preset" @click="quickSnooze(item.id, getSnoozeDate('+3'))">+3 days</button>
+                      <button class="snooze-preset" @click="quickSnooze(item.id, getSnoozeDate('+7'))">+7 days</button>
+                      <input type="date" class="snooze-date-input" @change="quickSnooze(item.id, $event.target.value)" title="Pick a date">
+                    </div>
+                    <div class="reassign-picker" x-show="showReassignFor === item.id" @click.stop>
+                      <template x-for="p in (dashboard?.people || [])" :key="p.id">
+                        <button class="reassign-person" @click="quickReassign(item.id, p.id, p.Name)" x-text="p.Name || 'Unknown'"></button>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="queue-panel" x-show="queueTab === 'runner' || window.innerWidth > 768">
+              <div class="queue-panel-header">
+                <span class="queue-panel-title">Runner's Queue</span>
+                <span class="queue-panel-count" x-text="(actionQueue.runnersQueueCount || 0) + ' items'"></span>
+              </div>
+              <div class="queue-panel-body">
+                <template x-if="!actionQueue.runnersQueue || actionQueue.runnersQueue.length === 0">
+                  <div class="empty-state">
+                    <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span class="empty-state-title">Team queue clear</span>
+                    <span class="empty-state-subtitle">All team tasks are accounted for</span>
+                  </div>
+                </template>
+                <template x-for="item in (actionQueue.runnersQueue || [])" :key="item.id">
+                  <div class="queue-item">
+                    <div class="queue-item-top">
+                      <span class="queue-item-name" @click="openDetailPanel(item.id, item.name)" style="cursor:pointer;" x-text="item.name || 'Untitled'"></span>
+                      <div class="queue-item-badges">
+                        <span class="status-badge small" x-show="item.status" :class="statusClass(item.status)" x-text="item.status"></span>
+                        <span class="status-badge small" x-show="item.priority" :class="priorityClass(item.priority)" x-text="item.priority"></span>
+                      </div>
+                    </div>
+                    <div class="queue-item-meta">
+                      <div class="table-inline-actions" x-show="item.focusAreaNames && item.focusAreaNames.length">
+                        <template x-for="name in (item.focusAreaNames || [])" :key="item.id + '-fa-' + name">
+                          <button type="button" class="mini-action-btn" @click.stop="openFocusAreaByName(name)" x-text="'FA: ' + name"></button>
+                        </template>
+                      </div>
+                      <span class="queue-item-due" :class="item.isOverdue ? 'overdue' : ''" x-show="item.dueDate" x-text="'Due: ' + formatDate(item.dueDate)"></span>
+                      <template x-if="item.assignedNames && item.assignedNames.length > 0">
+                        <div style="display:flex;gap:4px;align-items:center;">
+                          <template x-for="name in item.assignedNames.slice(0, 2)" :key="name">
+                            <span class="avatar avatar-sm" :style="`background:${getAvatar(name).color}`" x-text="getAvatar(name).initials" :title="name"></span>
+                          </template>
+                        </div>
+                      </template>
+                      <span class="queue-item-overdue-chip" x-show="item.isOverdue" x-text="item.daysOverdue + 'd overdue'"></span>
+                    </div>
+                    <template x-if="item.notes">
+                      <div class="queue-item-notes" x-text="item.notes"></div>
+                    </template>
+                    <div class="queue-item-actions">
+                      <button class="queue-action-btn done" @click="quickMarkDone(item)" title="Mark Done">Done</button>
+                      <button class="queue-action-btn snooze" @click="showSnoozeFor = (showSnoozeFor === item.id ? null : item.id); showReassignFor = null" title="Snooze">Snooze</button>
+                      <button class="queue-action-btn" @click="showReassignFor = (showReassignFor === item.id ? null : item.id); showSnoozeFor = null" title="Reassign">Reassign</button>
+                      <button class="btn-icon context-menu-trigger" @click.stop="openContextMenu($event, getCommitmentActions(item), item)" title="More actions" aria-label="More actions">&#8942;</button>
+                    </div>
+                    <div class="snooze-picker" x-show="showSnoozeFor === item.id" @click.stop>
+                      <button class="snooze-preset" @click="quickSnooze(item.id, getSnoozeDate('tomorrow'))">Tomorrow</button>
+                      <button class="snooze-preset" @click="quickSnooze(item.id, getSnoozeDate('+3'))">+3 days</button>
+                      <button class="snooze-preset" @click="quickSnooze(item.id, getSnoozeDate('+7'))">+7 days</button>
+                      <input type="date" class="snooze-date-input" @change="quickSnooze(item.id, $event.target.value)" title="Pick a date">
+                    </div>
+                    <div class="reassign-picker" x-show="showReassignFor === item.id" @click.stop>
+                      <template x-for="p in (dashboard?.people || [])" :key="p.id">
+                        <button class="reassign-person" @click="quickReassign(item.id, p.id, p.Name)" x-text="p.Name || 'Unknown'"></button>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>

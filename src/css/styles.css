@@ -13528,3 +13528,264 @@ textarea:focus-visible {
   outline-offset: 1px;
   border-color: var(--accent);
 }
+
+/* ── Claude Usage Tracker ─────────────────────────────────────── */
+.usage-view {
+  padding: 24px;
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.view-header-svg {
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.usage-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.usage-stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.usage-stat-number {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.usage-stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.usage-stat-sub {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.usage-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.usage-progress-bar {
+  background: var(--bg-hover);
+  border-radius: 100px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.usage-progress-fill {
+  height: 100%;
+  border-radius: 100px;
+  transition: width var(--transition-normal), background var(--transition-normal);
+}
+
+.usage-progress-fill--ok { background: var(--green); }
+.usage-progress-fill--warning { background: var(--amber); }
+.usage-progress-fill--danger { background: var(--red); }
+
+.usage-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.usage-form-card,
+.usage-log-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.usage-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.usage-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.usage-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.usage-form-field--grow {
+  flex: 1;
+  min-width: 160px;
+}
+
+.usage-form-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.usage-form-optional {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.usage-percent-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.usage-slider {
+  width: 120px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.usage-number-input {
+  width: 60px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 5px 8px;
+  text-align: center;
+}
+
+.usage-number-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.usage-text-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 7px 10px;
+  width: 100%;
+}
+
+.usage-text-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.usage-add-btn {
+  align-self: flex-end;
+  white-space: nowrap;
+}
+
+.usage-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.usage-session-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.usage-session-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.usage-session-table td {
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: middle;
+}
+
+.usage-session-table tr:last-child td {
+  border-bottom: none;
+}
+
+.usage-cell-muted {
+  color: var(--text-secondary);
+}
+
+.usage-cell-note {
+  color: var(--text-secondary);
+  font-style: italic;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usage-pct-badge {
+  background: var(--accent-dim);
+  color: var(--accent-light);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.usage-delete-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 4px;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.usage-delete-btn:hover {
+  color: var(--red);
+  background: var(--red-a08);
+}
+
+.usage-delete-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (max-width: 640px) {
+  .usage-stats-row { grid-template-columns: repeat(2, 1fr); }
+  .usage-form { flex-direction: column; align-items: stretch; }
+  .usage-add-btn { width: 100%; }
+}

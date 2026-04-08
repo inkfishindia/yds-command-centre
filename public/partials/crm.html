@@ -1,0 +1,602 @@
+      <div class="view-header-bar">
+        <div class="view-header-left">
+          <div class="view-header-text">
+            <h2 class="view-header-title">CRM</h2>
+            <span class="view-header-subtitle">Pipeline &amp; Leads</span>
+          </div>
+        </div>
+        <div class="view-header-actions">
+          <button class="btn btn-small btn-icon" @click="loadCrm()" :disabled="crmLoading" aria-label="Refresh CRM">
+            <span class="refresh-icon">&#x21bb;</span>
+            <span x-text="crmLoading ? 'Loading...' : 'Refresh'"></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="mktops-tabs" style="margin-bottom: 1.25rem;">
+        <button class="filter-pill" :class="crmSection === 'overview' && 'filter-pill-active'" @click="crmSwitchSection('overview')" aria-label="View Overview">Overview</button>
+        <button class="filter-pill" :class="crmSection === 'leads' && 'filter-pill-active'" @click="crmSwitchSection('leads')" aria-label="View Leads">
+          Leads
+          <span x-show="crm && crm.leadStats" class="crm-tab-count" x-text="crm && crm.leadStats ? crm.leadStats.total : ''"></span>
+        </button>
+        <button class="filter-pill" :class="crmSection === 'flows' && 'filter-pill-active'" @click="crmSwitchSection('flows')" aria-label="View Flows">
+          Flows
+          <span x-show="crm && crm.flowStats" class="crm-tab-count" x-text="crm && crm.flowStats ? crm.flowStats.total : ''"></span>
+        </button>
+        <button class="filter-pill" :class="crmSection === 'team' && 'filter-pill-active'" @click="crmSwitchSection('team')" aria-label="View Team">Team</button>
+        <button class="filter-pill" :class="crmSection === 'config' && 'filter-pill-active'" @click="crmSwitchSection('config')" aria-label="View Config">Config</button>
+      </div>
+
+      <div x-show="crmLoading && !crm" class="skeleton-stack" style="padding: 1rem 0;">
+        <div class="loading-skeleton skeleton-text-line"></div>
+        <div class="loading-skeleton skeleton-card"></div>
+        <div class="loading-skeleton skeleton-card"></div>
+      </div>
+
+      <template x-if="crmSection === 'overview'">
+        <div>
+          <div x-show="crmLoading && !crm" class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+          <template x-if="crm && !crmLoading">
+            <div>
+              <div class="mktops-overview-shell" style="margin-bottom:1.5rem;">
+                <section class="mktops-hero" :class="'mktops-hero--' + getCrmAreaStatus().tone">
+                  <div class="mktops-hero-copy">
+                    <div class="mktops-hero-kicker">Area Dashboard</div>
+                    <h3 class="mktops-hero-title">CRM operating system</h3>
+                    <p class="mktops-hero-text">See pipeline health, stalled flows, owner workload, and the highest-priority leads before dropping into the full lead and flow tables.</p>
+                  </div>
+                  <div class="mktops-hero-status">
+                    <span class="mktops-hero-status-label">Status</span>
+                    <span class="mktops-hero-status-value" x-text="getCrmAreaStatus().label"></span>
+                    <button class="overview-link-btn" @click="crmSwitchSection('flows')">Open Flows</button>
+                  </div>
+                </section>
+
+                <div class="mktops-area-metrics">
+                  <template x-for="metric in getCrmHeroMetrics()" :key="metric.id">
+                    <button class="mktops-area-metric-card area-card-button" @click="getCrmMetricAction(metric.id)()">
+                      <span class="mktops-area-metric-label" x-text="metric.label"></span>
+                      <div class="mktops-area-metric-value" x-text="metric.value"></div>
+                      <span class="mktops-area-metric-note" x-text="metric.note"></span>
+                    </button>
+                  </template>
+                </div>
+
+                <section class="org-col-panel">
+                  <div class="org-section-title-row">
+                    <h3 class="org-section-title">Saved Views</h3>
+                    <span class="org-section-badge" x-text="getCrmSavedViewItems().length"></span>
+                  </div>
+                  <div class="saved-view-pills">
+                    <template x-for="view in getCrmSavedViews()" :key="view.id">
+                      <button class="filter-pill" :class="crmSavedView === view.id && 'filter-pill-active'" @click="crmApplySavedView(view.id)" x-text="view.label"></button>
+                    </template>
+                  </div>
+                  <div class="overview-feed">
+                    <template x-for="item in getCrmSavedViewItems()" :key="item.title + item.detail">
+                      <button class="overview-feed-item overview-feed-item--warning" @click="item.action()">
+                        <span class="overview-feed-type" x-text="crmSavedView"></span>
+                        <div class="overview-feed-main">
+                          <span class="overview-feed-title" x-text="item.title"></span>
+                          <span class="overview-feed-detail" x-text="item.detail"></span>
+                        </div>
+                      </button>
+                    </template>
+                    <div class="empty-state compact-empty-state" x-show="getCrmSavedViewItems().length === 0">
+                      <p x-text="getCrmSavedViewEmptyState()"></p>
+                    </div>
+                  </div>
+                </section>
+
+                <div class="mktops-overview-grid">
+                  <template x-for="card in getCrmPriorityCards()" :key="card.id">
+                    <section class="mktops-priority-card" :class="'mktops-priority-card--' + card.tone">
+                      <div class="mktops-priority-head">
+                        <div>
+                          <h3 class="mktops-priority-title" x-text="card.title"></h3>
+                          <p class="mktops-priority-copy" x-text="card.label"></p>
+                        </div>
+                        <span class="mktops-priority-value" x-text="card.value"></span>
+                      </div>
+                      <div class="mktops-priority-list">
+                        <template x-for="item in card.items" :key="item.name + item.meta">
+                          <div class="mktops-priority-item">
+                            <span class="mktops-priority-item-name" x-text="item.name"></span>
+                            <span class="mktops-priority-item-meta" x-text="item.meta"></span>
+                          </div>
+                        </template>
+                      </div>
+                    </section>
+                  </template>
+                </div>
+
+                <div class="org-two-col">
+                  <section class="org-col-panel">
+                    <div class="org-section-title-row">
+                      <h3 class="org-section-title">Top Focus</h3>
+                      <span class="org-section-badge" x-text="getCrmFocusList().length"></span>
+                    </div>
+                    <div class="overview-feed">
+                      <template x-for="item in getCrmFocusList()" :key="item.title">
+                        <button class="overview-feed-item overview-feed-item--warning" @click="crmSwitchSection(item.target)">
+                          <span class="overview-feed-type">focus</span>
+                          <div class="overview-feed-main">
+                            <span class="overview-feed-title" x-text="item.title"></span>
+                            <span class="overview-feed-detail" x-text="item.detail"></span>
+                          </div>
+                        </button>
+                      </template>
+                    </div>
+                  </section>
+
+                  <section class="org-col-panel">
+                    <div class="org-section-title-row">
+                      <h3 class="org-section-title">Next Actions</h3>
+                    </div>
+                    <div class="overview-links">
+                      <button class="overview-link-card" @click="crmSwitchSection('leads')">
+                        <span class="overview-link-card-label">Review newest leads</span>
+                        <span class="overview-link-card-copy">Make sure the latest inbound leads are being qualified quickly.</span>
+                      </button>
+                      <button class="overview-link-card" @click="crmSwitchSection('flows')">
+                        <span class="overview-link-card-label">Unblock stalled flows</span>
+                        <span class="overview-link-card-copy">Clear stalled opportunities and rebalance owner workload.</span>
+                      </button>
+                      <button class="overview-link-card" @click="crmSwitchSection('team')">
+                        <span class="overview-link-card-label">Check team coverage</span>
+                        <span class="overview-link-card-copy">See who owns the pipeline and whether load looks uneven.</span>
+                      </button>
+                    </div>
+                  </section>
+                </div>
+              </div>
+
+              <div class="data-card-grid" style="margin-bottom: 1.5rem;">
+                <button class="data-card accent data-card-button" @click="crmApplySavedView('newest-leads')">
+                  <span class="data-card-label">Total Leads</span>
+                  <span class="data-card-value" x-text="crm.leadStats ? crm.leadStats.total : '—'"></span>
+                </button>
+                <button class="data-card success data-card-button" @click="crmApplySavedView('qualified')">
+                  <span class="data-card-label">Active Flows</span>
+                  <span class="data-card-value" x-text="getCrmFlowStatusCount('Active')"></span>
+                </button>
+                <button class="data-card warning data-card-button" @click="crmApplySavedView('stalled')">
+                  <span class="data-card-label">Stalled</span>
+                  <span class="data-card-value" x-text="getCrmFlowStatusCount('Stalled')"></span>
+                </button>
+                <button class="data-card data-card-button" style="border-color: var(--accent);" @click="crmApplySavedView('qualified')">
+                  <span class="data-card-label">Qualified</span>
+                  <span class="data-card-value" x-text="getCrmFlowStatusCount('Qualified')"></span>
+                </button>
+                <button class="data-card success data-card-button" @click="crmApplySavedView('won')">
+                  <span class="data-card-label">Won</span>
+                  <span class="data-card-value" x-text="getCrmFlowStatusCount('Won')"></span>
+                </button>
+                <button class="data-card danger data-card-button" @click="crmApplySavedView('stalled')">
+                  <span class="data-card-label">Lost</span>
+                  <span class="data-card-value" x-text="getCrmFlowStatusCount('Lost')"></span>
+                </button>
+              </div>
+
+              <div x-show="crm.flowStats && crm.flowStats.byStatus && crm.flowStats.byStatus.length > 0" style="margin-bottom: 1.5rem;">
+                <h3 class="crm-section-heading">Flow Status</h3>
+                <div class="crm-status-bar">
+                  <template x-for="item in (crm.flowStats ? crm.flowStats.byStatus : [])" :key="item.name">
+                    <button class="crm-status-pill" :class="getCrmStatusColor(item.name)" @click="crmFlowFilters.status = item.name; crmSwitchSection('flows')" :aria-label="`Filter flows by ${item.name}`">
+                      <span x-text="item.name"></span>
+                      <span class="crm-status-pill-count" x-text="item.count"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+
+              <div x-show="crm.flowStats && crm.flowStats.byOwner && crm.flowStats.byOwner.length > 0" style="margin-bottom: 1.5rem;">
+                <h3 class="crm-section-heading">Owner Workload</h3>
+                <div class="crm-owner-grid">
+                  <template x-for="owner in (crm.flowStats ? crm.flowStats.byOwner : [])" :key="owner.name">
+                    <div class="crm-owner-card">
+                      <span class="crm-owner-name" x-text="owner.name"></span>
+                      <span class="crm-owner-count"><span x-text="owner.count"></span> flows</span>
+                      <div class="crm-owner-bar-wrap">
+                        <div class="crm-owner-bar" :style="`width: ${Math.round((owner.count / (crm.flowStats.total || 1)) * 100)}%`"></div>
+                      </div>
+                      <div class="table-inline-actions" style="margin-top:0.625rem">
+                        <button type="button" class="mini-action-btn" @click="crmFlowFilters = { ...crmFlowFilters, owner: owner.name, status: '', stage: '' }; crmSwitchSection('flows')">Flows</button>
+                        <button type="button" class="mini-action-btn" @click="openCrmOwnerContext(owner.name)">Team</button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <div x-show="crm.leadStats && crm.leadStats.recentLeads && crm.leadStats.recentLeads.length > 0">
+                <h3 class="crm-section-heading">Recent Leads</h3>
+                <div class="table-wrap">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Company</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="lead in (crm.leadStats ? crm.leadStats.recentLeads : [])" :key="lead.lead_id">
+                        <tr @click="openCrmLead(lead.lead_id)" style="cursor:pointer;" :aria-label="`Open lead ${lead.name}`">
+                          <td x-text="lead.name || '—'"></td>
+                          <td x-text="lead.company || '—'"></td>
+                          <td x-text="lead.Category || '—'"></td>
+                          <td><span class="badge" :data-status="lead.Status" x-text="lead.Status || '—'"></span></td>
+                          <td x-text="lead.created_at ? lead.created_at.substring(0, 10) : '—'"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <template x-if="crmSection === 'leads'">
+        <div>
+          <div class="mktops-filters" style="margin-bottom: 1rem;">
+            <input type="text" class="filter-search" placeholder="Search leads..." :value="crmLeadFilters.search" @input.debounce.300ms="crmApplyFilter('search', $event.target.value)" aria-label="Search leads" />
+            <select class="filter-search" :value="crmLeadFilters.status" @change="crmApplyFilter('status', $event.target.value)" aria-label="Filter by status" style="width: auto;">
+              <option value="">All statuses</option>
+              <option value="New Lead">New Lead</option>
+              <option value="Contacted">Contacted</option>
+              <option value="Qualified">Qualified</option>
+              <option value="Converted">Converted</option>
+              <option value="Disqualified">Disqualified</option>
+            </select>
+            <select class="filter-search" :value="crmLeadFilters.category" @change="crmApplyFilter('category', $event.target.value)" aria-label="Filter by category" style="width: auto;">
+              <option value="">All categories</option>
+              <option value="Dropshipping">Dropshipping</option>
+              <option value="B2B">B2B</option>
+              <option value="Retail">Retail</option>
+              <option value="Corporate">Corporate</option>
+            </select>
+            <span class="text-muted" style="margin-left: auto;" x-text="crmLeadsTotal + ' leads'"></span>
+          </div>
+          <div x-show="crmLeadsLoading" class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+          <template x-if="!crmLeadsLoading && crmLeads.length > 0">
+            <div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Name</th>
+                      <th>Company</th>
+                      <th>City</th>
+                      <th>Category</th>
+                      <th>Status</th>
+                      <th>Score</th>
+                      <th>Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="lead in crmLeads" :key="lead.lead_id">
+                      <tr @click="openCrmLead(lead.lead_id)" style="cursor:pointer;" :aria-label="`Open lead ${lead.name}`">
+                        <td class="text-muted" x-text="lead.lead_id"></td>
+                        <td x-text="lead.name || '—'"></td>
+                        <td x-text="lead.company || '—'"></td>
+                        <td x-text="lead.city || '—'"></td>
+                        <td x-text="lead.Category || '—'"></td>
+                        <td><span class="badge" :data-status="lead.Status" x-text="lead.Status || '—'"></span></td>
+                        <td x-text="lead.lead_score || '—'"></td>
+                        <td x-text="lead.created_at ? lead.created_at.substring(0, 10) : '—'"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div class="crm-pagination">
+                <button class="btn btn-small" @click="crmPrevPage()" :disabled="crmLeadsPage <= 1" aria-label="Previous page">Previous</button>
+                <span class="text-muted" x-text="`Page ${crmLeadsPage} of ${crmTotalPages()}`"></span>
+                <button class="btn btn-small" @click="crmNextPage()" :disabled="crmLeadsPage >= crmTotalPages()" aria-label="Next page">Next</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="!crmLeadsLoading && crmLeads.length === 0" class="empty-state">
+            <p>No leads found.</p>
+          </div>
+        </div>
+      </template>
+
+      <template x-if="crmSection === 'flows'">
+        <div>
+          <div class="mktops-filters" style="margin-bottom: 1rem;">
+            <select class="filter-search" :value="crmFlowFilters.status" @change="crmApplyFlowFilter('status', $event.target.value)" aria-label="Filter by status" style="width: auto;">
+              <option value="">All statuses</option>
+              <option value="Active">Active</option>
+              <option value="Stalled">Stalled</option>
+              <option value="Qualified">Qualified</option>
+              <option value="New">New</option>
+              <option value="Won">Won</option>
+              <option value="Lost">Lost</option>
+            </select>
+            <select class="filter-search" :value="crmFlowFilters.owner" @change="crmApplyFlowFilter('owner', $event.target.value)" aria-label="Filter by owner" style="width: auto;">
+              <option value="">All owners</option>
+              <option value="Chandan">Chandan</option>
+              <option value="Arun">Arun</option>
+              <option value="Ashwini">Ashwini</option>
+            </select>
+            <span class="text-muted" style="margin-left: auto;" x-text="crmFlows.length + ' flows'"></span>
+          </div>
+          <div x-show="crmFlowsLoading" class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+          <template x-if="!crmFlowsLoading && crmFlows.length > 0">
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Lead</th>
+                    <th>Stage</th>
+                    <th>Status</th>
+                    <th>Owner</th>
+                    <th>Priority</th>
+                    <th>Contact</th>
+                    <th>Intent</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="flow in crmFlows" :key="flow.flow_id">
+                    <tr @click="openCrmFlow(flow.flow_id)" style="cursor:pointer;" :aria-label="`Open flow for ${flow.leadName}`">
+                      <td x-text="flow.leadName || '—'"></td>
+                      <td x-text="flow.stage || '—'"></td>
+                      <td><span class="badge" :data-status="flow.status" :class="getCrmStatusColor(flow.status)" x-text="flow.status || '—'"></span></td>
+                      <td x-text="flow.owner || '—'"></td>
+                      <td x-text="flow.priority || '—'"></td>
+                      <td x-text="flow.contact_status || '—'"></td>
+                      <td x-text="flow.intent || '—'"></td>
+                      <td x-text="flow.created_at ? flow.created_at.substring(0, 10) : '—'"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </template>
+          <div x-show="!crmFlowsLoading && crmFlows.length === 0" class="empty-state">
+            <p>No flows found.</p>
+          </div>
+        </div>
+      </template>
+
+      <template x-if="crmSection === 'team'">
+        <div>
+          <div x-show="!crmTeam" class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+          <template x-if="crmTeam">
+            <div class="data-card-grid">
+              <template x-for="member in (crmTeam.users || [])" :key="member.user_id">
+                <div class="data-card crm-team-card">
+                  <span class="data-card-label" x-text="member.role_id || 'Agent'"></span>
+                  <span class="data-card-value" style="font-size: 1rem;" x-text="member.display_name || member.name || '—'"></span>
+                  <div class="crm-team-meta">
+                    <span class="text-muted" x-text="(member.channels || []).join(', ') || 'No channels'"></span>
+                  </div>
+                  <div class="crm-team-flows" x-show="member.activeFlows !== undefined">
+                    <span class="crm-status-active" x-text="`${member.activeFlows || 0} active`"></span>
+                    <template x-if="member.flowsByStatus">
+                      <span class="crm-status-stalled" x-text="`${member.flowsByStatus.Stalled || 0} stalled`"></span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <template x-if="crmSection === 'config'">
+        <div>
+          <div x-show="!crmConfig" class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+          <template x-if="crmConfig">
+            <div class="crm-config-sections">
+              <details class="crm-config-block" open>
+                <summary class="crm-config-summary">SLA Rules</summary>
+                <div x-show="crmConfig.slaRules && crmConfig.slaRules.length > 0" class="table-wrap">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <template x-for="col in Object.keys((crmConfig.slaRules || [{}])[0] || {})" :key="col">
+                          <th x-text="col"></th>
+                        </template>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(rule, i) in (crmConfig.slaRules || [])" :key="i">
+                        <tr>
+                          <template x-for="col in Object.keys(rule)" :key="col">
+                            <td x-text="rule[col]"></td>
+                          </template>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+                <div x-show="!crmConfig.slaRules || crmConfig.slaRules.length === 0" class="empty-state"><p>No SLA rules configured.</p></div>
+              </details>
+
+              <details class="crm-config-block">
+                <summary class="crm-config-summary">Routing Rules</summary>
+                <div x-show="crmConfig.routingRules && crmConfig.routingRules.length > 0" class="table-wrap">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <template x-for="col in Object.keys((crmConfig.routingRules || [{}])[0] || {})" :key="col">
+                          <th x-text="col"></th>
+                        </template>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(rule, i) in (crmConfig.routingRules || [])" :key="i">
+                        <tr>
+                          <template x-for="col in Object.keys(rule)" :key="col">
+                            <td x-text="rule[col]"></td>
+                          </template>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+                <div x-show="!crmConfig.routingRules || crmConfig.routingRules.length === 0" class="empty-state"><p>No routing rules configured.</p></div>
+              </details>
+
+              <details class="crm-config-block">
+                <summary class="crm-config-summary">Flow Types</summary>
+                <div x-show="crmConfig.flowTypeConfig && crmConfig.flowTypeConfig.length > 0" class="table-wrap">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <template x-for="col in Object.keys((crmConfig.flowTypeConfig || [{}])[0] || {})" :key="col">
+                          <th x-text="col"></th>
+                        </template>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(ft, i) in (crmConfig.flowTypeConfig || [])" :key="i">
+                        <tr>
+                          <template x-for="col in Object.keys(ft)" :key="col">
+                            <td x-text="ft[col]"></td>
+                          </template>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+                <div x-show="!crmConfig.flowTypeConfig || crmConfig.flowTypeConfig.length === 0" class="empty-state"><p>No flow types configured.</p></div>
+              </details>
+
+              <details class="crm-config-block">
+                <summary class="crm-config-summary">Message Templates</summary>
+                <div x-show="crmConfig.messageTemplates && crmConfig.messageTemplates.length > 0" class="table-wrap">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <template x-for="col in Object.keys((crmConfig.messageTemplates || [{}])[0] || {})" :key="col">
+                          <th x-text="col"></th>
+                        </template>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(tpl, i) in (crmConfig.messageTemplates || [])" :key="i">
+                        <tr>
+                          <template x-for="col in Object.keys(tpl)" :key="col">
+                            <td x-text="tpl[col]"></td>
+                          </template>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+                <div x-show="!crmConfig.messageTemplates || crmConfig.messageTemplates.length === 0" class="empty-state"><p>No templates configured.</p></div>
+              </details>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <div class="detail-panel" x-show="crmDetail || crmDetailLoading" x-cloak>
+        <div class="detail-panel-header">
+          <h3>
+            <template x-if="crmDetailLoading">
+              <span>Loading...</span>
+            </template>
+            <template x-if="!crmDetailLoading && crmDetail && crmDetailType === 'lead'">
+              <span x-text="crmDetail.lead ? (crmDetail.lead.name || 'Lead Detail') : 'Lead Detail'"></span>
+            </template>
+            <template x-if="!crmDetailLoading && crmDetail && crmDetailType === 'flow'">
+              <span x-text="crmDetail.flow ? (`Flow — ${crmDetail.flow.stage || ''}`) : 'Flow Detail'"></span>
+            </template>
+          </h3>
+          <button class="btn-ghost" @click="closeCrmDetail()" aria-label="Close detail panel">Close</button>
+        </div>
+        <div class="detail-panel-body">
+          <template x-if="!crmDetailLoading && crmDetail && crmDetailType === 'lead'">
+            <div>
+              <template x-if="crmDetail.lead">
+                <div>
+                  <h4 class="crm-detail-section-title">Lead Info</h4>
+                  <template x-for="[k, v] in Object.entries(crmDetail.lead).filter(([k,v]) => v !== null && v !== undefined && v !== '')" :key="k">
+                    <div class="detail-row">
+                      <span class="detail-label" x-text="k.replace(/_/g, ' ')"></span>
+                      <span class="detail-value" x-text="v"></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <template x-if="crmDetail.flows && crmDetail.flows.length > 0">
+                <div style="margin-top: 1.25rem;">
+                  <h4 class="crm-detail-section-title">Related Flows (<span x-text="crmDetail.flows.length"></span>)</h4>
+                  <template x-for="flow in crmDetail.flows" :key="flow.flow_id">
+                    <div class="detail-row crm-detail-flow-row" @click="openCrmFlow(flow.flow_id)" role="button" tabindex="0" @keydown.enter="openCrmFlow(flow.flow_id)" style="cursor:pointer;">
+                      <span class="detail-label" x-text="flow.stage || '—'"></span>
+                      <span class="detail-value">
+                        <span class="badge" :data-status="flow.status" :class="getCrmStatusColor(flow.status)" x-text="flow.status || '—'"></span>
+                        <span class="text-muted" style="margin-left: 4px;" x-text="flow.owner || ''"></span>
+                      </span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <template x-if="!crmDetailLoading && crmDetail && crmDetailType === 'flow'">
+            <div>
+              <template x-if="crmDetail.flow">
+                <div>
+                  <h4 class="crm-detail-section-title">Flow Info</h4>
+                  <template x-for="[k, v] in Object.entries(crmDetail.flow).filter(([k,v]) => v !== null && v !== undefined && v !== '')" :key="k">
+                    <div class="detail-row">
+                      <span class="detail-label" x-text="k.replace(/_/g, ' ')"></span>
+                      <span class="detail-value" x-text="v"></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <template x-if="crmDetail.lead">
+                <div style="margin-top: 1.25rem;">
+                  <h4 class="crm-detail-section-title">Linked Lead</h4>
+                  <div class="detail-row crm-detail-flow-row" @click="openCrmLead(crmDetail.lead.lead_id)" role="button" tabindex="0" @keydown.enter="openCrmLead(crmDetail.lead.lead_id)" style="cursor:pointer;">
+                    <span class="detail-label" x-text="crmDetail.lead.name || '—'"></span>
+                    <span class="detail-value text-muted" x-text="crmDetail.lead.company || ''"></span>
+                  </div>
+                </div>
+              </template>
+              <template x-if="crmDetail.suggestedActions && crmDetail.suggestedActions.length > 0">
+                <div style="margin-top: 1.25rem;">
+                  <h4 class="crm-detail-section-title">Suggested Actions</h4>
+                  <template x-for="(action, i) in crmDetail.suggestedActions" :key="i">
+                    <div class="detail-row">
+                      <span class="detail-value" x-text="action"></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <div x-show="crmDetailLoading" class="skeleton-stack">
+            <div class="loading-skeleton skeleton-text-line"></div>
+            <div class="loading-skeleton skeleton-text-line"></div>
+            <div class="loading-skeleton skeleton-text-line"></div>
+          </div>
+        </div>
+      </div>
+      <div x-show="crmDetail || crmDetailLoading" @click="closeCrmDetail()" style="position:fixed;inset:0;z-index:49;" x-cloak></div>

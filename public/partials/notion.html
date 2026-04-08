@@ -1,0 +1,202 @@
+        <div class="view-header-bar">
+          <div class="view-header-left">
+            <span class="view-header-emoji">📋</span>
+            <div class="view-header-text">
+              <h2 class="view-header-title">Notion Browser</h2>
+              <span class="view-header-subtitle">Browse databases and pages</span>
+            </div>
+          </div>
+          <div class="view-header-actions">
+            <div class="notion-breadcrumb">
+              <button class="notion-crumb" @click="notionActiveDb = null; notionActivePage = null; notionPageContent = ''" :class="!notionActiveDb && 'crumb-active'">Notion</button>
+              <template x-if="notionActiveDb">
+                <span>
+                  <span class="crumb-sep">/</span>
+                  <button class="notion-crumb" @click="notionActivePage = null; notionPageContent = ''" :class="!notionActivePage && 'crumb-active'" x-text="notionActiveDb.name"></button>
+                </span>
+              </template>
+              <template x-if="notionActivePage">
+                <span>
+                  <span class="crumb-sep">/</span>
+                  <span class="notion-crumb crumb-active" x-text="notionActivePage.name"></span>
+                </span>
+              </template>
+            </div>
+            <button class="btn btn-small" @click="fetch('/api/notion/cache/clear',{method:'POST'}).then(()=>loadNotion())">Clear Cache</button>
+            <button class="btn btn-small" @click="loadNotion()">Refresh</button>
+          </div>
+        </div>
+
+        <template x-if="notionLoading && !notionActiveDb && !notionActivePage">
+          <div class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+        </template>
+
+        <template x-if="!notionActiveDb && !notionActivePage && !notionLoading">
+          <div>
+            <template x-if="notionKeyPages.length > 0">
+              <div>
+                <h3 class="section-title">Key Pages</h3>
+                <div class="notion-key-pages">
+                  <template x-for="page in notionKeyPages" :key="page.id">
+                    <button class="notion-key-page-card" @click="openNotionPage(page.id, page.name)">
+                      <div class="notion-kp-name" x-text="page.name"></div>
+                      <div class="notion-kp-desc" x-text="page.description"></div>
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <h3 class="section-title">Databases</h3>
+            <div class="notion-db-grid">
+              <template x-for="db in notionDatabases" :key="db.id">
+                <button class="notion-db-card" @click="openNotionDb(db)">
+                  <div class="notion-db-icon" x-text="db.icon"></div>
+                  <div class="notion-db-info">
+                    <div class="notion-db-name" x-text="db.name"></div>
+                    <div class="notion-db-desc" x-text="db.description"></div>
+                  </div>
+                </button>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="notionActiveDb && !notionActivePage">
+          <div>
+            <div class="notion-filter-bar">
+              <input
+                type="text"
+                class="notion-search-input"
+                placeholder="Search entries..."
+                x-model="notionSearchQuery"
+              >
+              <template x-if="getAvailableStatuses().length > 0">
+                <select class="notion-filter-select" x-model="notionFilterStatus" aria-label="Filter by status">
+                  <option value="">All statuses</option>
+                  <template x-for="status in getAvailableStatuses()" :key="status">
+                    <option :value="status" x-text="status"></option>
+                  </template>
+                </select>
+              </template>
+              <span class="notion-result-count" x-text="getFilteredEntries().length + ' of ' + notionEntries.length + ' entries'"></span>
+            </div>
+            <template x-if="notionLoading && notionEntries.length === 0">
+              <div class="skeleton-stack">
+                <div class="loading-skeleton skeleton-card"></div>
+                <div class="loading-skeleton skeleton-card"></div>
+                <div class="loading-skeleton skeleton-card"></div>
+              </div>
+            </template>
+            <template x-if="notionEntries.length === 0 && !notionLoading">
+              <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>
+                <span class="empty-state-title">No entries found</span>
+                <span class="empty-state-subtitle">This database appears to be empty</span>
+              </div>
+            </template>
+            <div class="notion-entries">
+              <template x-for="entry in getFilteredEntries()" :key="entry.id">
+                <button class="notion-entry-row" @click="openNotionPage(entry.id, getEntryName(entry))">
+                  <div class="notion-entry-name" x-text="getEntryName(entry)"></div>
+                  <div class="notion-entry-badges">
+                    <template x-if="entry.Status">
+                      <span class="status-badge" :class="statusClass(entry.Status)" x-text="entry.Status"></span>
+                    </template>
+                    <template x-if="entry.Health">
+                      <span class="status-badge" :class="statusClass(entry.Health)" x-text="entry.Health"></span>
+                    </template>
+                    <template x-if="entry.Priority">
+                      <span class="status-badge" :class="priorityClass(entry.Priority)" x-text="entry.Priority"></span>
+                    </template>
+                    <span class="notion-entry-meta" x-text="getEntryMeta(entry)"></span>
+                  </div>
+                </button>
+              </template>
+            </div>
+            <template x-if="notionHasMore">
+              <div class="load-more-wrap">
+                <button class="btn btn-small" @click="loadMoreEntries()" :disabled="notionLoading">Load more</button>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <template x-if="notionActivePage">
+          <div class="notion-page-viewer">
+            <div class="notion-page-header">
+              <h2 class="notion-page-title" x-text="notionActivePage.name"></h2>
+              <div class="notion-page-actions">
+                <template x-if="notionActivePage.url">
+                  <a class="btn btn-small" :href="notionActivePage.url" target="_blank">Open in Notion</a>
+                </template>
+                <button class="btn btn-small" @click="askColinAboutPage(notionActivePage)">Ask Colin</button>
+              </div>
+            </div>
+
+            <template x-if="notionActivePage.properties && getPropertyEntries(notionActivePage.properties).length > 0">
+              <div class="notion-props">
+                <template x-for="[key, val] in getPropertyEntries(notionActivePage.properties)" :key="key">
+                  <div class="prop-row">
+                    <span class="prop-key" x-text="key"></span>
+                    <span class="prop-val">
+                      <template x-if="typeof val === 'string' && val.startsWith('http')">
+                        <a :href="val" target="_blank" class="prop-link" x-text="val"></a>
+                      </template>
+                      <template x-if="!(typeof val === 'string' && val.startsWith('http'))">
+                        <span x-text="formatPropertyValue(val)"></span>
+                      </template>
+                    </span>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <template x-if="!notionRelatedLoading && hasRelated()">
+              <div class="notion-related">
+                <h3 class="section-title section-title--flush">Related</h3>
+                <template x-for="[relName, relPages] in getRelatedEntries()" :key="relName">
+                  <div class="related-group">
+                    <div class="related-group-label" x-text="relName"></div>
+                    <div class="related-list">
+                      <template x-for="rp in relPages" :key="rp.id">
+                        <button class="related-item" @click="openNotionPage(rp.id, rp.name)">
+                          <span class="related-name" x-text="rp.name"></span>
+                          <span class="related-badges">
+                            <template x-if="rp.status">
+                              <span class="status-badge" :class="statusClass(rp.status)" x-text="rp.status"></span>
+                            </template>
+                            <template x-if="rp.health">
+                              <span class="status-badge" :class="statusClass(rp.health)" x-text="rp.health"></span>
+                            </template>
+                            <template x-if="rp.dueDate">
+                              <span class="related-due" x-text="'Due: ' + rp.dueDate"></span>
+                            </template>
+                          </span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+            <template x-if="notionRelatedLoading">
+              <div class="loading loading--inline">Loading related...</div>
+            </template>
+
+            <template x-if="notionLoading">
+              <div class="skeleton-stack">
+                <div class="loading-skeleton skeleton-text-line" style="width:60%"></div>
+                <div class="loading-skeleton skeleton-text-line" style="width:80%"></div>
+                <div class="loading-skeleton skeleton-text-line" style="width:70%"></div>
+              </div>
+            </template>
+            <template x-if="!notionLoading && notionPageContent">
+              <div class="notion-content doc-content" x-html="renderMarkdown(notionPageContent)"></div>
+            </template>
+          </div>
+        </template>

@@ -3,6 +3,41 @@
 | Date | Agent | Action | Details | Pending |
 |------|-------|--------|---------|---------|
 | 2026-03-20 12:17 | backend-builder | Added Tech Team module | 10-tab view with Notion, GitHub, Sheets integrations | — |
+| 2026-04-07 23:30 | lead | Read activity-log.md | Found ~150 stale unknown entries from Mar 26–31 | — |
+| 2026-04-07 23:30 | lead | Read open-loops.md | Empty, no open loops | — |
+| 2026-04-07 23:30 | lead | Read handoff.md | Previous session 2026-03-26 | — |
+| 2026-04-07 23:30 | lead | Read decisions.md | 5 decisions from 2026-03-21 | — |
+| 2026-04-07 23:30 | lead | Read settings.json | Hooks config: SessionStart, Stop, PreCompact, PreToolUse, PostToolUse | — |
+| 2026-04-07 23:30 | lead | Read activity-logger.mjs | PostToolUse hook — source of unknown entries | — |
+| 2026-04-07 23:30 | lead | Read cross-project-session-start.mjs | SessionStart context loader | — |
+| 2026-04-07 23:30 | lead | Read cross-project-session-stop.mjs | Stop hook enforcer | — |
+| 2026-04-07 23:30 | lead | Explained logging architecture | 3-layer system: activity log, handoff, decisions | Check Colin's hooks |
+| 2026-04-07 23:35 | lead | Read app-reference.md | 14 views, ~40+ endpoints, full inventory | — |
+| 2026-04-07 23:35 | lead | Read server.js | Express entry, middleware, auth gate | — |
+| 2026-04-07 23:35 | lead | Explained app architecture | Full stack, views, patterns to Dan | Check Colin's hooks |
+| 2026-04-08 00:10 | lead | Ran test suite | 691 pass, 0 fail | — |
+| 2026-04-08 00:10 | lead | Ran npm build | 22 JS files bundled, CSS minified 21% | — |
+| 2026-04-08 00:10 | lead | Checked server config | Config loads clean, no errors | — |
+| 2026-04-08 00:15 | lead | Started dev server | Port 3000 already in use (existing node process PID 28722) | — |
+| 2026-04-08 00:15 | lead | Opened app in Chrome DevTools | App shell loads, sidebar nav visible, content area dark/empty | — |
+| 2026-04-08 00:15 | lead | Tested 10 API endpoints | All 10 return 200 with data: dashboard, action-queue, marketing-ops, tech-team, crm, bmc, registry, notebooks, documents, skills | — |
+| 2026-04-08 00:16 | lead | Navigated to dashboard view | Header shows 77 Open, 50 Overdue, context filters — but content panels render empty | — |
+| 2026-04-08 00:16 | lead | Checked Alpine state | dashboard loaded with full data (13 keys, 27 upcoming), but views not rendering | — |
+| 2026-04-08 00:17 | lead | Read console messages | 246 errors: ~30+ undefined functions (getOverviewKpis, getFilteredProjects, etc.) and null property reads | — |
+| 2026-04-08 00:20 | lead | Checked src/js/modules/ | All 22 modules exist, functions defined in overview.js, documents.js, commitments.js, projects.js, claude-usage.js | — |
+| 2026-04-08 00:20 | lead | Checked build script | Bundler reads app.js, inlines all module imports into IIFE, strips exports | — |
+| 2026-04-08 00:20 | lead | Checked built public/js/app.js | All 22 modules present (8551 lines), createOverviewModule at line 5836 | — |
+| 2026-04-08 00:22 | lead | Checked API responses | /api/overview returns 53KB JSON, /api/health returns ok with Anthropic key | — |
+| 2026-04-08 00:23 | lead | Checked Alpine initialized modules | Only overview + notion initialized; projects, docs, commitments, claude-usage NOT initialized | — |
+| 2026-04-08 00:24 | lead | Identified root cause | Views use x-show (CSS hide) not x-if (DOM remove); Alpine evaluates all expressions including uninitialised lazy modules | Fix: switch x-show to x-if |
+| 2026-04-08 00:25 | lead | Updated settings.json Stop hook | Aligned project Stop hook with user-level hook to prevent infinite loop | — |
+| 2026-04-08 02:05 | lead | Dan said "fix" | Approved x-show→x-if fix | — |
+| 2026-04-08 02:05 | lead | Dispatched frontend-builder agent | Task: convert 14 lazy views from x-show to template x-if in public/index.html | — |
+| 2026-04-08 02:10 | frontend-builder | Converted 14 views x-show→x-if | team, docs, knowledge, decisions, projects, registry, commitments, factory, marketingOps, techTeam, bmc, crm, ops, claude-usage. Commitments needed display:contents wrapper (two root elements) | — |
+| 2026-04-08 02:12 | lead | Reloaded app in Chrome DevTools | Overview page loads, verifying fix | — |
+| 2026-04-08 02:13 | lead | Dan asked "why dint you use agents?" | Acknowledged skipping code-reviewer and ux-auditor in pipeline | — |
+| 2026-04-08 02:14 | lead | Dispatched code-reviewer agent (background) | Reviewing template balance, root children, Alpine scope, display:contents | Awaiting result |
+| 2026-04-08 02:14 | lead | Dispatched ux-auditor agent (background) | Checking CSS transitions, x-cloak, layout impact of x-if change | Awaiting result |
 | 2026-03-20 12:24 | frontend-builder | Security + UX polish | Full-app audit findings applied | — |
 | 2026-03-20 12:33 | backend-builder | Audit fixes | Security hardening, async I/O, empty-state banners, test coverage | — |
 | 2026-03-20 12:43 | backend-builder | Fixed Notion database IDs | Spec IDs were wrong, replaced with actual workspace IDs | — |
@@ -175,3 +210,60 @@
 | 2026-03-27 15:27 | file-write | unknown | — |
 | 2026-03-27 15:28 | file-write | unknown | — |
 | 2026-03-27 15:28 | file-write | unknown | — |
+| 2026-03-29 13:21 | file-write | unknown | — |
+| 2026-03-29 13:24 | file-write | unknown | — |
+| 2026-03-29 13:44 | file-write | unknown | — |
+| 2026-03-29 13:44 | file-write | unknown | — |
+| 2026-03-31 22:40 | file-write | unknown | — |
+| 2026-03-31 22:40 | file-write | unknown | — |
+| 2026-03-31 22:41 | file-write | unknown | — |
+| 2026-03-31 22:41 | file-write | unknown | — |
+| 2026-03-31 22:41 | file-write | unknown | — |
+| 2026-03-31 22:41 | file-write | unknown | — |
+| 2026-03-31 22:42 | file-write | unknown | — |
+| 2026-03-31 22:46 | file-write | unknown | — |
+| 2026-04-07 23:31 | file-write | unknown | — |
+| 2026-04-07 23:31 | file-write | unknown | — |
+| 2026-04-07 23:36 | file-write | unknown | — |
+| 2026-04-07 23:37 | file-write | unknown | — |
+| 2026-04-07 23:37 | file-write | unknown | — |
+| 2026-04-07 23:38 | file-write | unknown | — |
+| 2026-04-07 23:38 | file-write | unknown | — |
+| 2026-04-07 23:39 | file-write | unknown | — |
+| 2026-04-07 23:39 | file-write | unknown | — |
+| 2026-04-07 23:40 | file-write | unknown | — |
+| 2026-04-07 23:40 | file-write | unknown | — |
+| 2026-04-07 23:41 | file-write | unknown | — |
+| 2026-04-07 23:41 | file-write | unknown | — |
+| 2026-04-07 23:42 | file-write | unknown | — |
+| 2026-04-08 00:17 | file-write | unknown | — |
+| 2026-04-08 01:59 | file-write | unknown | — |
+| 2026-04-08 02:00 | file-write | unknown | — |
+| 2026-04-08 02:00 | file-write | unknown | — |
+| 2026-04-08 03:46 | file-write | unknown | — |
+| 2026-04-08 03:46 | file-write | unknown | — |
+| 2026-04-08 03:46 | file-write | unknown | — |
+| 2026-04-08 03:46 | file-write | unknown | — |
+| 2026-04-08 03:46 | file-write | unknown | — |
+| 2026-04-08 03:47 | file-write | unknown | — |
+| 2026-04-08 03:47 | file-write | unknown | — |
+| 2026-04-08 03:47 | file-write | unknown | — |
+| 2026-04-08 03:47 | file-write | unknown | — |
+| 2026-04-08 03:47 | file-write | unknown | — |
+| 2026-04-08 03:47 | file-write | unknown | — |
+| 2026-04-08 03:48 | file-write | unknown | — |
+| 2026-04-08 03:48 | file-write | unknown | — |
+| 2026-04-08 03:49 | file-write | unknown | — |
+| 2026-04-08 03:49 | file-write | unknown | — |
+| 2026-04-08 03:49 | file-write | unknown | — |
+| 2026-04-08 03:49 | file-write | unknown | — |
+| 2026-04-08 03:49 | file-write | unknown | — |
+| 2026-04-08 03:49 | file-write | unknown | — |
+| 2026-04-08 03:50 | file-write | unknown | — |
+| 2026-04-08 03:50 | file-write | unknown | — |
+| 2026-04-08 03:53 | file-write | unknown | — |
+| 2026-04-08 03:54 | file-write | unknown | — |
+| 2026-04-08 04:08 | file-write | unknown | — |
+| 2026-04-08 04:08 | file-write | unknown | — |
+| 2026-04-08 04:09 | file-write | unknown | — |
+| 2026-04-08 04:09 | file-write | unknown | — |

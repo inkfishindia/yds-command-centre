@@ -96,7 +96,7 @@ src/js/
 | Design planning | `design-planner` | Haiku | `design-system/` |
 | Frontend code | `frontend-builder` | Sonnet | `src/js/`, `public/`, `css/` |
 | Backend code | `backend-builder` | Sonnet | `server/`, `test/`, `server.js` |
-| Quality gate | `code-reviewer` | Sonnet | read-only review |
+| Quality gate | `code-reviewer` | Haiku | read-only review |
 | UX consistency | `ux-auditor` | Haiku | read-only audit |
 | Image generation | `pixel` | Sonnet | `~/Documents/nanobanana_generated/` |
 | Deploy/infra | `devops-infra` | Haiku | config files |
@@ -128,7 +128,12 @@ src/js/
 **After code changes (always):**
 `code-reviewer` → `tester` (tests) → `scribe` (update docs)
 
-Do not skip steps. The lead session orchestrates — call each agent in order, passing context forward. For full-stack features, backend-builder's handoff tells frontend-builder the new endpoint shape.
+The lead session orchestrates — call each agent in order, passing context forward. For full-stack features, backend-builder's handoff tells frontend-builder the new endpoint shape.
+
+**Dispatch rules:**
+- **Always foreground** — never use `run_in_background` for review agents (code-reviewer, ux-auditor, tester, scribe). Background agents orphan when sessions end and burn tokens indefinitely.
+- **Parallel OK** — independent review agents (e.g., code-reviewer + ux-auditor) can run as parallel foreground calls in one message.
+- **Proportional review** — trivial fixes (typos, config, single-line) go straight to code-reviewer only. Full pipeline (design-planner → builder → reviewer → auditor → tester → scribe) is for features and multi-file changes.
 
 ## How to Run
 

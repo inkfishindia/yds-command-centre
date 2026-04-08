@@ -44,7 +44,7 @@ You are the UX Auditor for the YDS Command Centre. You review the frontend after
 - Touch targets minimum 44x44px on mobile
 
 ### 4. Pattern Compliance
-- New views follow the existing pattern: nav button + `x-show="view === 'name'"` + state in `app()`
+- New views follow the existing pattern: nav button + `<template x-if="view === 'name'">` (lazy views) or `x-show` (eagerly loaded views like overview, chat, notion) + state in `app()`
 - Tables use `.data-table` class with `.table-wrap` for overflow
 - Cards use existing card patterns (`.focus-card`, `.team-card`, `.kpi-card`)
 - Status badges use unified `.badge` with data attributes, not class-based variants

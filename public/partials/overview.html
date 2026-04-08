@@ -1,0 +1,253 @@
+        <div class="overview-view" x-show="!overviewLoading && overview">
+          <div class="view-header-bar">
+            <div class="view-header-left">
+              <span class="view-header-emoji">🔭</span>
+              <div class="view-header-text">
+                <h2 class="view-header-title">Organisation Overview</h2>
+                <span class="view-header-subtitle">One connected view across execution, growth, systems, and team capacity</span>
+              </div>
+            </div>
+            <div class="view-header-actions">
+              <span class="org-last-refresh" x-show="overview?.timestamp" x-text="'Updated ' + (overview?.timestamp ? new Date(overview.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '—')"></span>
+              <button class="btn btn-small btn-icon" :class="overviewLoading && 'btn-spinning'" @click="loadOverview()" aria-label="Refresh overview">
+                <span class="refresh-icon">&#x21bb;</span> Refresh
+              </button>
+            </div>
+          </div>
+
+          <div class="overview-attention-banner" x-show="overview?.attention?.counts">
+            <div class="overview-banner-head">
+              <div>
+                <h2 class="overview-section-title">Attention</h2>
+                <p class="overview-section-copy">The fastest read on what needs intervention today.</p>
+              </div>
+              <button class="overview-link-btn" @click="openOverviewTarget('dashboard')">Open execution cockpit</button>
+            </div>
+            <div class="overview-attention-counts">
+              <div class="attention-count attention-count--clickable attention-dan" tabindex="0" role="button" x-show="overview.attention.counts.waitingOnDan > 0" @click="openNavigationTarget('actionQueue')" @keydown.enter="openNavigationTarget('actionQueue')">
+                <span class="attention-number" x-text="overview.attention.counts.waitingOnDan"></span>
+                <span class="attention-label">Waiting on Dan</span>
+              </div>
+              <div class="attention-count attention-count--clickable attention-blocked" tabindex="0" role="button" x-show="overview.attention.counts.blockedTotal > 0" @click="openNavigationTarget('dashboard')" @keydown.enter="openNavigationTarget('dashboard')">
+                <span class="attention-number" x-text="overview.attention.counts.blockedTotal"></span>
+                <span class="attention-label">Blocked</span>
+              </div>
+              <div class="attention-count attention-count--clickable attention-overdue" tabindex="0" role="button" x-show="overview.attention.counts.overdueTotal > 0" @click="openNavigationTarget('commitments')" @keydown.enter="openNavigationTarget('commitments')">
+                <span class="attention-number" x-text="overview.attention.counts.overdueTotal"></span>
+                <span class="attention-label">Overdue</span>
+              </div>
+              <div class="attention-count attention-upcoming">
+                <span class="attention-number" x-text="overview.attention.counts.upcomingThisWeek || 0"></span>
+                <span class="attention-label">Due This Week</span>
+              </div>
+            </div>
+
+            <div class="overview-blocked-list" x-show="overview.attention.blockedItems?.length > 0">
+              <template x-for="item in (overview.attention.blockedItems || []).slice(0, 8)" :key="item.id">
+                <div class="overview-blocked-item">
+                  <span class="blocked-source-tag" x-text="item.source"></span>
+                  <span class="blocked-item-name" x-text="item.name"></span>
+                  <span class="blocked-item-meta">
+                    <span x-show="item.daysOverdue > 0" class="overdue-badge" x-text="item.daysOverdue + 'd overdue'"></span>
+                    <span x-show="item.owner" class="blocked-owner" x-text="item.owner"></span>
+                  </span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="org-kpi-row">
+            <template x-for="kpi in getOverviewKpis()" :key="kpi.id">
+              <div class="org-kpi-card" tabindex="0" role="button" @click="openOverviewTarget(kpi.targetView)" @keydown.enter="openOverviewTarget(kpi.targetView)" :class="kpi.status === 'critical' ? 'org-kpi-card--alert' : ''">
+                <div class="org-kpi-header">
+                  <span class="org-kpi-title" x-text="kpi.title"></span>
+                  <span class="org-status-badge" :class="overviewStatusClass(kpi.status)" x-show="kpi.badge" x-text="kpi.badge"></span>
+                </div>
+                <div class="org-kpi-metric">
+                  <span class="org-metric-value" x-text="getOverviewKpiDisplayValue(kpi)"></span>
+                  <span class="org-metric-label" x-text="kpi.label"></span>
+                </div>
+                <div class="org-kpi-sub" x-text="kpi.sublabel"></div>
+                <div class="org-health-bar" x-show="kpi.healthSegments">
+                  <div class="org-health-bar-inner">
+                    <div class="org-health-segment" :style="'background:var(--green);flex:' + (kpi.healthSegments.onTrack || 0)"></div>
+                    <div class="org-health-segment" :style="'background:var(--amber);flex:' + (kpi.healthSegments.atRisk || 0)"></div>
+                    <div class="org-health-segment" :style="'background:var(--red);flex:' + (kpi.healthSegments.offTrack || 0)"></div>
+                  </div>
+                </div>
+                <div class="org-progress-bar-wrap" x-show="typeof kpi.progress === 'number'">
+                  <div class="org-progress-bar" :style="'width:' + (kpi.progress || 0) + '%'"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div class="overview-section-head">
+            <div>
+              <h2 class="overview-section-title">Area Dashboards</h2>
+              <p class="overview-section-copy">Each area answers the same questions: health, throughput, blockers, workload, and next move.</p>
+            </div>
+          </div>
+
+          <div class="org-dept-grid">
+            <template x-for="card in getOverviewAreaCards()" :key="card.id">
+              <div class="org-dept-block" tabindex="0" role="button" @click="openOverviewTarget(card.targetView)" @keydown.enter="openOverviewTarget(card.targetView)">
+                <div class="org-dept-header">
+                  <div>
+                    <h2 x-text="card.label"></h2>
+                    <div class="org-dept-owner" x-text="card.owner"></div>
+                  </div>
+                  <span class="org-dept-badge" :class="overviewStatusClass(card.status)" x-text="card.statusLabel"></span>
+                </div>
+                <div class="org-dept-headline">
+                  <span class="org-dept-headline-value" x-text="card.headlineMetric?.value"></span>
+                  <span class="org-dept-headline-label" x-text="card.headlineMetric?.label"></span>
+                </div>
+                <template x-for="metric in (card.secondaryMetrics || [])" :key="metric.label">
+                  <div class="org-dept-stat">
+                    <span class="org-stat-label" x-text="metric.label"></span>
+                    <span class="org-stat-value" x-text="metric.value"></span>
+                  </div>
+                </template>
+                <div class="org-dept-note">
+                  <span class="org-dept-note-label">Top risk</span>
+                  <span class="org-dept-note-copy" x-text="card.topRisk"></span>
+                </div>
+                <div class="org-dept-note">
+                  <span class="org-dept-note-label">Next move</span>
+                  <span class="org-dept-note-copy" x-text="card.nextMilestone"></span>
+                </div>
+                <div class="org-dept-footer">
+                  <button class="org-view-btn" @click.stop="openOverviewTarget(card.targetView)" x-text="card.ctaLabel || 'Open Area'"></button>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div class="org-two-col">
+            <div class="org-col-panel">
+              <div class="org-section-title-row">
+                <h2 class="org-section-title">Cross-Functional Activity</h2>
+                <span class="org-section-badge" x-text="getOverviewActivityFeed().length"></span>
+              </div>
+              <div class="overview-feed" x-show="getOverviewActivityFeed().length > 0">
+                <template x-for="item in getOverviewActivityFeed()" :key="item.id">
+                  <button class="overview-feed-item" :class="overviewToneClass(item.tone)" @click="openOverviewTarget(item.targetView)">
+                    <span class="overview-feed-type" x-text="item.type"></span>
+                    <div class="overview-feed-main">
+                      <span class="overview-feed-title" x-text="item.title"></span>
+                      <span class="overview-feed-detail" x-text="item.detail"></span>
+                    </div>
+                    <span class="overview-feed-date" x-text="formatOverviewTimestamp(item.timestamp)"></span>
+                  </button>
+                </template>
+              </div>
+              <div class="org-col-empty" x-show="getOverviewActivityFeed().length === 0">
+                <span>No recent activity yet</span>
+              </div>
+            </div>
+
+            <div class="org-col-panel">
+              <div class="org-kpi-header">
+                <span class="org-kpi-title">Quick Links</span>
+              </div>
+              <div class="overview-links" x-show="getOverviewQuickLinks().length > 0">
+                <template x-for="link in getOverviewQuickLinks()" :key="link.id">
+                  <button class="overview-link-card" @click="openOverviewTarget(link.targetView)">
+                    <span class="overview-link-card-label" x-text="link.label"></span>
+                    <span class="overview-link-card-copy" x-text="link.description"></span>
+                  </button>
+                </template>
+              </div>
+              <div class="org-col-empty" x-show="getOverviewQuickLinks().length === 0">
+                <span>No quick links available</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="org-two-col">
+            <div class="org-col-panel">
+              <div class="org-section-title-row">
+                <h2 class="org-section-title">Projects</h2>
+                <span class="org-section-badge" x-text="overview.projects?.active || 0"></span>
+              </div>
+              <div x-show="overview.projects?.items?.length > 0">
+                <template x-for="proj in (overview.projects?.items || []).slice(0, 8)" :key="proj.id">
+                  <div class="org-project-row" tabindex="0" role="button" @click="openNavigationTarget('projects')" @keydown.enter="openNavigationTarget('projects')">
+                    <div class="org-project-info">
+                      <div class="org-project-name" x-text="proj.name || '—'"></div>
+                      <div class="org-project-meta">
+                        <span class="status-badge" :class="statusClass(proj.status)" x-text="proj.status || '—'"></span>
+                        <span class="org-project-counts" x-show="proj.overdueCount > 0" x-text="proj.overdueCount + ' overdue'"></span>
+                      </div>
+                    </div>
+                    <div class="org-project-progress-wrap">
+                      <div class="org-progress-bar-track">
+                        <div class="org-progress-bar" :style="'width:' + (proj.progress || 0) + '%'"></div>
+                      </div>
+                      <span class="org-project-pct" x-text="(proj.progress || 0) + '%'"></span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+              <div class="org-col-empty" x-show="!overview.projects?.items?.length">
+                <span>No projects loaded</span>
+              </div>
+            </div>
+            <div class="org-col-panel" x-show="overview.insights">
+              <div class="org-section-title-row">
+                <h2 class="org-section-title">Team Snapshot</h2>
+                <span class="org-section-badge" x-text="overview.people?.total || 0"></span>
+              </div>
+              <div class="org-people-grid" x-show="overview.people?.members?.length > 0">
+                <template x-for="person in (overview.people?.members || [])" :key="person.id">
+                  <div class="org-person-card" tabindex="0" role="button" @click="openDetailPanel(person.id, person.name)" @keydown.enter="openDetailPanel(person.id, person.name)">
+                    <div class="org-person-name" x-text="person.name || '—'"></div>
+                    <div class="org-person-role" x-text="person.role || '—'"></div>
+                    <span class="status-badge" :class="statusClass(person.status || 'active')" x-text="person.status || 'active'"></span>
+                  </div>
+                </template>
+              </div>
+              <div class="overview-completion-grid">
+                <template x-for="[label, data] in Object.entries(overview.insights?.completionRates || {})" :key="label">
+                  <div class="completion-card">
+                    <div class="completion-ring">
+                      <span class="completion-pct" x-text="(data.pct || 0) + '%'"></span>
+                    </div>
+                    <span class="completion-label" x-text="label"></span>
+                    <span class="completion-detail" x-text="(data.done || 0) + '/' + (data.total || 0)"></span>
+                  </div>
+                </template>
+              </div>
+              <div class="org-col-empty" x-show="!overview.people?.members?.length">
+                <span>No team members loaded</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="overview-loading" x-show="overviewLoading" style="padding:1.5rem 1rem;max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:1.5rem">
+          <div class="loading-skeleton skeleton-text-line" style="width:240px;height:28px"></div>
+          <div style="display:flex;gap:0.75rem">
+            <div class="loading-skeleton skeleton-card" style="min-width:180px;height:100px;flex-shrink:0"></div>
+            <div class="loading-skeleton skeleton-card" style="min-width:180px;height:100px;flex-shrink:0"></div>
+            <div class="loading-skeleton skeleton-card" style="min-width:180px;height:100px;flex-shrink:0"></div>
+            <div class="loading-skeleton skeleton-card" style="min-width:180px;height:100px;flex-shrink:0"></div>
+            <div class="loading-skeleton skeleton-card" style="min-width:180px;height:100px;flex-shrink:0"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem">
+            <div class="loading-skeleton skeleton-card" style="height:220px"></div>
+            <div class="loading-skeleton skeleton-card" style="height:220px"></div>
+            <div class="loading-skeleton skeleton-card" style="height:220px"></div>
+            <div class="loading-skeleton skeleton-card" style="height:220px"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+            <div class="loading-skeleton skeleton-card" style="height:180px"></div>
+            <div class="loading-skeleton skeleton-card" style="height:180px"></div>
+          </div>
+        </div>
+
+        <div class="empty-state" x-show="!overviewLoading && !overview">
+          <p>Unable to load overview. Check your connection.</p>
+          <button class="btn-secondary" @click="loadOverview()">Retry</button>
+        </div>

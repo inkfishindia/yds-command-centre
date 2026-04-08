@@ -1,44 +1,34 @@
 # Session Handoff — Command Centre
 
-## Last Session
-- 2026-03-26 03:06 IST
+## Last Session: 2026-04-08 ~04:30 IST
 
-## Current State
-- **Deployed live** at yds-command-centre.vercel.app (private, password-gated)
-- GitHub repo: inkfishindia/yds-command-centre (private)
-- Vercel auto-deploys on every push to main
-- Server status: local dev working on port 3000
-- All 690 tests passing, lint clean
+## What Was Accomplished
 
-## What Was Built This Session
-- Auth gate middleware (ACCESS_PASSWORD env var, cookie-based)
-- Vercel deployment config (vercel.json, module.exports for serverless)
-- CORS simplified — password gate handles access control
-- Google Sheets auth supports inline JSON (for Vercel, no file path)
-- CEO dashboard — new route, service, test, dedicated /ceo page
-- 7-panel dashboard architecture spec saved as roadmap
+Dan asked "if we had to split the app and optimize it how would you do it?" — initially I started reading files directly, Dan corrected me to use agents. Dispatched **Plan agent** to analyze the full codebase and produce a concrete splitting/optimization strategy.
+
+Plan agent read: app.js, index.html, build-assets.mjs, package.json, server.js, styles.css, command-shell.js, and all partials. Produced a 5-phase plan:
+
+1. **JS Code Splitting** — replace hand-rolled bundler with esbuild, split 22-module monolith (316 KB) into core bundle (~120 KB) + 13 lazy chunks loaded on navigation via dynamic `import()`
+2. **HTML Partial Extraction** — extract 15 remaining inline views from index.html (3,924→~260 lines), extending the existing 6-partial pattern
+3. **CSS Splitting** — split 13,791-line styles.css into core + per-view CSS loaded with partials
+4. **Build Pipeline Polish** — content hashing, aggressive caching, esbuild watch mode, source maps
+5. **Backend Cleanup** — minor: extract cache middleware, add partial cache headers (backend already well-structured)
+
+Expected outcome: initial JS gzip 80→35 KB, index.html 3,924→260 lines, 246 console errors→0, build time 200→50ms.
+
+No code changes were made this session — plan only, awaiting Dan's approval to execute.
+
+**Full plan persisted in:** `data/sessions/open-loops.md` — Loop 1: App Split & Optimization. All 5 phases with specific file paths, line numbers, and implementation details.
 
 ## Key Decisions
-- Deploy to Vercel free tier (serverless); may migrate to Render for better perf
-- No Claude chat on live site — dashboard only, notes/lists for Colin to pick up
-- Password gate is the primary access control (no CORS whitelist needed)
-- Simplified CORS to `cors()` since auth gate protects all routes
-- Keep Google Sheets as short-term source of truth
-- Use service-account auth for Sheets, not browser OAuth
 
-## Open Issues
-- Vercel cold starts make the app slow (~2-5s per request)
-- `STRATEGY_SPREADSHEET_ID` still pending verification
-- Legacy CRM pipeline parser may mismatch current LEAD_FLOWS values
-- GitHub repo is PUBLIC — should be switched to private
+- #8: Use esbuild for code splitting (not Vite/Webpack) — zero-config, single dependency, 50ms builds, stays within Alpine.js stack
+- Dan reinforced: always use agents for research/planning tasks, don't do direct file reads for broad analysis
 
-## Env Vars on Vercel
-- ACCESS_PASSWORD, NOTION_TOKEN, NODE_ENV=production
-- All SPREADSHEET_IDs, GOOGLE_SERVICE_ACCOUNT_KEY (inline JSON)
-- No ANTHROPIC_API_KEY (chat disabled on live site)
+## What To Do Next
 
-## Next Steps
-- Consider migrating from Vercel to Render for always-on server (no cold starts)
-- Build Panel 1 (Pulse Bar) and Panel 5 (Strategic Layer) from 7-panel spec
-- Verify all Google Sheets are shared with service account email
-- Revoke exposed tokens (GitHub PATs, Notion, Google SA key, Vercel token)
+1. **Get Dan's approval** on the 5-phase plan
+2. **Execute Phase 1** (JS code splitting) — highest impact, can be done independently
+3. **Previous session carryover**: code-reviewer + ux-auditor results from x-show→x-if fix were never received (agents were running in background when session ended)
+4. **Previous session carryover**: verify all 14 converted views render correctly
+5. **Previous session carryover**: clean up ~150 stale unknown entries in activity-log.md

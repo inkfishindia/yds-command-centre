@@ -1,0 +1,166 @@
+        <div class="view-header-bar">
+          <div class="view-header-left">
+            <span class="view-header-emoji">📄</span>
+            <div class="view-header-text">
+              <h2 class="view-header-title">Documents</h2>
+              <span class="view-header-subtitle">Briefings, reviews, and reports</span>
+            </div>
+          </div>
+          <div class="view-header-actions"></div>
+        </div>
+        <div class="docs-tabs">
+          <button class="tab-btn" :class="docsTab === 'outputs' && 'tab-active'" @click="docsTab = 'outputs'">Outputs</button>
+          <button class="tab-btn" :class="docsTab === 'briefings' && 'tab-active'" @click="docsTab = 'briefings'">Briefings</button>
+          <button class="tab-btn" :class="docsTab === 'decisions' && 'tab-active'" @click="docsTab = 'decisions'">Decisions</button>
+          <button class="tab-btn" :class="docsTab === 'weekly-reviews' && 'tab-active'" @click="docsTab = 'weekly-reviews'">Weekly Reviews</button>
+        </div>
+        <div class="docs-review-bar" x-show="docsTab === 'outputs'">
+          <div class="docs-review-pills">
+            <span class="metric-pill" x-text="(docsReviewSummary.total || 0) + ' Total'"></span>
+            <span class="metric-pill danger" x-text="(docsReviewSummary.pending || 0) + ' Pending'"></span>
+            <span class="metric-pill" x-text="(docsReviewSummary.approved || 0) + ' Approved'"></span>
+            <span class="metric-pill" x-text="(docsReviewSummary['needs-edit'] || 0) + ' Needs Edit'"></span>
+          </div>
+          <div class="docs-review-filters">
+            <input class="input docs-filter-input" x-model="docsSearch" placeholder="Search outputs or docs..." />
+            <select class="filter-select" x-model="docsStatusFilter">
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="needs-edit">Needs Edit</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+        </div>
+        <template x-if="docsLoading">
+          <div class="skeleton-stack">
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+            <div class="loading-skeleton skeleton-card"></div>
+          </div>
+        </template>
+        <template x-if="!docsLoading && !activeDoc">
+          <div>
+            <template x-if="getVisibleDocuments().length === 0">
+              <div class="empty-state">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span class="empty-state-title">No documents yet</span>
+                <span class="empty-state-subtitle">Use /brief, /decide, or /review in chat to generate them</span>
+              </div>
+            </template>
+            <div class="doc-list doc-list-grid">
+              <template x-for="doc in getVisibleDocuments()" :key="doc.path || doc.name">
+                <article class="doc-card">
+                  <button class="doc-item doc-item-card" @click="openDocument(docsTab, doc.name)" style="cursor:pointer;">
+                    <span class="doc-name" x-text="doc.name"></span>
+                    <span class="doc-date" x-text="new Date(doc.modified).toLocaleDateString()"></span>
+                    <span class="pill" :class="getDocsStatusClass(doc.status)" x-text="doc.status || 'pending'"></span>
+                  </button>
+                  <div class="doc-card-actions" x-show="docsTab === 'outputs'">
+                    <button class="btn-ghost btn-sm" @click="openOutputDrawer(docsTab, doc.name, doc.name)">Drawer</button>
+                    <button class="btn-primary btn-sm" @click="reviewDocument(doc, 'approved')">Approve</button>
+                    <button class="btn-ghost btn-sm" @click="reviewDocument(doc, 'needs-edit')">Needs Edit</button>
+                    <button class="btn-ghost btn-sm" @click="reviewDocument(doc, 'rejected')">Reject</button>
+                  </div>
+                </article>
+              </template>
+            </div>
+          </div>
+        </template>
+        <template x-if="activeDoc">
+          <div class="doc-viewer">
+            <div class="doc-viewer-header">
+              <button class="btn btn-small" @click="activeDoc = null">&larr; Back</button>
+              <span class="doc-viewer-title" x-text="activeDoc.filename"></span>
+              <span class="pill" :class="getDocsStatusClass(activeDoc.status)" x-text="activeDoc.status || 'pending'"></span>
+              <button class="btn btn-small" @click="discussDocument(activeDoc)" :disabled="streaming">Discuss with Colin</button>
+            </div>
+            <div class="doc-detail-layout">
+              <aside class="doc-detail-sidebar">
+                <div class="doc-detail-card">
+                  <div class="doc-detail-label">Category</div>
+                  <div class="doc-detail-value" x-text="activeDoc.category || 'unknown'"></div>
+                </div>
+                <div class="doc-detail-card">
+                  <div class="doc-detail-label">Path</div>
+                  <div class="doc-detail-value doc-detail-path" x-text="activeDoc.path || '—'"></div>
+                </div>
+                <div class="doc-detail-card">
+                  <div class="doc-detail-label">Review Status</div>
+                  <div class="doc-detail-value" x-text="activeDoc.status || 'pending'"></div>
+                  <div class="doc-detail-muted" x-text="activeDoc.reviewedAt ? ('Updated ' + new Date(activeDoc.reviewedAt).toLocaleString()) : 'Not reviewed yet'"></div>
+                </div>
+                <div class="doc-detail-card" x-show="activeDoc.category === 'outputs'">
+                  <div class="doc-detail-label">Actions</div>
+                  <div class="doc-card-actions">
+                    <button class="btn-primary btn-sm" @click="reviewActiveDocument('approved')">Approve</button>
+                    <button class="btn-ghost btn-sm" @click="reviewActiveDocument('needs-edit')">Needs Edit</button>
+                    <button class="btn-ghost btn-sm" @click="reviewActiveDocument('rejected')">Reject</button>
+                  </div>
+                </div>
+                <div class="doc-detail-card" x-show="activeDoc.reviewerNote">
+                  <div class="doc-detail-label">Reviewer Note</div>
+                  <div class="doc-detail-value" x-text="activeDoc.reviewerNote"></div>
+                </div>
+                <div class="doc-detail-card" x-show="activeDoc.relatedContext && ((activeDoc.relatedContext.owners || []).length || (activeDoc.relatedContext.focusAreas || []).length || (activeDoc.relatedContext.projects || []).length || (activeDoc.relatedContext.decisions || []).length || (activeDoc.relatedContext.views || []).length)">
+                  <div class="doc-detail-label">Linked Context</div>
+                  <div class="doc-context-block" x-show="(activeDoc.relatedContext?.owners || []).length">
+                    <div class="doc-detail-muted">Owners</div>
+                    <div class="table-inline-actions">
+                      <template x-for="owner in (activeDoc.relatedContext?.owners || [])" :key="'doc-owner-' + owner.name">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'owner', name: owner.name })" x-text="owner.name"></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="doc-context-block" x-show="(activeDoc.relatedContext?.focusAreas || []).length">
+                    <div class="doc-detail-muted">Focus Areas</div>
+                    <div class="table-inline-actions">
+                      <template x-for="area in (activeDoc.relatedContext?.focusAreas || [])" :key="'doc-area-' + area.name">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'focus-area', name: area.name })" x-text="area.name"></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="doc-context-block" x-show="(activeDoc.relatedContext?.projects || []).length">
+                    <div class="doc-detail-muted">Projects</div>
+                    <div class="table-inline-actions">
+                      <template x-for="project in (activeDoc.relatedContext?.projects || [])" :key="'doc-project-' + project.name">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'project', name: project.name })" x-text="project.name"></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="doc-context-block" x-show="(activeDoc.relatedContext?.decisions || []).length">
+                    <div class="doc-detail-muted">Decisions</div>
+                    <div class="table-inline-actions">
+                      <template x-for="decision in (activeDoc.relatedContext?.decisions || [])" :key="'doc-decision-' + decision.title">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'decision', title: decision.title })" x-text="decision.title"></button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="doc-context-block" x-show="(activeDoc.relatedContext?.views || []).length">
+                    <div class="doc-detail-muted">Areas</div>
+                    <div class="table-inline-actions">
+                      <template x-for="viewLink in (activeDoc.relatedContext?.views || [])" :key="'doc-view-' + viewLink.id">
+                        <button type="button" class="mini-action-btn" @click="openDocumentContextLink({ type: 'view', id: viewLink.id })" x-text="viewLink.label"></button>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+                <div class="doc-detail-card">
+                  <div class="doc-detail-label">History</div>
+                  <template x-if="(activeDoc.history || []).length === 0">
+                    <div class="doc-detail-muted">No review history yet.</div>
+                  </template>
+                  <div class="doc-history-list">
+                    <template x-for="(entry, idx) in (activeDoc.history || [])" :key="idx">
+                      <div class="doc-history-item">
+                        <span class="pill" :class="getDocsStatusClass(entry.status)" x-text="entry.status"></span>
+                        <span class="doc-detail-muted" x-text="new Date(entry.reviewedAt).toLocaleString()"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </aside>
+              <div class="doc-content" x-html="renderMarkdown(activeDoc.content)"></div>
+            </div>
+          </div>
+        </template>

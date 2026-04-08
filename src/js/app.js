@@ -5,45 +5,32 @@
 
 import { configureMarkdown } from './modules/markdown.js';
 import { createDashboardModule } from './modules/dashboard.js';
-import { createBmcModule } from './modules/bmc.js';
-import { createCrmModule } from './modules/crm.js';
-import { createMarketingOpsModule } from './modules/marketing-ops.js';
-import { createTechTeamModule } from './modules/tech-team.js';
-import { createRegistryModule } from './modules/registry.js';
-import { createProjectsModule } from './modules/projects.js';
-import { createTeamModule } from './modules/team.js';
-import { createDocumentsModule } from './modules/documents.js';
-import { createNotionBrowserModule } from './modules/notion-browser.js';
-import { createCommitmentsModule } from './modules/commitments.js';
-import { createFactoryModule } from './modules/factory.js';
 import { createCommandShellModule } from './modules/command-shell.js';
 import { createChatModule } from './modules/chat.js';
-import { createOverviewModule } from './modules/overview.js';
 import { createToastsModule } from './modules/toasts.js';
 import { createDetailDrawerModule } from './modules/detail-drawer.js';
 import { createInlineActionsModule } from './modules/inline-actions.js';
-import { createOpsModule } from './modules/ops.js';
-import { createCompetitorIntelModule } from './modules/competitor-intel.js';
 
 configureMarkdown();
 
-// Lazy module registry: maps view name -> factory function.
+// Lazy module registry: maps view name -> async module factory.
 // These are NOT initialized at startup — only when the user first navigates to the view.
 const LAZY_MODULE_FACTORIES = {
-  overview: createOverviewModule,
-  bmc: createBmcModule,
-  crm: createCrmModule,
-  marketingOps: createMarketingOpsModule,
-  techTeam: createTechTeamModule,
-  registry: createRegistryModule,
-  projects: createProjectsModule,
-  team: createTeamModule,
-  docs: createDocumentsModule,
-  notion: createNotionBrowserModule,
-  commitments: createCommitmentsModule,
-  factory: createFactoryModule,
-  ops: createOpsModule,
-  'competitor-intel': createCompetitorIntelModule,
+  overview: () => import('./modules/overview.js').then(({ createOverviewModule }) => createOverviewModule()),
+  bmc: () => import('./modules/bmc.js').then(({ createBmcModule }) => createBmcModule()),
+  crm: () => import('./modules/crm.js').then(({ createCrmModule }) => createCrmModule()),
+  marketingOps: () => import('./modules/marketing-ops.js').then(({ createMarketingOpsModule }) => createMarketingOpsModule()),
+  techTeam: () => import('./modules/tech-team.js').then(({ createTechTeamModule }) => createTechTeamModule()),
+  registry: () => import('./modules/registry.js').then(({ createRegistryModule }) => createRegistryModule()),
+  projects: () => import('./modules/projects.js').then(({ createProjectsModule }) => createProjectsModule()),
+  team: () => import('./modules/team.js').then(({ createTeamModule }) => createTeamModule()),
+  docs: () => import('./modules/documents.js').then(({ createDocumentsModule }) => createDocumentsModule()),
+  notion: () => import('./modules/notion-browser.js').then(({ createNotionBrowserModule }) => createNotionBrowserModule()),
+  commitments: () => import('./modules/commitments.js').then(({ createCommitmentsModule }) => createCommitmentsModule()),
+  factory: () => import('./modules/factory.js').then(({ createFactoryModule }) => createFactoryModule()),
+  ops: () => import('./modules/ops.js').then(({ createOpsModule }) => createOpsModule()),
+  'competitor-intel': () => import('./modules/competitor-intel.js').then(({ createCompetitorIntelModule }) => createCompetitorIntelModule()),
+  'claude-usage': () => import('./modules/claude-usage.js').then(({ createClaudeUsageModule }) => createClaudeUsageModule()),
 };
 
 function app() {
@@ -78,34 +65,120 @@ function app() {
 
     // Tracks which lazy modules have been initialized
     _initializedModules: {},
+    _moduleLoadPromises: {},
 
     // Tracks which HTML partials have been fetched and injected
     _partialLoaded: {},
+    _partialLoadPromises: {},
+    _loadedViewStyles: {},
+    _viewStylePromises: {},
+
+    _viewStyleFile(name) {
+      const fileMap = {
+        factory: 'factory',
+        registry: 'registry',
+        knowledge: 'knowledge',
+        marketingOps: 'marketingOps',
+        techTeam: 'techTeam',
+        bmc: 'bmc',
+        crm: 'crm',
+        ops: 'ops',
+        'claude-usage': 'claude-usage',
+      };
+      return fileMap[name] || null;
+    },
+
+    async _ensureViewStyles(name) {
+      const file = this._viewStyleFile(name);
+      if (!file || this._loadedViewStyles[file]) return;
+      if (this._viewStylePromises[file]) {
+        await this._viewStylePromises[file];
+        return;
+      }
+
+      const loadPromise = new Promise((resolve) => {
+        const existing = document.querySelector(`link[data-view-style="${file}"]`);
+        if (existing) {
+          this._loadedViewStyles[file] = true;
+          resolve();
+          return;
+        }
+
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = `/css/views/${file}.css`;
+        link.dataset.viewStyle = file;
+        link.onload = () => {
+          this._loadedViewStyles[file] = true;
+          delete this._viewStylePromises[file];
+          resolve();
+        };
+        link.onerror = () => {
+          console.error(`Failed to load view styles: ${file}`);
+          delete this._viewStylePromises[file];
+          resolve();
+        };
+        document.head.appendChild(link);
+      });
+
+      this._viewStylePromises[file] = loadPromise;
+      await loadPromise;
+    },
 
     async _loadPartial(name) {
       if (this._partialLoaded[name]) return;
+      if (this._partialLoadPromises[name]) {
+        await this._partialLoadPromises[name];
+        return;
+      }
+      const loadPromise = (async () => {
       try {
+        await this._ensureViewStyles(name);
         const res = await fetch(`/partials/${name}.html`);
         if (!res.ok) throw new Error(`Failed to load partial: ${name}`);
         const html = await res.text();
-        const container = document.querySelector(`.${this._partialViewClass(name)}`);
+        let container = document.querySelector(`.${this._partialViewClass(name)}`);
+        if (!container) {
+          await this.$nextTick();
+          container = document.querySelector(`.${this._partialViewClass(name)}`);
+        }
         if (container) {
           container.innerHTML = html;
+          window.Alpine?.initTree?.(container);
+          window.lucide?.createIcons?.();
           this._partialLoaded[name] = true;
+        } else {
+          throw new Error(`Missing partial container: ${name}`);
         }
       } catch (err) {
         console.error(`Failed to load view partial: ${name}`, err);
+      } finally {
+        delete this._partialLoadPromises[name];
       }
+      })();
+      this._partialLoadPromises[name] = loadPromise;
+      await loadPromise;
     },
 
     _partialViewClass(name) {
       const classMap = {
+        chat: 'chat-layout',
+        overview: 'overview-partial-view',
+        actionQueue: 'action-queue-view',
+        focusArea: 'focus-area-view',
+        team: 'team-view',
+        personView: 'person-view',
+        notion: 'notion-view',
         marketingOps: 'mktops-view',
         factory: 'factory-view',
         ops: 'ops-view',
         dashboard: 'dashboard-view',
         bmc: 'bmc-view',
         techTeam: 'tech-view',
+        crm: 'crm-view',
+        knowledge: 'knowledge-view',
+        registry: 'registry-view',
+        'claude-usage': 'usage-view',
       };
       return classMap[name] || name + '-view';
     },
@@ -177,6 +250,8 @@ function app() {
     opsProducts: [], opsProductsTotal: 0, opsProductsLoading: false,
     opsProductsFilters: { tier: '', vendor: '', search: '' },
     opsPOs: [], opsPOsTotal: 0, opsPOsLoading: false,
+    // claude-usage
+    claudeUsageSessions: [], claudeUsageNewPercent: 50, claudeUsageNewNote: '', claudeUsageMaxWeekly: 1000,
 
     // Eager modules — always initialized
     ...createDashboardModule(),
@@ -217,13 +292,24 @@ function app() {
 
     // Lazily initialize a module the first time its view is navigated to.
     // Merges all state and methods from the factory into `this` (the Alpine component).
-    _ensureModule(name) {
+    async _ensureModule(name) {
       if (this._initializedModules[name]) return;
+      if (this._moduleLoadPromises[name]) {
+        await this._moduleLoadPromises[name];
+        return;
+      }
       const factory = LAZY_MODULE_FACTORIES[name];
       if (!factory) return;
-      const mod = factory();
-      Object.assign(this, mod);
-      this._initializedModules[name] = true;
+      const loadPromise = Promise.resolve(factory())
+        .then((mod) => {
+          Object.assign(this, mod);
+          this._initializedModules[name] = true;
+        })
+        .finally(() => {
+          delete this._moduleLoadPromises[name];
+        });
+      this._moduleLoadPromises[name] = loadPromise;
+      await loadPromise;
     },
 
     // Initialization
@@ -285,8 +371,10 @@ function app() {
       }
       // Eagerly load notion-browser so openDetailPanel/closeDetailPanel are
       // available globally (many views call openDetailPanel on click).
-      this._ensureModule('notion');
-      this._ensureModule('overview');
+      await this._ensureModule('notion');
+      await this._ensureModule('overview');
+      await this.$nextTick();
+      await this._loadPartial('overview');
       this.loadOverview().then(async () => {
         if (this.view && this.view !== 'overview' && typeof this.openNavigationTarget === 'function') {
           await this.openNavigationTarget(this.view);
@@ -511,7 +599,7 @@ function app() {
 
     async openOwnerContext(ownerName) {
       if (!ownerName) return;
-      this._ensureModule('team');
+      await this._ensureModule('team');
       if (Array.isArray(this.teamData) && this.teamData.length === 0) {
         await this.loadTeam();
       }
@@ -542,7 +630,7 @@ function app() {
 
     async openProjectByName(projectName) {
       if (!projectName) return;
-      this._ensureModule('projects');
+      await this._ensureModule('projects');
       if (!Array.isArray(this.projects) || this.projects.length === 0) {
         await this.loadProjects();
       }
