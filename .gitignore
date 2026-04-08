@@ -10,3 +10,4 @@ Zreference/
 server/data/read-models/
 server/data/source-health.json
 server/data/sync-runs.json
+.vercel
