@@ -31,7 +31,7 @@
         <span class="header-alert-count" x-show="getUnreadNotificationCount() > 0" x-text="getUnreadNotificationCount()" x-cloak></span>
       </button>
       <span class="status-dot" :class="connected ? 'status-online' : 'status-offline'" aria-hidden="true"></span>
-      <span class="status-text" role="status" x-text="connected ? 'Colin Online' : 'Connecting...'"></span>
+      <span class="status-text" role="status" x-text="connected ? (chatAvailable ? 'App Online' : 'App Online • Chat Offline') : 'Connecting...'"></span>
     </div>
   </header>
 

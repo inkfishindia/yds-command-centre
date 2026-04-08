@@ -31,10 +31,11 @@ function loginRoute(req, res) {
   const submitted = req.body && req.body.password;
 
   if (submitted === password) {
+    const encodedPassword = encodeURIComponent(password);
     // Set cookie — httpOnly, secure in production, 30 day expiry
     const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-    res.setHeader('Set-Cookie', `${COOKIE_NAME}=${password}; Path=/; HttpOnly${secure}; SameSite=Strict; Max-Age=${30 * 24 * 60 * 60}`);
-    return res.redirect('/');
+    res.setHeader('Set-Cookie', `${COOKIE_NAME}=${encodedPassword}; Path=/; HttpOnly${secure}; SameSite=Strict; Max-Age=${30 * 24 * 60 * 60}`);
+    return res.redirect(303, '/');
   }
 
   res.status(401).send(loginPage('Wrong password'));
@@ -44,7 +45,13 @@ function parseCookies(cookieHeader) {
   const cookies = {};
   for (const pair of cookieHeader.split(';')) {
     const [key, ...rest] = pair.split('=');
-    if (key) cookies[key.trim()] = rest.join('=').trim();
+    if (!key) continue;
+    const rawValue = rest.join('=').trim();
+    try {
+      cookies[key.trim()] = decodeURIComponent(rawValue);
+    } catch {
+      cookies[key.trim()] = rawValue;
+    }
   }
   return cookies;
 }

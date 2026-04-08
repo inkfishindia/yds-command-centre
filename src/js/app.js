@@ -193,6 +193,7 @@ function app() {
 
     // Connection status
     connected: false,
+    chatAvailable: false,
 
     // Skills
     skills: [],
@@ -329,9 +330,11 @@ function app() {
       try {
         const res = await fetch('/api/health');
         const data = await res.json();
-        this.connected = data.status === 'ok' && data.hasAnthropicKey;
+        this.connected = data.status === 'ok';
+        this.chatAvailable = !!data.hasAnthropicKey;
       } catch {
         this.connected = false;
+        this.chatAvailable = false;
       }
 
       // Load available skills
