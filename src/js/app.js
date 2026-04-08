@@ -237,6 +237,10 @@ function app() {
     projects: [], projectsLoading: false, projectsFilter: 'Active', projectsTypeFilter: '', expandedProject: null,
     // team
     teamData: [], teamLoading: false,
+    getOverloadedCount() {
+      if (!Array.isArray(this.teamData) || this.teamData.length === 0) return 0;
+      return this.teamData.filter((person) => (person?.overdueCount || 0) >= 3 || (person?.activeCommitmentCount || 0) >= 8).length;
+    },
     // documents
     documents: { outputs: [], briefings: [], decisions: [], 'weekly-reviews': [] }, docsTab: 'outputs', docsLoading: false, activeDoc: null,
     // notion-browser (detailPanel is used globally by many views via openDetailPanel)
@@ -246,6 +250,12 @@ function app() {
     commitments: [], commitmentsLoading: false, commitmentsView: 'kanban',
     commitmentFilters: { focusArea: '', person: '', priority: '', status: '' },
     editDropdown: null, showCreateCommitment: false, showCreateDecision: false,
+    undoToast: null,
+    actionFeedback: null,
+    submittingCommitment: false,
+    submittingDecision: false,
+    newCommitment: { name: '', assigneeId: '', dueDate: '', focusAreaId: '', priority: 'Medium', notes: '' },
+    newDecision: { name: '', decision: '', rationale: '', context: '', focusAreaId: '', owner: 'Dan' },
     showSnoozeFor: null, showReassignFor: null, selectedOverdue: [],
     // factory
     factoryConfig: null, factoryConfigLoading: false,

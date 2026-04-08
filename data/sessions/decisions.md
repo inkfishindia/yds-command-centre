@@ -10,3 +10,4 @@
 | 6 | 2026-04-08 | Fix frontend x-show→x-if for lazy module views | Alpine evaluates all x-show expressions on load including uninitialised lazy modules, causing 246 errors and empty panels; x-if removes from DOM until active | Pending |
 | 7 | 2026-04-08 | Reconcile conflicting Stop hooks into single per-action format | Two Stop hooks had contradictory requirements (one summary row vs per-action rows) causing infinite loop at session end | Active |
 | 8 | 2026-04-08 | Use esbuild for JS code splitting (not Vite/Webpack) | Zero-config, single dependency, 50ms builds, stays within Alpine.js stack — no framework change needed | Proposed |
+| 9 | 2026-04-08 | Diagnosed live "data not loading" as auth-gate cookie encoding regression in commit 4979625; no code change yet | URL-encoding cookie on set + decodeURIComponent on read locks out users holding pre-deploy raw cookies until re-login. Vercel logs confirm all API endpoints return 200 after fresh login | Pending fix |
