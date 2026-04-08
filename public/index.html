@@ -102,7 +102,7 @@
           <button class="nav-btn" :class="view === 'dashboard' && 'nav-active'" @click="view = 'dashboard'; loadDashboard()" aria-label="Dashboard" :aria-current="view === 'dashboard' ? 'page' : false" :title="getShortcutTooltip('Dashboard', 'dashboard')">
             <span class="nav-icon-emoji" aria-hidden="true">📊</span>
             <span class="nav-label" x-show="sidebarExpanded">Dashboard</span>
-            <span class="nav-badge nav-badge-danger" x-show="dashboard && dashboard.overdue && dashboard.overdue.length > 0" x-text="dashboard.overdue.length" x-cloak></span>
+            <span class="nav-badge nav-badge-danger" x-show="(dashboard?.overdue?.length || 0) > 0" x-text="dashboard?.overdue?.length || 0" x-cloak></span>
             <span class="nav-health-dot" :class="(dashboard?.overdue?.length || 0) > 0 ? 'dot-danger' : 'dot-success'" x-show="dashboard" x-cloak></span>
           </button>
           <button class="nav-btn" :class="view === 'actionQueue' && 'nav-active'" @click="view = 'actionQueue'; loadActionQueue()" aria-label="Action Queue" :aria-current="view === 'actionQueue' ? 'page' : false" :title="getShortcutTooltip('Action Queue', 'queue')">
