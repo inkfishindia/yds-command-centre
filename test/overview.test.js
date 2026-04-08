@@ -15,6 +15,11 @@ describe('Overview Service — exports', () => {
     const service = require('../server/services/overview-service');
     assert.equal(typeof service.clearCache, 'function');
   });
+
+  it('exports withTimeout as a function', () => {
+    const service = require('../server/services/overview-service');
+    assert.equal(typeof service.withTimeout, 'function');
+  });
 });
 
 // ── Route: module loads ────────────────────────────────────────────────────────
@@ -300,5 +305,22 @@ describe('Overview Read Model', () => {
     assert.ok(Array.isArray(result.meta.degradedSources));
     assert.ok(result.meta.sourceFreshness.dashboard);
     assert.equal(result.meta.partial, false);
+  });
+});
+
+describe('Overview Service — timeouts', () => {
+  it('passes through resolved values before the timeout', async () => {
+    const service = require('../server/services/overview-service');
+    const result = await service.withTimeout(Promise.resolve('ok'), 'fast-source', 25);
+    assert.equal(result, 'ok');
+  });
+
+  it('rejects hung sources after the timeout window', async () => {
+    const service = require('../server/services/overview-service');
+
+    await assert.rejects(
+      service.withTimeout(new Promise(() => {}), 'hung-source', 10),
+      /hung-source timed out after 10ms/,
+    );
   });
 });

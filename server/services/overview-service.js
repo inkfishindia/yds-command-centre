@@ -9,6 +9,7 @@ const notionService = require('./notion');
 const projectsService = require('./projects-service');
 
 const CACHE_TTL_MS = 2 * 60 * 1000;
+const OVERVIEW_SOURCE_TIMEOUT_MS = 12 * 1000;
 
 let overviewCache = null;
 
@@ -16,6 +17,24 @@ function getFreshCache() {
   if (!overviewCache) return null;
   if (Date.now() - overviewCache.time > CACHE_TTL_MS) return null;
   return overviewCache.data;
+}
+
+function withTimeout(promise, label, timeoutMs = OVERVIEW_SOURCE_TIMEOUT_MS) {
+  let timer = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  return Promise.race([
+    Promise.resolve(promise).finally(() => {
+      if (timer) clearTimeout(timer);
+    }),
+    timeoutPromise,
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 function buildAttention(actionQueue, dashboard) {
@@ -609,18 +628,18 @@ async function getOverviewPayload() {
     crmOverviewResult,
     opsOverviewResult,
   ] = await Promise.allSettled([
-    dashboardService.getActionQueuePayload(),
-    dashboardService.getDashboardPayload(),
-    marketingOpsService.getSummary(),
-    marketingOpsService.getMarketingTasksSummary(),
-    techTeamService.getSummary(),
-    notionService.getAITeam(),
-    techTeamService.getTechBacklog({}),
-    notionService.getSessionsLog(30),
-    notionService.getPeople(),
-    projectsService.getProjectsPayload(),
-    crmService.getOverview(),
-    opsService.getOverview(),
+    withTimeout(dashboardService.getActionQueuePayload(), 'action-queue'),
+    withTimeout(dashboardService.getDashboardPayload(), 'dashboard'),
+    withTimeout(marketingOpsService.getSummary(), 'marketing-ops-summary'),
+    withTimeout(marketingOpsService.getMarketingTasksSummary(), 'marketing-tasks-summary'),
+    withTimeout(techTeamService.getSummary(), 'tech-summary'),
+    withTimeout(notionService.getAITeam(), 'ai-team'),
+    withTimeout(techTeamService.getTechBacklog({}), 'tech-backlog'),
+    withTimeout(notionService.getSessionsLog(30), 'sessions'),
+    withTimeout(notionService.getPeople(), 'people'),
+    withTimeout(projectsService.getProjectsPayload(), 'projects'),
+    withTimeout(crmService.getOverview(), 'crm-overview'),
+    withTimeout(opsService.getOverview(), 'ops-overview'),
   ]);
 
   const actionQueue = actionQueueResult.status === 'fulfilled' ? actionQueueResult.value : null;
@@ -728,4 +747,5 @@ function clearCache() {
 module.exports = {
   getOverviewPayload,
   clearCache,
+  withTimeout,
 };
