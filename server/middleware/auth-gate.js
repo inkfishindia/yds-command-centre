@@ -22,8 +22,9 @@ const PUBLIC_ASSET_PATHS = [
 function authGate(req, res, next) {
   const password = process.env.ACCESS_PASSWORD;
 
-  // No password configured → gate disabled (local dev)
+  // No password configured or a Vercel preview deploy → gate disabled.
   if (!password) return next();
+  if (process.env.VERCEL_ENV === 'preview') return next();
 
   // Allow the login page and its POST
   if (req.path === LOGIN_PATH) return next();
@@ -39,8 +40,7 @@ function authGate(req, res, next) {
   }
 
   // Check cookie
-  const cookies = parseCookies(req.headers.cookie || '');
-  if (cookies[COOKIE_NAME] === password) return next();
+  if (hasValidAuthCookie(req.headers.cookie || '', password)) return next();
 
   // Not authenticated → show login form
   res.status(401).send(loginPage());
@@ -61,19 +61,25 @@ function loginRoute(req, res) {
   res.status(401).send(loginPage('Wrong password'));
 }
 
-function parseCookies(cookieHeader) {
-  const cookies = {};
+function hasValidAuthCookie(cookieHeader, password) {
+  if (!cookieHeader || !password) return false;
+
   for (const pair of cookieHeader.split(';')) {
     const [key, ...rest] = pair.split('=');
     if (!key) continue;
     const rawValue = rest.join('=').trim();
+    if (key.trim() !== COOKIE_NAME) continue;
+
+    if (rawValue === password) return true;
+
     try {
-      cookies[key.trim()] = decodeURIComponent(rawValue);
+      if (decodeURIComponent(rawValue) === password) return true;
     } catch {
-      cookies[key.trim()] = rawValue;
+      // Ignore malformed escape sequences and fall back to the raw value check above.
     }
   }
-  return cookies;
+
+  return false;
 }
 
 function loginPage(error) {
@@ -106,4 +112,4 @@ function loginPage(error) {
 </html>`;
 }
 
-module.exports = { authGate, loginRoute };
+module.exports = { authGate, loginRoute, hasValidAuthCookie };

@@ -389,9 +389,14 @@ function app() {
       if (window.innerWidth <= 768) {
         this.commitmentsView = 'list';
       }
-      // Eagerly load notion-browser so openDetailPanel/closeDetailPanel are
-      // available globally (many views call openDetailPanel on click).
-      await this._ensureModule('notion');
+      // Try to eagerly load notion-browser so openDetailPanel/closeDetailPanel
+      // are available globally. If this chunk fails to import, keep booting the
+      // rest of the app so the main shell does not render blank.
+      try {
+        await this._ensureModule('notion');
+      } catch (err) {
+        console.error('Failed to initialize notion module during boot:', err);
+      }
       await this._ensureModule('overview');
       await this.$nextTick();
       await this._loadPartial('overview');
