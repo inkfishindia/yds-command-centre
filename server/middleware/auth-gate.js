@@ -5,6 +5,10 @@
  */
 const COOKIE_NAME = 'yds_cc_auth';
 const LOGIN_PATH = '/login';
+const PUBLIC_GET_PATHS = new Set([
+  '/api/health',
+  '/api/health/details',
+]);
 
 function authGate(req, res, next) {
   const password = process.env.ACCESS_PASSWORD;
@@ -15,8 +19,8 @@ function authGate(req, res, next) {
   // Allow the login page and its POST
   if (req.path === LOGIN_PATH) return next();
 
-  // Allow health check (useful for Vercel monitoring)
-  if (req.path === '/api/health') return next();
+  // Allow health reads (useful for Vercel monitoring and in-app status surfaces)
+  if (req.method === 'GET' && PUBLIC_GET_PATHS.has(req.path)) return next();
 
   // Check cookie
   const cookies = parseCookies(req.headers.cookie || '');

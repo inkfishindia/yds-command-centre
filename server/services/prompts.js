@@ -76,6 +76,10 @@ function loadSkillPrompt(skillName) {
  * List all available skills
  */
 function listSkills() {
+  if (!fs.existsSync(config.SKILLS_DIR)) {
+    return [];
+  }
+
   try {
     const entries = fs.readdirSync(config.SKILLS_DIR, { withFileTypes: true });
     return entries
@@ -85,6 +89,9 @@ function listSkills() {
         return fs.existsSync(path.join(config.SKILLS_DIR, name, 'prompt.md'));
       });
   } catch (err) {
+    if (err && err.code === 'ENOENT') {
+      return [];
+    }
     console.error('Failed to list skills:', err.message);
     return [];
   }
