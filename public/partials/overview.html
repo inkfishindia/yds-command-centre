@@ -15,6 +15,18 @@
             </div>
           </div>
 
+          <div
+            class="read-model-banner"
+            x-show="overviewMeta"
+            :class="'read-model-banner--' + getOverviewMetaTone()"
+          >
+            <div class="read-model-banner-copy">
+              <strong x-text="getOverviewMetaSummary()"></strong>
+              <span x-show="getOverviewFreshness()" x-text="getOverviewFreshness()"></span>
+              <span x-show="overviewMeta?.lastSyncedAt" x-text="'Last sync ' + formatOverviewDateTime(overviewMeta.lastSyncedAt)"></span>
+            </div>
+          </div>
+
           <div class="overview-attention-banner" x-show="overview?.attention?.counts">
             <div class="overview-banner-head">
               <div>
@@ -53,6 +65,71 @@
                   </span>
                 </div>
               </template>
+            </div>
+          </div>
+
+          <div class="overview-system-panel" x-show="systemHealth">
+            <div class="org-section-title-row">
+              <h2 class="org-section-title">System Status</h2>
+              <span class="org-section-badge" x-text="getSystemHealthCounts().readModels"></span>
+            </div>
+            <div class="overview-system-summary">
+              <div class="overview-system-stat">
+                <span class="overview-system-value" x-text="getSystemHealthCounts().staleReadModels"></span>
+                <span class="overview-system-label">Stale read models</span>
+              </div>
+              <div class="overview-system-stat">
+                <span class="overview-system-value" x-text="getSystemHealthCounts().partialReadModels"></span>
+                <span class="overview-system-label">Partial read models</span>
+              </div>
+              <div class="overview-system-stat">
+                <span class="overview-system-value" x-text="getSystemHealthCounts().degradedSources"></span>
+                <span class="overview-system-label">Degraded sources</span>
+              </div>
+            </div>
+            <div class="overview-system-grid">
+              <div class="overview-system-card">
+                <div class="overview-system-card-head">
+                  <h3>Read Models</h3>
+                  <span class="overview-system-meta" x-text="'Updated ' + formatOverviewDateTime(systemHealth?.sourceHealth?.updatedAt)"></span>
+                </div>
+                <div class="overview-system-list" x-show="getSystemHealthReadModels().length > 0">
+                  <template x-for="model in getSystemHealthReadModels()" :key="model.name">
+                    <div class="overview-system-row">
+                      <div class="overview-system-row-main">
+                        <span class="overview-system-name" x-text="model.name"></span>
+                        <span class="overview-system-meta" x-text="'Generated ' + formatOverviewDateTime(model.generatedAt || model.persistedAt)"></span>
+                      </div>
+                      <span
+                        class="org-status-badge"
+                        :class="systemHealthStatusClass(model.stale ? 'fallback' : (model.partial ? 'degraded' : 'ok'))"
+                        x-text="model.stale ? 'stale' : (model.partial ? 'partial' : 'ok')"
+                      ></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+              <div class="overview-system-card">
+                <div class="overview-system-card-head">
+                  <h3>Source Health</h3>
+                  <span class="overview-system-meta" x-text="systemHealth?.sourceHealth?.updatedAt ? 'Checked ' + formatOverviewDateTime(systemHealth.sourceHealth.updatedAt) : 'No checks yet'"></span>
+                </div>
+                <div class="overview-system-list" x-show="getSystemHealthSources().length > 0">
+                  <template x-for="source in getSystemHealthSources()" :key="source.name">
+                    <div class="overview-system-row">
+                      <div class="overview-system-row-main">
+                        <span class="overview-system-name" x-text="source.name"></span>
+                        <span class="overview-system-meta" x-text="source.readModel ? 'via ' + source.readModel : 'No owner'"></span>
+                      </div>
+                      <span
+                        class="org-status-badge"
+                        :class="systemHealthStatusClass(source.status)"
+                        x-text="source.status"
+                      ></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
             </div>
           </div>
 

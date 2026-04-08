@@ -6,6 +6,7 @@ const path = require('path');
 
 const SHEETS_PATH = path.join(__dirname, '../server/services/sheets.js');
 const OPS_SERVICE_PATH = path.join(__dirname, '../server/services/ops-service.js');
+const OPS_READ_MODEL_PATH = path.join(__dirname, '../server/read-model/ops.js');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -502,6 +503,55 @@ describe('Ops Route — module loading', () => {
     const router = require('../server/routes/ops');
     const has = router.stack.some(l => l.route && l.route.path === '/purchase-orders' && l.route.methods.get);
     assert.ok(has, 'GET /purchase-orders should be registered');
+  });
+});
+
+describe('Ops Read Model', () => {
+  afterEach(() => {
+    delete require.cache[OPS_SERVICE_PATH];
+    delete require.cache[OPS_READ_MODEL_PATH];
+  });
+
+  it('wraps overview payload in data/meta contract', async () => {
+    const svc = require(OPS_SERVICE_PATH);
+    const opsReadModel = require('../server/read-model/ops');
+
+    svc.getOverview = async () => ({
+      stockHealth: { available: true, byStatus: [], outOfStock: 0 },
+      alerts: [],
+      pendingPOs: { available: true, count: 0, items: [] },
+      vendors: [],
+      products: { available: true, total: 0, byTier: [] },
+      timestamp: '2026-04-08T00:00:00.000Z',
+    });
+
+    const result = await opsReadModel.build();
+    assert.ok(result.data, 'has data');
+    assert.ok(result.meta, 'has meta');
+    assert.equal(result.meta.partial, false);
+    assert.deepEqual(result.meta.degradedSources, []);
+    assert.equal(result.meta.sourceFreshness.stockHealth.status, 'ok');
+  });
+
+  it('flags degraded sources when overview sections are unavailable', async () => {
+    const svc = require(OPS_SERVICE_PATH);
+    const opsReadModel = require('../server/read-model/ops');
+
+    svc.getOverview = async () => ({
+      stockHealth: { available: false },
+      alerts: [],
+      pendingPOs: { available: false, count: 0, items: [] },
+      vendors: null,
+      products: { available: false, total: 0, byTier: [] },
+      timestamp: '2026-04-08T00:00:00.000Z',
+    });
+
+    const result = await opsReadModel.build();
+    assert.equal(result.meta.partial, true);
+    assert.ok(result.meta.degradedSources.includes('stockHealth'));
+    assert.ok(result.meta.degradedSources.includes('products'));
+    assert.ok(result.meta.degradedSources.includes('pendingPOs'));
+    assert.ok(result.meta.degradedSources.includes('vendors'));
   });
 });
 

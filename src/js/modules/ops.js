@@ -1,9 +1,12 @@
+import { formatReadModelFreshness, getReadModelSummary, getReadModelTone, unwrapReadModelResponse } from './read-models.js';
+
 export function createOpsModule() {
   return {
     // ── State ──────────────────────────────────────────────────────────
     opsSection: 'overview',
 
     ops: null,
+    opsMeta: null,
     opsLoading: false,
     opsLastRefresh: null,
     opsSavedView: 'alerts',
@@ -32,7 +35,9 @@ export function createOpsModule() {
       try {
         const res = await fetch('/api/ops', { signal });
         if (res.ok) {
-          this.ops = await res.json();
+          const { data, meta } = unwrapReadModelResponse(await res.json());
+          this.ops = data;
+          this.opsMeta = meta;
           this.opsLastRefresh = new Date();
           this.runNotificationChecks?.('ops');
         }
@@ -245,6 +250,18 @@ export function createOpsModule() {
       if (diff < 60) return `Refreshed ${diff}s ago`;
       if (diff < 3600) return `Refreshed ${Math.round(diff / 60)}m ago`;
       return `Refreshed ${Math.round(diff / 3600)}h ago`;
+    },
+
+    getOpsFreshnessLabel() {
+      return formatReadModelFreshness(this.opsMeta);
+    },
+
+    getOpsMetaTone() {
+      return getReadModelTone(this.opsMeta);
+    },
+
+    getOpsMetaSummary() {
+      return getReadModelSummary(this.opsMeta, 'All primary ops sources loaded');
     },
 
     getOpsAreaStatus() {

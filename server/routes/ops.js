@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const opsService = require('../services/ops-service');
+const opsReadModel = require('../read-model/ops');
 
 /**
  * GET /api/ops
@@ -10,7 +11,7 @@ const opsService = require('../services/ops-service');
  */
 router.get('/', async (req, res) => {
   try {
-    res.json(await opsService.getOverview());
+    res.json(await opsReadModel.build());
   } catch (err) {
     console.error('[ops] overview error:', err.message);
     res.status(500).json({ error: 'Failed to load ops overview' });

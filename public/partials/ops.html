@@ -16,6 +16,17 @@
         </div>
       </div>
 
+      <div
+        class="read-model-banner"
+        x-show="opsMeta"
+        :class="'read-model-banner--' + getOpsMetaTone()"
+      >
+        <div class="read-model-banner-copy">
+          <strong x-text="getOpsMetaSummary()"></strong>
+          <span x-text="getOpsFreshnessLabel()"></span>
+        </div>
+      </div>
+
       <!-- Tabs -->
       <div class="mktops-tabs" style="margin-bottom: 1.25rem;">
         <button class="filter-pill" :class="opsSection === 'overview' && 'filter-pill-active'" @click="opsSwitchSection('overview')" aria-label="Overview">Overview</button>

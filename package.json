@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "build": "node scripts/build-assets.mjs",
+    "sync:readmodels": "node scripts/sync-read-models.mjs",
     "start": "npm run build && node server.js",
     "dev": "npm run build && node --watch server.js",
     "test": "node --test 'test/*.test.js'",

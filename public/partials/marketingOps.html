@@ -15,6 +15,17 @@
         </div>
       </div>
 
+      <div
+        class="read-model-banner"
+        x-show="mktopsMeta"
+        :class="'read-model-banner--' + getMktopsMetaTone()"
+      >
+        <div class="read-model-banner-copy">
+          <strong x-text="getMktopsMetaSummary()"></strong>
+          <span x-text="getMktopsFreshnessLabel()"></span>
+        </div>
+      </div>
+
       <!-- Loading -->
       <template x-if="mktopsLoading && !mktops">
         <div class="skeleton-stack">

@@ -29,6 +29,7 @@ const LAZY_MODULE_FACTORIES = {
   commitments: () => import('./modules/commitments.js').then(({ createCommitmentsModule }) => createCommitmentsModule()),
   factory: () => import('./modules/factory.js').then(({ createFactoryModule }) => createFactoryModule()),
   ops: () => import('./modules/ops.js').then(({ createOpsModule }) => createOpsModule()),
+  status: () => import('./modules/system-status.js').then(({ createSystemStatusModule }) => createSystemStatusModule()),
   'competitor-intel': () => import('./modules/competitor-intel.js').then(({ createCompetitorIntelModule }) => createCompetitorIntelModule()),
   'claude-usage': () => import('./modules/claude-usage.js').then(({ createClaudeUsageModule }) => createClaudeUsageModule()),
 };
@@ -51,6 +52,7 @@ function app() {
       p0Bugs: true,
       lowStock: true,
       stalledFlows: true,
+      systemHealth: true,
       dailyDigest: true,
       dailyDigestTime: '09:00',
       quietHoursEnabled: true,
@@ -62,6 +64,7 @@ function app() {
     _notificationIntervalId: null,
     _notificationSnapshot: null,
     notificationCenter: [],
+    systemAlertSnapshot: null,
 
     // Tracks which lazy modules have been initialized
     _initializedModules: {},
@@ -83,6 +86,7 @@ function app() {
         bmc: 'bmc',
         crm: 'crm',
         ops: 'ops',
+        status: 'system-status',
         'claude-usage': 'claude-usage',
       };
       return fileMap[name] || null;
@@ -172,6 +176,7 @@ function app() {
         marketingOps: 'mktops-view',
         factory: 'factory-view',
         ops: 'ops-view',
+        status: 'status-view',
         dashboard: 'dashboard-view',
         bmc: 'bmc-view',
         techTeam: 'tech-view',
@@ -206,6 +211,8 @@ function app() {
     // Object.assign will overwrite these stubs with the real module state + methods.
     // overview
     overview: null, overviewLoading: false,
+    // system status
+    systemStatus: null, systemStatusLoading: false, systemSyncing: false, systemSyncMessage: '',
     // bmc
     bmc: null, bmcLoading: false, bmcDetailItem: null, bmcDetailKey: '', bmcSearch: '', bmcFilter: 'highlights', bmcFocus: '',
     // crm
@@ -882,6 +889,9 @@ function app() {
       const stalledFlows = (this.crm?.flowStats?.byStatus || []).reduce((sum, item) => {
         return String(item.name || '').toLowerCase() === 'stalled' ? sum + (item.count || 0) : sum;
       }, 0);
+      const systemStale = this.systemAlertSnapshot?.staleReadModels || 0;
+      const systemFailures = this.systemAlertSnapshot?.failingReadModels || 0;
+      const degradedSystems = this.systemAlertSnapshot?.degradedSources || 0;
 
       return {
         blocked,
@@ -889,7 +899,41 @@ function app() {
         p0Bugs,
         lowStock,
         stalledFlows,
+        systemStale,
+        systemFailures,
+        degradedSystems,
       };
+    },
+
+    async refreshSystemAlertSnapshot() {
+      try {
+        const res = await fetch('/api/health/details');
+        if (!res.ok) return;
+
+        const payload = await res.json();
+        const readModels = Array.isArray(payload?.readModels) ? payload.readModels : [];
+        const syncSummary = Array.isArray(payload?.syncSummary) ? payload.syncSummary : [];
+        const degradedSources = Object.values(payload?.sourceHealth?.sources || {}).filter((entry) => entry?.status !== 'ok').length;
+        const scheduleIntervalMinutes = Math.max(0, Math.round((Number(payload?.syncSchedule?.intervalMs || 0)) / 60000));
+        const staleThresholdMinutes = Math.max(30, scheduleIntervalMinutes * 2 || 0);
+        const now = Date.now();
+        const staleReadModels = readModels.filter((item) => {
+          if (!item?.stale) return false;
+          const stamp = item.lastSyncedAt || item.generatedAt || item.persistedAt;
+          if (!stamp) return true;
+          return (now - new Date(stamp).getTime()) >= staleThresholdMinutes * 60000;
+        }).length;
+        const failingReadModels = syncSummary.filter((item) => item?.lastStatus === 'failed').length;
+
+        this.systemAlertSnapshot = {
+          staleReadModels,
+          failingReadModels,
+          degradedSources,
+          staleThresholdMinutes,
+        };
+      } catch (err) {
+        console.error('System alert snapshot error:', err);
+      }
     },
 
     getNotificationTimeMinutes(clockValue) {
@@ -987,6 +1031,9 @@ function app() {
         p0Bugs: 'P0 bugs',
         lowStock: 'Stock risk',
         stalledFlows: 'Stalled flows',
+        systemStale: 'Stale read models',
+        systemFailures: 'Sync failures',
+        degradedSystems: 'Degraded systems',
         digest: 'Daily digest',
         test: 'Test',
       };
@@ -1060,9 +1107,10 @@ function app() {
       }
     },
 
-    runNotificationChecks(source = 'manual') {
+    async runNotificationChecks(source = 'manual') {
       this.syncNotificationPermission();
       if (!this.notificationSettings.enabled || this.notificationPermission !== 'granted') return;
+      await this.refreshSystemAlertSnapshot();
 
       const current = this.getNotificationSnapshot();
       const previous = this._notificationSnapshot;
@@ -1108,13 +1156,50 @@ function app() {
           body: `${current.stalledFlows} stalled flows now need follow-up`,
           view: 'crm',
         },
+        {
+          key: 'systemStale',
+          enabled: this.notificationSettings.systemHealth,
+          persistent: true,
+          title: 'Read models are stale too long',
+          body: `${current.systemStale} read model(s) have stayed stale beyond the sync threshold`,
+          view: 'status',
+        },
+        {
+          key: 'systemFailures',
+          enabled: this.notificationSettings.systemHealth,
+          persistent: true,
+          title: 'Read model sync failures need attention',
+          body: `${current.systemFailures} read model sync failure(s) are still unresolved`,
+          view: 'status',
+        },
+        {
+          key: 'degradedSystems',
+          enabled: this.notificationSettings.systemHealth,
+          persistent: true,
+          title: 'Source systems are degraded',
+          body: `${current.degradedSystems} source system(s) are reporting degraded health`,
+          view: 'status',
+        },
       ];
 
       alerts.forEach((alert) => {
         if (!alert.enabled) return;
+        if (this.isNotificationCooldownActive(alert.key)) return;
+        if (alert.persistent) {
+          if ((current[alert.key] || 0) <= 0) return;
+          this.sendBrowserNotification(alert.title, {
+            body: alert.body,
+            tag: `alert-${alert.key}-${source}`,
+            view: alert.view,
+            type: 'alert',
+            rule: alert.key,
+          });
+          this.markNotificationCooldown(alert.key);
+          return;
+        }
+
         const delta = (current[alert.key] || 0) - (previous[alert.key] || 0);
         if (delta < Number(this.notificationSettings.minimumIncrease || 1)) return;
-        if (this.isNotificationCooldownActive(alert.key)) return;
         if ((current[alert.key] || 0) > (previous[alert.key] || 0)) {
           this.sendBrowserNotification(alert.title, {
             body: alert.body,

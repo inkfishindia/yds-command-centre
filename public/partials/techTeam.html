@@ -24,6 +24,17 @@
         </div>
       </div>
 
+      <div
+        class="read-model-banner"
+        x-show="techTeamMeta"
+        :class="'read-model-banner--' + getTechMetaTone()"
+      >
+        <div class="read-model-banner-copy">
+          <strong x-text="getTechMetaSummary()"></strong>
+          <span x-text="getTechFreshnessLabel()"></span>
+        </div>
+      </div>
+
       <div class="mktops-overview-shell" x-show="techTeam">
         <section class="mktops-hero" :class="'mktops-hero--' + getTechAreaStatus().tone">
           <div class="mktops-hero-copy">

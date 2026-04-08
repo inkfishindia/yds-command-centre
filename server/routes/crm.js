@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const crmService = require('../services/crm-service');
+const crmReadModel = require('../read-model/crm');
 
 /**
  * GET /api/crm
@@ -10,7 +11,7 @@ const crmService = require('../services/crm-service');
  */
 router.get('/', async (req, res) => {
   try {
-    res.json(await crmService.getOverview());
+    res.json(await crmReadModel.build());
   } catch (err) {
     console.error('CRM overview error:', err);
     res.status(500).json({ error: 'Failed to load CRM data' });

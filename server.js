@@ -5,6 +5,7 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const config = require('./server/config');
+const readModelScheduler = require('./server/services/read-model-scheduler');
 
 const { authGate, loginRoute } = require('./server/middleware/auth-gate');
 
@@ -46,7 +47,7 @@ app.use('/api', (req, res, next) => {
     '/notebooks',
   ];
 
-  if (requestPath.startsWith('/chat') || requestPath === '/health') {
+  if (requestPath.startsWith('/chat') || requestPath.startsWith('/health')) {
     res.setHeader('Cache-Control', 'no-store');
     return next();
   }
@@ -122,16 +123,7 @@ app.use('/api/overview', require('./server/routes/overview'));
 app.use('/api/ops', require('./server/routes/ops'));
 app.use('/api/competitor-intel', require('./server/routes/competitor-intel'));
 app.use('/api/ceo-dashboard', require('./server/routes/ceo-dashboard'));
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    hasAnthropicKey: !!config.ANTHROPIC_API_KEY,
-    hasNotionToken: !!config.NOTION_TOKEN,
-    model: config.MODEL,
-  });
-});
+app.use('/api/health', require('./server/routes/health'));
 
 // Static file serving — Alpine.js frontend from public/
 // Cache JS/CSS for 1 hour (assets are rebuilt on deploy); HTML always revalidates.
@@ -174,5 +166,13 @@ if (process.env.VERCEL) {
     // Pre-warm ops sales cache so the 5s aggregation runs at startup, not on first request
     const opsService = require('./server/services/ops-service');
     opsService.warmCaches();
+
+    // Schedule persisted read-model syncs in the background so the dashboard keeps warm snapshots
+    const syncSchedule = readModelScheduler.startScheduler();
+    if (syncSchedule.enabled) {
+      console.log(`  Read-model sync scheduled every ${Math.round(syncSchedule.intervalMs / 60000)}m (startup delay ${Math.round(syncSchedule.startupDelayMs / 1000)}s)`);
+    } else {
+      console.log('  Read-model sync scheduler disabled');
+    }
   });
 }

@@ -142,6 +142,7 @@ describe('Overview Service — response shape', () => {
     assert.ok(payload.health, 'has health');
     assert.ok(payload.insights, 'has insights');
     assert.ok(payload.timestamp, 'has timestamp');
+    assert.ok(payload.sourceState, 'has sourceState');
   });
 
   it('attention has required sub-keys', () => {
@@ -212,6 +213,14 @@ describe('Overview Service — response shape', () => {
     assert.ok(!isNaN(Date.parse(payload.timestamp)));
   });
 
+  it('tracks per-source resolution state', () => {
+    assert.equal(payload.sourceState.actionQueue, 'fulfilled');
+    assert.equal(payload.sourceState.dashboard, 'fulfilled');
+    assert.equal(payload.sourceState.marketingOpsSummary, 'fulfilled');
+    assert.equal(payload.sourceState.crmOverview, 'fulfilled');
+    assert.equal(payload.sourceState.opsOverview, 'fulfilled');
+  });
+
   it('returns cached result on second call', async () => {
     const service = require('../server/services/overview-service');
     const second = await service.getOverviewPayload();
@@ -246,9 +255,50 @@ describe('Overview Service — graceful degradation', () => {
     assert.ok(result.health, 'has health');
     assert.ok(result.insights, 'has insights');
     assert.ok(result.timestamp, 'has timestamp');
+    assert.ok(result.sourceState, 'has sourceState');
     assert.equal(result.attention.counts.waitingOnDan, 0);
     assert.equal(result.health.aiTeam.total, 0);
+    assert.equal(result.sourceState.actionQueue, 'rejected');
+    assert.equal(result.sourceState.dashboard, 'rejected');
 
     service.clearCache();
+  });
+});
+
+describe('Overview Read Model', () => {
+  it('wraps overview payload in data/meta contract', async () => {
+    const dashboardService = require('../server/services/dashboard-service');
+    const marketingOpsService = require('../server/services/marketing-ops-service');
+    const techTeamService = require('../server/services/tech-team-service');
+    const notionService = require('../server/services/notion');
+    const projectsService = require('../server/services/projects-service');
+    const crmService = require('../server/services/crm-service');
+    const opsService = require('../server/services/ops-service');
+    const overviewService = require('../server/services/overview-service');
+    const overviewReadModel = require('../server/read-model/overview');
+
+    dashboardService.getActionQueuePayload = async () => ({ dansQueue: [], runnersQueue: [], dansQueueCount: 0, runnersQueueCount: 0 });
+    dashboardService.getDashboardPayload = async () => ({ focusAreas: [], overdue: [], upcoming: [], recentDecisions: [], healthDistribution: { onTrack: 0, atRisk: 0, offTrack: 0 }, teamWorkload: [] });
+    marketingOpsService.getSummary = async () => ({ campaigns: [], content: [], stats: {} });
+    marketingOpsService.getMarketingTasksSummary = async () => ({ total: 0, byStatus: {}, byPriority: {}, byChannel: {}, overdue: 0, urgent: 0, inProgress: 0, blocked: 0 });
+    techTeamService.getSummary = async () => ({ stats: { totalItems: 0, doneItems: 0, inProgress: 0, blocked: 0, specsInReview: 0 } });
+    techTeamService.getTechBacklog = async () => [];
+    notionService.getAITeam = async () => [];
+    notionService.getSessionsLog = async () => [];
+    notionService.getPeople = async () => [];
+    projectsService.getProjectsPayload = async () => ({ projects: [] });
+    crmService.getOverview = async () => ({ pipeline: { totalLeads: 0, statusBreakdown: [], available: true } });
+    opsService.getOverview = async () => ({ alerts: [], stockHealth: { outOfStock: 0 } });
+
+    overviewService.clearCache();
+    const result = await overviewReadModel.build();
+
+    assert.ok(result.data, 'has data');
+    assert.ok(result.meta, 'has meta');
+    assert.equal(typeof result.meta.partial, 'boolean');
+    assert.ok(!isNaN(Date.parse(result.meta.generatedAt)));
+    assert.ok(Array.isArray(result.meta.degradedSources));
+    assert.ok(result.meta.sourceFreshness.dashboard);
+    assert.equal(result.meta.partial, false);
   });
 });

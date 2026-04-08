@@ -1,9 +1,13 @@
+import { formatReadModelFreshness, getReadModelSummary, getReadModelTone, unwrapReadModelResponse } from './read-models.js';
+
 export function createCrmModule() {
   return {
     // CRM
     crmSection: 'overview',
     crm: null,
+    crmMeta: null,
     crmLoading: false,
+    crmLastRefresh: null,
     crmSavedView: 'newest-leads',
 
     // Leads
@@ -35,7 +39,10 @@ export function createCrmModule() {
       try {
         const res = await fetch('/api/crm', { signal });
         if (res.ok) {
-          this.crm = await res.json();
+          const { data, meta } = unwrapReadModelResponse(await res.json());
+          this.crm = data;
+          this.crmMeta = meta;
+          this.crmLastRefresh = new Date();
           this.runNotificationChecks?.('crm');
         }
       } catch (err) {
@@ -261,6 +268,26 @@ export function createCrmModule() {
         (s) => s.name.toLowerCase() === status.toLowerCase()
       );
       return item ? item.count : 0;
+    },
+
+    getCrmRefreshLabel() {
+      if (!this.crmLastRefresh) return 'Never refreshed';
+      const diff = Math.round((Date.now() - this.crmLastRefresh.getTime()) / 1000);
+      if (diff < 60) return `Refreshed ${diff}s ago`;
+      if (diff < 3600) return `Refreshed ${Math.round(diff / 60)}m ago`;
+      return `Refreshed ${Math.round(diff / 3600)}h ago`;
+    },
+
+    getCrmFreshnessLabel() {
+      return formatReadModelFreshness(this.crmMeta);
+    },
+
+    getCrmMetaTone() {
+      return getReadModelTone(this.crmMeta);
+    },
+
+    getCrmMetaSummary() {
+      return getReadModelSummary(this.crmMeta, 'All primary CRM sources loaded');
     },
 
     getCrmOverviewKpi(name) {

@@ -1,7 +1,10 @@
+import { formatReadModelFreshness, getReadModelSummary, getReadModelTone, unwrapReadModelResponse } from './read-models.js';
+
 export function createMarketingOpsModule() {
   return {
     // Marketing Ops
     mktops: null,
+    mktopsMeta: null,
     mktopsLoading: false,
     mktopsSection: 'overview',
     mktopsLastRefresh: null,
@@ -107,7 +110,9 @@ export function createMarketingOpsModule() {
           fetch('/api/marketing-ops/tasks/summary').catch(() => null),
         ]);
         if (summaryRes.ok) {
-          this.mktops = await summaryRes.json();
+          const { data, meta } = unwrapReadModelResponse(await summaryRes.json());
+          this.mktops = data;
+          this.mktopsMeta = meta;
           this.mktopsLastRefresh = new Date();
           this.runNotificationChecks?.('marketing');
         }
@@ -129,6 +134,18 @@ export function createMarketingOpsModule() {
       if (diff < 60) return `Refreshed ${diff}s ago`;
       if (diff < 3600) return `Refreshed ${Math.round(diff / 60)}m ago`;
       return `Refreshed ${Math.round(diff / 3600)}h ago`;
+    },
+
+    getMktopsFreshnessLabel() {
+      return formatReadModelFreshness(this.mktopsMeta);
+    },
+
+    getMktopsMetaTone() {
+      return getReadModelTone(this.mktopsMeta);
+    },
+
+    getMktopsMetaSummary() {
+      return getReadModelSummary(this.mktopsMeta, 'All primary marketing sources loaded');
     },
 
     getMarketingAreaStatus() {

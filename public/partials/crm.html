@@ -6,10 +6,22 @@
           </div>
         </div>
         <div class="view-header-actions">
+          <span class="view-refresh-label" x-show="crmLastRefresh" x-text="getCrmRefreshLabel()"></span>
           <button class="btn btn-small btn-icon" @click="loadCrm()" :disabled="crmLoading" aria-label="Refresh CRM">
             <span class="refresh-icon">&#x21bb;</span>
             <span x-text="crmLoading ? 'Loading...' : 'Refresh'"></span>
           </button>
+        </div>
+      </div>
+
+      <div
+        class="read-model-banner"
+        x-show="crmMeta"
+        :class="'read-model-banner--' + getCrmMetaTone()"
+      >
+        <div class="read-model-banner-copy">
+          <strong x-text="getCrmMetaSummary()"></strong>
+          <span x-text="getCrmFreshnessLabel()"></span>
         </div>
       </div>
 

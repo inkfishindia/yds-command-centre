@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const techTeamService = require('../services/tech-team-service');
+const techTeamReadModel = require('../read-model/tech-team');
 
 // GET /api/tech-team — Tech team summary (command center data)
 router.get('/', async (req, res) => {
   try {
-    res.json(await techTeamService.getSummary());
+    res.json(await techTeamReadModel.build());
   } catch (err) {
     console.error('Tech team summary error:', err);
     res.status(500).json({ error: 'Failed to load tech team data' });

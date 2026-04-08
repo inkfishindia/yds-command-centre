@@ -71,7 +71,7 @@ export function createCommandShellModule() {
 
     async openNavigationTarget(action) {
       // Load HTML partial for views that have been extracted to separate files
-      const partialViews = ['chat', 'overview', 'dashboard', 'actionQueue', 'focusArea', 'team', 'personView', 'docs', 'notion', 'knowledge', 'decisions', 'projects', 'registry', 'commitments', 'factory', 'marketingOps', 'techTeam', 'bmc', 'crm', 'ops', 'claude-usage'];
+      const partialViews = ['chat', 'overview', 'dashboard', 'actionQueue', 'focusArea', 'team', 'personView', 'docs', 'notion', 'knowledge', 'decisions', 'projects', 'registry', 'commitments', 'factory', 'marketingOps', 'techTeam', 'bmc', 'crm', 'ops', 'status', 'claude-usage'];
       this.view = action;
       this.tableSelectedRow = -1;
       if (partialViews.includes(action)) {
@@ -105,6 +105,7 @@ export function createCommandShellModule() {
       else if (action === 'actionQueue') this.loadActionQueue();
       else if (action === 'factory' && !this.factoryConfig) this.loadFactoryConfig();
       else if (action === 'ops') this.loadOps();
+      else if (action === 'status') this.loadSystemStatus();
       else if (action === 'claude-usage') this.loadClaudeUsage();
     },
 
@@ -181,6 +182,7 @@ export function createCommandShellModule() {
         { label: 'CRM', icon: '▸', type: 'view', view: 'crm', keywords: ['customers', 'contacts', 'clients'], action: () => this.openNavigationTarget('crm') },
         { label: 'Marketing Ops', icon: '▸', type: 'view', view: 'marketingOps', keywords: ['marketing', 'campaigns', 'content'], action: () => this.openNavigationTarget('marketingOps') },
         { label: 'Tech Team', icon: '▸', type: 'view', view: 'techTeam', keywords: ['tech', 'engineering', 'dev', 'sprint'], action: () => this.openNavigationTarget('techTeam') },
+        { label: 'System Status', icon: '▸', type: 'view', view: 'status', keywords: ['health', 'status', 'sync', 'read models'], action: () => this.openNavigationTarget('status') },
         { label: 'Action Queue', icon: '▸', type: 'view', view: 'actionQueue', keywords: ['queue', 'actions', 'pending'], action: () => this.openNavigationTarget('actionQueue') },
       ];
     },
@@ -201,6 +203,17 @@ export function createCommandShellModule() {
           icon: '⚡',
           type: 'action',
           action: () => fetch('/api/notion/cache/clear', { method: 'POST' }).then(() => this.showSuccess('Cache cleared')),
+        },
+        {
+          label: 'Sync Read Models',
+          icon: '⚡',
+          type: 'action',
+          action: async () => {
+            await fetch('/api/health/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+            if (this.view === 'status') await this.loadSystemStatus();
+            if (this.view === 'overview') await this.loadOverview();
+            this.showSuccess('Read models synced');
+          },
         },
         {
           label: 'New Commitment',

@@ -1,0 +1,78 @@
+'use strict';
+
+const { afterEach, describe, it } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+
+const STORE_PATH = path.join(__dirname, '../server/services/read-model-store.js');
+const READ_MODELS_DIR = path.join(__dirname, '../server/data/read-models');
+const SOURCE_HEALTH_PATH = path.join(__dirname, '../server/data/source-health.json');
+const SYNC_RUNS_PATH = path.join(__dirname, '../server/data/sync-runs.json');
+
+async function cleanup() {
+  await fs.rm(READ_MODELS_DIR, { recursive: true, force: true, maxRetries: 3, retryDelay: 25 }).catch(() => {});
+  await fs.rm(SOURCE_HEALTH_PATH, { force: true });
+  await fs.rm(SYNC_RUNS_PATH, { force: true });
+}
+
+describe('Read Model Store', () => {
+  afterEach(async () => {
+    delete require.cache[STORE_PATH];
+    await cleanup();
+  });
+
+  it('saves and loads a read model payload', async () => {
+    const store = require(STORE_PATH);
+    await store.saveReadModel('ops', {
+      data: { ok: true },
+      meta: { generatedAt: '2026-04-08T00:00:00.000Z', partial: false },
+    });
+
+    const record = await store.loadReadModel('ops');
+    assert.equal(record.name, 'ops');
+    assert.equal(record.payload.data.ok, true);
+    assert.ok(record.persistedAt);
+  });
+
+  it('tracks source health updates', async () => {
+    const store = require(STORE_PATH);
+    await store.updateSourceHealth('crm', {
+      pipeline: { status: 'ok', checkedAt: '2026-04-08T00:00:00.000Z' },
+      team: { status: 'degraded', checkedAt: '2026-04-08T00:01:00.000Z' },
+    });
+
+    const state = await store.loadSourceHealth();
+    assert.equal(state.sources.pipeline.readModel, 'crm');
+    assert.equal(state.sources.pipeline.status, 'ok');
+    assert.equal(state.sources.team.status, 'degraded');
+  });
+
+  it('stores sync runs in newest-first order', async () => {
+    const store = require(STORE_PATH);
+    await store.appendSyncRun({ name: 'overview', ok: true, startedAt: '2026-04-08T00:00:00.000Z' });
+    await store.appendSyncRun({ name: 'ops', ok: false, startedAt: '2026-04-08T00:01:00.000Z' });
+
+    const runs = await store.loadSyncRuns();
+    assert.equal(runs.length, 2);
+    assert.equal(runs[0].name, 'ops');
+    assert.equal(runs[1].name, 'overview');
+  });
+
+  it('builds latest sync state per model', async () => {
+    const store = require(STORE_PATH);
+    await store.appendSyncRun({ name: 'overview', ok: true, startedAt: '2026-04-08T00:00:00.000Z', finishedAt: '2026-04-08T00:01:00.000Z' });
+    await store.appendSyncRun({ name: 'overview', ok: false, startedAt: '2026-04-08T00:02:00.000Z', finishedAt: '2026-04-08T00:03:00.000Z', error: 'offline' });
+    await store.appendSyncRun({ name: 'ops', ok: true, partial: true, startedAt: '2026-04-08T00:04:00.000Z', finishedAt: '2026-04-08T00:05:00.000Z' });
+
+    const summary = await store.loadLatestSyncStates();
+    const overview = summary.find((item) => item.name === 'overview');
+    const ops = summary.find((item) => item.name === 'ops');
+
+    assert.equal(overview.lastStatus, 'failed');
+    assert.equal(overview.lastFailureAt, '2026-04-08T00:03:00.000Z');
+    assert.equal(overview.lastSuccessAt, '2026-04-08T00:01:00.000Z');
+    assert.equal(overview.lastError, 'offline');
+    assert.equal(ops.lastStatus, 'partial');
+  });
+});

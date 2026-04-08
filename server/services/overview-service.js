@@ -637,6 +637,20 @@ async function getOverviewPayload() {
     : [];
   const crmOverview = crmOverviewResult.status === 'fulfilled' ? crmOverviewResult.value : null;
   const opsOverview = opsOverviewResult.status === 'fulfilled' ? opsOverviewResult.value : null;
+  const sourceState = {
+    actionQueue: actionQueueResult.status,
+    dashboard: dashboardResult.status,
+    marketingOpsSummary: mktOpsSummaryResult.status,
+    marketingTasksSummary: mktTasksSummaryResult.status,
+    techSummary: techSummaryResult.status,
+    aiTeam: aiTeamResult.status,
+    techBacklog: techBacklogResult.status,
+    sessions: sessionsResult.status,
+    people: peopleResult.status,
+    projects: projectsPayloadResult.status,
+    crmOverview: crmOverviewResult.status,
+    opsOverview: opsOverviewResult.status,
+  };
 
   // Log any source failures but continue with partial data
   [
@@ -699,6 +713,7 @@ async function getOverviewPayload() {
     areaCards,
     activityFeed,
     quickLinks: buildQuickLinks({ attention, areaCards }),
+    sourceState,
     timestamp: new Date().toISOString(),
   };
 

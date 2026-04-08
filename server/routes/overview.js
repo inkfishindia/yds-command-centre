@@ -3,11 +3,11 @@
 const express = require('express');
 
 const router = express.Router();
-const overviewService = require('../services/overview-service');
+const overviewReadModel = require('../read-model/overview');
 
 router.get('/', async (req, res) => {
   try {
-    res.json(await overviewService.getOverviewPayload());
+    res.json(await overviewReadModel.build());
   } catch (err) {
     console.error('Overview error:', err);
     res.status(500).json({ error: 'Failed to load overview' });

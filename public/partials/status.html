@@ -1,0 +1,132 @@
+<div class="system-status-view" x-show="!systemStatusLoading || systemStatus">
+  <div class="view-header-bar">
+    <div class="view-header-left">
+      <span class="view-header-emoji">🩺</span>
+      <div class="view-header-text">
+        <h2 class="view-header-title">System Status</h2>
+        <span class="view-header-subtitle">Read-model health, source freshness, and manual rebuild controls</span>
+      </div>
+    </div>
+    <div class="view-header-actions">
+      <span class="org-last-refresh" x-show="systemStatus?.sourceHealth?.updatedAt" x-text="'Checked ' + formatSystemStatusDate(systemStatus?.sourceHealth?.updatedAt)"></span>
+      <button class="btn btn-small btn-icon" :class="systemSyncing && 'btn-spinning'" @click="syncReadModels()" :disabled="systemSyncing">
+        <span class="refresh-icon">&#x21bb;</span> Sync All
+      </button>
+      <button class="btn btn-small btn-icon" :class="systemStatusLoading && 'btn-spinning'" @click="loadSystemStatus()">
+        <span class="refresh-icon">&#x21bb;</span> Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="system-status-flash" x-show="systemSyncMessage" x-text="systemSyncMessage"></div>
+
+  <section class="system-status-card">
+    <div class="system-status-card-head">
+      <h3>Sync Policy</h3>
+      <span class="system-status-meta" x-text="getSystemScheduleSummary()"></span>
+    </div>
+    <div class="system-status-list">
+      <div class="system-status-row">
+        <div class="system-status-main">
+          <div class="system-status-row-head">
+            <span class="system-status-name">Automatic schedule</span>
+            <span class="org-status-badge" :class="systemStatusBadgeClass(getSystemSyncSchedule()?.enabled ? 'ok' : 'neutral')" x-text="getSystemSyncSchedule()?.enabled ? 'enabled' : 'disabled'"></span>
+          </div>
+          <span class="system-status-meta" x-show="getSystemSyncSchedule()?.nextRunAt" x-text="'Next run ' + formatSystemStatusDate(getSystemSyncSchedule()?.nextRunAt)"></span>
+          <span class="system-status-meta" x-show="getSystemSyncSchedule()?.lastRunFinishedAt" x-text="'Last automatic run ' + formatSystemStatusDate(getSystemSyncSchedule()?.lastRunFinishedAt)"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="system-status-summary">
+    <div class="system-status-stat">
+      <span class="system-status-value" x-text="getSystemStatusCounts().readModels"></span>
+      <span class="system-status-label">Read models</span>
+    </div>
+    <div class="system-status-stat">
+      <span class="system-status-value" x-text="getSystemStatusCounts().stale"></span>
+      <span class="system-status-label">Stale</span>
+    </div>
+    <div class="system-status-stat">
+      <span class="system-status-value" x-text="getSystemStatusCounts().partial"></span>
+      <span class="system-status-label">Partial</span>
+    </div>
+    <div class="system-status-stat">
+      <span class="system-status-value" x-text="getSystemStatusCounts().degradedSources"></span>
+      <span class="system-status-label">Degraded sources</span>
+    </div>
+    <div class="system-status-stat">
+      <span class="system-status-value" x-text="getSystemStatusCounts().failedSyncs"></span>
+      <span class="system-status-label">Recent sync failures</span>
+    </div>
+  </div>
+
+  <div class="system-status-grid">
+    <section class="system-status-card">
+      <div class="system-status-card-head">
+        <h3>Read Models</h3>
+        <span class="system-status-meta" x-text="getSystemStatusReadModels().length + ' tracked'"></span>
+      </div>
+      <div class="system-status-list" x-show="getSystemStatusReadModels().length > 0">
+        <template x-for="model in getSystemStatusReadModels()" :key="model.name">
+          <div class="system-status-row">
+            <div class="system-status-main">
+              <div class="system-status-row-head">
+                <span class="system-status-name" x-text="model.name"></span>
+                <span class="org-status-badge" :class="systemStatusBadgeClass(model.stale ? 'stale' : (model.partial ? 'partial' : 'ok'))" x-text="model.stale ? 'stale' : (model.partial ? 'partial' : 'ok')"></span>
+              </div>
+              <span class="system-status-meta" x-text="'Generated ' + formatSystemStatusDate(model.generatedAt || model.persistedAt)"></span>
+              <span class="system-status-meta" x-show="model.lastSyncedAt" x-text="'Last sync ' + formatSystemStatusDate(model.lastSyncedAt)"></span>
+              <span class="system-status-meta" x-show="model.syncState?.lastFailureAt" x-text="'Last failure ' + formatSystemStatusDate(model.syncState.lastFailureAt)"></span>
+              <span class="system-status-meta" x-show="model.syncState?.lastError" x-text="model.syncState.lastError"></span>
+            </div>
+            <button class="btn btn-small" @click="syncReadModels(model.name)" :disabled="systemSyncing">Sync</button>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <section class="system-status-card">
+      <div class="system-status-card-head">
+        <h3>Source Health</h3>
+        <span class="system-status-meta" x-text="getSystemStatusSources().length + ' sources'"></span>
+      </div>
+      <div class="system-status-list" x-show="getSystemStatusSources().length > 0">
+        <template x-for="source in getSystemStatusSources()" :key="source.name">
+          <div class="system-status-row">
+            <div class="system-status-main">
+              <div class="system-status-row-head">
+                <span class="system-status-name" x-text="source.name"></span>
+                <span class="org-status-badge" :class="systemStatusBadgeClass(source.status)" x-text="source.status"></span>
+              </div>
+              <span class="system-status-meta" x-text="source.readModel ? 'via ' + source.readModel : 'No owner'"></span>
+              <span class="system-status-meta" x-show="source.checkedAt" x-text="'Checked ' + formatSystemStatusDate(source.checkedAt)"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
+  </div>
+
+  <section class="system-status-card">
+    <div class="system-status-card-head">
+      <h3>Recent Sync Runs</h3>
+      <span class="system-status-meta" x-text="getSystemSyncRuns().length + ' runs'"></span>
+    </div>
+    <div class="system-status-list" x-show="getSystemSyncRuns().length > 0">
+      <template x-for="run in getSystemSyncRuns()" :key="run.name + ':' + run.startedAt">
+        <div class="system-status-row">
+          <div class="system-status-main">
+            <div class="system-status-row-head">
+              <span class="system-status-name" x-text="run.name"></span>
+              <span class="org-status-badge" :class="systemStatusBadgeClass(run.ok === false ? 'error' : (run.stale ? 'stale' : (run.partial ? 'partial' : 'ok')))" x-text="run.ok === false ? 'failed' : (run.stale ? 'stale' : (run.partial ? 'partial' : 'ok'))"></span>
+            </div>
+            <span class="system-status-meta" x-text="'Started ' + formatSystemStatusDate(run.startedAt)"></span>
+            <span class="system-status-meta" x-show="run.error" x-text="run.error"></span>
+          </div>
+        </div>
+      </template>
+    </div>
+  </section>
+</div>

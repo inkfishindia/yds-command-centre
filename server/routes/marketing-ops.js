@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const marketingOpsService = require('../services/marketing-ops-service');
+const marketingOpsReadModel = require('../read-model/marketing-ops');
 
 // GET /api/marketing-ops — aggregated summary
 router.get('/', async (req, res) => {
   try {
-    res.json(await marketingOpsService.getSummary());
+    res.json(await marketingOpsReadModel.build());
   } catch (err) {
     console.error('Marketing ops summary error:', err);
     res.status(500).json({ error: 'Failed to load marketing ops data' });

@@ -1,5 +1,44 @@
 .crm-view { padding: 0 1.5rem 1.5rem; overflow-y: auto; height: 100%; }
 
+.crm-meta-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+}
+
+.crm-meta-banner-copy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.crm-meta-banner-copy strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.crm-meta-banner--healthy {
+  border-color: color-mix(in srgb, var(--green) 35%, var(--border));
+}
+
+.crm-meta-banner--warning {
+  border-color: color-mix(in srgb, var(--amber) 45%, var(--border));
+  background: color-mix(in srgb, var(--amber) 8%, var(--bg-secondary));
+}
+
+.crm-meta-banner--critical {
+  border-color: color-mix(in srgb, var(--red) 45%, var(--border));
+  background: color-mix(in srgb, var(--red) 8%, var(--bg-secondary));
+}
+
 /* Status colors */
 .crm-status-active   { color: var(--green); }
 .crm-status-stalled  { color: var(--amber); }
@@ -188,4 +227,10 @@
   .crm-view { padding: 0 0.75rem 1.5rem; }
   .crm-owner-grid { grid-template-columns: 1fr 1fr; }
   .crm-status-bar { gap: 0.35rem; }
+  .crm-meta-banner { padding: 0.75rem; }
+  .crm-meta-banner-copy {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
 }

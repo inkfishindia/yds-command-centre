@@ -1,7 +1,11 @@
 'use strict';
 
-const { describe, it } = require('node:test');
+const { describe, it, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
+
+const CRM_SERVICE_PATH = path.join(__dirname, '../server/services/crm-service.js');
+const CRM_READ_MODEL_PATH = path.join(__dirname, '../server/read-model/crm.js');
 
 describe('CRM Service — exports', () => {
   it('exports the expected service methods', () => {
@@ -156,5 +160,52 @@ describe('CRM Service — date parsing', () => {
     const result = await crmService.getLeads({ page: '1', limit: '10' });
     // unconfigured — just check it doesn't throw
     assert.ok(typeof result === 'object');
+  });
+});
+
+describe('CRM Read Model', () => {
+  afterEach(() => {
+    delete require.cache[CRM_SERVICE_PATH];
+    delete require.cache[CRM_READ_MODEL_PATH];
+  });
+
+  it('wraps overview payload in data/meta contract', async () => {
+    const crmService = require(CRM_SERVICE_PATH);
+    const crmReadModel = require(CRM_READ_MODEL_PATH);
+
+    crmService.getOverview = async () => ({
+      pipeline: { available: true, totalLeads: 4 },
+      leadStats: { total: 4, byStatus: [], byCategory: [], recentLeads: [] },
+      flowStats: { total: 3, byStatus: [], byOwner: [] },
+      team: { count: 2, users: [] },
+      timestamp: '2026-04-08T00:00:00.000Z',
+    });
+
+    const result = await crmReadModel.build();
+    assert.ok(result.data);
+    assert.ok(result.meta);
+    assert.equal(result.meta.partial, false);
+    assert.deepEqual(result.meta.degradedSources, []);
+    assert.equal(result.meta.sourceFreshness.pipeline.status, 'ok');
+  });
+
+  it('flags degraded CRM sources when overview is partial', async () => {
+    const crmService = require(CRM_SERVICE_PATH);
+    const crmReadModel = require(CRM_READ_MODEL_PATH);
+
+    crmService.getOverview = async () => ({
+      pipeline: { available: false, totalLeads: 0 },
+      leadStats: { total: 0, byStatus: [], byCategory: [], recentLeads: [] },
+      flowStats: { total: 0, byStatus: [], byOwner: [] },
+      team: { count: 0, users: [] },
+      timestamp: '2026-04-08T00:00:00.000Z',
+    });
+
+    const result = await crmReadModel.build();
+    assert.equal(result.meta.partial, true);
+    assert.ok(result.meta.degradedSources.includes('pipeline'));
+    assert.ok(result.meta.degradedSources.includes('leadStats'));
+    assert.ok(result.meta.degradedSources.includes('flowStats'));
+    assert.ok(result.meta.degradedSources.includes('team'));
   });
 });

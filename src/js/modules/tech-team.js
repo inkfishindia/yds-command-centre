@@ -1,7 +1,10 @@
+import { formatReadModelFreshness, getReadModelSummary, getReadModelTone, unwrapReadModelResponse } from './read-models.js';
+
 export function createTechTeamModule() {
   return {
     // Tech Team
     techTeam: null,
+    techTeamMeta: null,
     techTeamLoading: false,
     techTeamSection: 'command',
     techTeamLastRefresh: null,
@@ -27,13 +30,21 @@ export function createTechTeamModule() {
           fetch('/api/tech-team/strategy').catch(() => null),
         ]);
         if (summaryRes.ok) {
-          this.techTeam = await summaryRes.json();
+          const { data, meta } = unwrapReadModelResponse(await summaryRes.json());
+          this.techTeam = data;
+          this.techTeamMeta = meta;
           this.techTeamLastRefresh = new Date();
           this.runNotificationChecks?.('tech');
         }
-        if (githubRes && githubRes.ok) this.techGithub = await githubRes.json();
-        if (agentsRes && agentsRes.ok) this.techAgents = await agentsRes.json();
-        if (strategyRes && strategyRes.ok) this.techStrategy = await strategyRes.json();
+        if (this.techTeam) {
+          this.techGithub = this.techTeam.github || null;
+          this.techAgents = this.techTeam.agents || null;
+          this.techStrategy = this.techTeam.strategy || null;
+        } else {
+          if (githubRes && githubRes.ok) this.techGithub = await githubRes.json();
+          if (agentsRes && agentsRes.ok) this.techAgents = await agentsRes.json();
+          if (strategyRes && strategyRes.ok) this.techStrategy = await strategyRes.json();
+        }
       } catch (err) {
         if (this.isAbortError(err)) return;
         console.error('Tech Team load error:', err);
@@ -49,6 +60,18 @@ export function createTechTeamModule() {
       if (diff < 60) return `Refreshed ${diff}s ago`;
       if (diff < 3600) return `Refreshed ${Math.round(diff / 60)}m ago`;
       return `Refreshed ${Math.round(diff / 3600)}h ago`;
+    },
+
+    getTechFreshnessLabel() {
+      return formatReadModelFreshness(this.techTeamMeta);
+    },
+
+    getTechMetaTone() {
+      return getReadModelTone(this.techTeamMeta);
+    },
+
+    getTechMetaSummary() {
+      return getReadModelSummary(this.techTeamMeta, 'All primary tech sources loaded');
     },
 
     getTechAreaStatus() {
