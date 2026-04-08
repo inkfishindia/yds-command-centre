@@ -129,8 +129,20 @@ app.use('/api/health', require('./server/routes/health'));
 // Cache JS/CSS for 1 hour (assets are rebuilt on deploy); HTML always revalidates.
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders(res, filePath) {
-    if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+    const normalized = filePath.replace(/\\/g, '/');
+    const isHashedChunk = /\/public\/js\/chunks\/.+-[A-Z0-9]{8}\.js$/i.test(normalized);
+
+    if (normalized.endsWith('/public/js/app.js')) {
+      // The app shell points at lazy chunks whose names change on every deploy.
+      // Force revalidation so browsers do not keep an old shell after a new deploy.
+      res.setHeader('Cache-Control', 'no-cache');
+    } else if (normalized.endsWith('.css')) {
+      // CSS filenames are stable across deploys, so avoid stale UI after release.
+      res.setHeader('Cache-Control', 'no-cache');
+    } else if (isHashedChunk) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (normalized.endsWith('.js')) {
+      res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=60');
     } else if (filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache');
     }
