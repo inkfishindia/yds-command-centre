@@ -60,4 +60,27 @@ describe('Auth Gate', () => {
     assert.equal(statusCode, 401);
     assert.match(String(sentBody || ''), /YDS Command Centre/);
   });
+
+  it('allows static shell assets without auth when password protection is enabled', () => {
+    process.env.ACCESS_PASSWORD = 'secret';
+    const { authGate } = require(AUTH_GATE_PATH);
+    let nextCalled = false;
+
+    authGate({
+      method: 'GET',
+      path: '/partials/overview.html',
+      headers: {},
+    }, {
+      status() {
+        throw new Error('Did not expect a status response');
+      },
+      send() {
+        throw new Error('Did not expect a login page response');
+      },
+    }, () => {
+      nextCalled = true;
+    });
+
+    assert.equal(nextCalled, true);
+  });
 });

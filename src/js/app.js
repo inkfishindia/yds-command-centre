@@ -138,7 +138,7 @@ function app() {
       const loadPromise = (async () => {
       try {
         await this._ensureViewStyles(name);
-        const res = await fetch(`/partials/${name}.html`);
+        const res = await fetch(`/partials/${name}.html`, { cache: 'no-store' });
         if (!res.ok) throw new Error(`Failed to load partial: ${name}`);
         const html = await res.text();
         let container = document.querySelector(`.${this._partialViewClass(name)}`);
@@ -338,7 +338,7 @@ function app() {
 
       // Check server health
       try {
-        const res = await fetch('/api/health');
+        const res = await fetch('/api/health', { cache: 'no-store' });
         const data = await res.json();
         this.connected = data.status === 'ok';
         this.chatAvailable = !!data.hasAnthropicKey;
@@ -349,7 +349,7 @@ function app() {
 
       // Load available skills
       try {
-        const res = await fetch('/api/skills');
+        const res = await fetch('/api/skills', { cache: 'no-store' });
         const data = await res.json();
         this.skills = data.skills;
       } catch (err) {

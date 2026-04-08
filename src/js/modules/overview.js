@@ -17,8 +17,8 @@ export function createOverviewModule() {
       this.overviewLoading = true;
       try {
         const [overviewRes, healthRes] = await Promise.all([
-          fetch('/api/overview'),
-          fetch('/api/health/details'),
+          fetch('/api/overview', { cache: 'no-store' }),
+          fetch('/api/health/details', { cache: 'no-store' }),
         ]);
 
         if (overviewRes.ok) {

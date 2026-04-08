@@ -9,6 +9,15 @@ const PUBLIC_GET_PATHS = new Set([
   '/api/health',
   '/api/health/details',
 ]);
+const PUBLIC_ASSET_PREFIXES = [
+  '/css/',
+  '/js/',
+  '/partials/',
+];
+const PUBLIC_ASSET_PATHS = [
+  '/favicon.ico',
+  '/favicon.png',
+];
 
 function authGate(req, res, next) {
   const password = process.env.ACCESS_PASSWORD;
@@ -19,8 +28,15 @@ function authGate(req, res, next) {
   // Allow the login page and its POST
   if (req.path === LOGIN_PATH) return next();
 
-  // Allow health reads (useful for Vercel monitoring and in-app status surfaces)
-  if (req.method === 'GET' && PUBLIC_GET_PATHS.has(req.path)) return next();
+  // Allow read-only health checks plus static shell assets to load without auth.
+  // Data APIs remain protected unless explicitly listed above.
+  if ((req.method === 'GET' || req.method === 'HEAD') && (
+    PUBLIC_GET_PATHS.has(req.path)
+    || PUBLIC_ASSET_PATHS.includes(req.path)
+    || PUBLIC_ASSET_PREFIXES.some((prefix) => req.path.startsWith(prefix))
+  )) {
+    return next();
+  }
 
   // Check cookie
   const cookies = parseCookies(req.headers.cookie || '');
