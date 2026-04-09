@@ -12,6 +12,18 @@ export function unwrapReadModelResponse(payload) {
   };
 }
 
+export function getReadModelUrl(name) {
+  return `/api/read-models/${encodeURIComponent(String(name || ''))}`;
+}
+
+export async function fetchReadModel(name, options) {
+  const response = await fetch(getReadModelUrl(name), options);
+  return {
+    response,
+    payload: response.ok ? unwrapReadModelResponse(await response.json()) : null,
+  };
+}
+
 export function formatReadModelFreshness(meta) {
   const generatedAt = meta?.generatedAt;
   if (!generatedAt) return '';

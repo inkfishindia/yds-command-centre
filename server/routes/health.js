@@ -6,6 +6,7 @@ const config = require('../config');
 const readModelStore = require('../services/read-model-store');
 const readModelSync = require('../services/read-model-sync');
 const readModelScheduler = require('../services/read-model-scheduler');
+const projectionJobStore = require('../services/projection-job-store');
 
 const router = express.Router();
 
@@ -20,10 +21,11 @@ router.get('/', (req, res) => {
 
 router.get('/details', async (req, res) => {
   try {
-    const [readModels, sourceHealth, syncRuns] = await Promise.all([
+    const [readModels, sourceHealth, syncRuns, projectionJobs] = await Promise.all([
       readModelStore.loadAllReadModelStatuses(),
       readModelStore.loadSourceHealth(),
       readModelStore.loadSyncRuns(),
+      projectionJobStore.loadProjectionJobs(),
     ]);
     const syncSummary = await readModelStore.loadLatestSyncStates();
 
@@ -32,6 +34,7 @@ router.get('/details', async (req, res) => {
       readModels,
       sourceHealth,
       syncRuns: syncRuns.slice(0, 25),
+      projectionJobs: projectionJobs.slice(0, 25),
       syncSummary,
       syncSchedule: readModelScheduler.getStatus(),
     });
@@ -48,7 +51,7 @@ router.post('/sync', async (req, res) => {
       : undefined;
 
     const result = names
-      ? await readModelSync.syncAllReadModels(names)
+      ? await readModelScheduler.runScheduledSync('manual', names)
       : await readModelScheduler.runScheduledSync('manual');
 
     if (result?.skipped) {

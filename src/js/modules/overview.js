@@ -1,8 +1,8 @@
 import {
+  fetchReadModel,
   formatReadModelFreshness,
   getReadModelSummary,
   getReadModelTone,
-  unwrapReadModelResponse,
 } from './read-models.js';
 
 export function createOverviewModule() {
@@ -17,14 +17,13 @@ export function createOverviewModule() {
       this.overviewLoading = true;
       try {
         const [overviewRes, healthRes] = await Promise.all([
-          fetch('/api/overview', { cache: 'no-store' }),
+          fetchReadModel('overview', { cache: 'no-store' }),
           fetch('/api/health/details', { cache: 'no-store' }),
         ]);
 
-        if (overviewRes.ok) {
-          const payload = unwrapReadModelResponse(await overviewRes.json());
-          this.overview = payload.data;
-          this.overviewMeta = payload.meta;
+        if (overviewRes.response.ok && overviewRes.payload) {
+          this.overview = overviewRes.payload.data;
+          this.overviewMeta = overviewRes.payload.meta;
           this.runNotificationChecks?.('overview');
         }
 

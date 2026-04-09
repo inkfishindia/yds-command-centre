@@ -7,6 +7,7 @@ const path = require('node:path');
 const SCHEDULER_PATH = path.join(__dirname, '../server/services/read-model-scheduler.js');
 const CONFIG_PATH = path.join(__dirname, '../server/config.js');
 const SYNC_PATH = path.join(__dirname, '../server/services/read-model-sync.js');
+const JOB_STORE_PATH = path.join(__dirname, '../server/services/projection-job-store.js');
 
 function stubModule(modulePath, exports) {
   require.cache[modulePath] = {
@@ -25,6 +26,7 @@ describe('Read Model Scheduler', () => {
     delete require.cache[SCHEDULER_PATH];
     delete require.cache[CONFIG_PATH];
     delete require.cache[SYNC_PATH];
+    delete require.cache[JOB_STORE_PATH];
   });
 
   it('reports disabled status when started disabled', () => {
@@ -34,6 +36,10 @@ describe('Read Model Scheduler', () => {
       READ_MODEL_SYNC_STARTUP_DELAY_MS: 1000,
     });
     stubModule(SYNC_PATH, { syncAllReadModels: async () => ({ results: [] }) });
+    stubModule(JOB_STORE_PATH, {
+      createProjectionJob: async () => ({ id: 'job-1' }),
+      updateProjectionJob: async () => ({}),
+    });
 
     const scheduler = require(SCHEDULER_PATH);
     const status = scheduler.startScheduler({ enabled: false });
@@ -53,6 +59,10 @@ describe('Read Model Scheduler', () => {
       syncAllReadModels: () => new Promise((resolve) => {
         resolveSync = resolve;
       }),
+    });
+    stubModule(JOB_STORE_PATH, {
+      createProjectionJob: async () => ({ id: 'job-1' }),
+      updateProjectionJob: async () => ({}),
     });
 
     const scheduler = require(SCHEDULER_PATH);

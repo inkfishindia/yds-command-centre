@@ -1,4 +1,4 @@
-import { formatReadModelFreshness, getReadModelSummary, getReadModelTone, unwrapReadModelResponse } from './read-models.js';
+import { fetchReadModel, formatReadModelFreshness, getReadModelSummary, getReadModelTone } from './read-models.js';
 
 export function createMarketingOpsModule() {
   return {
@@ -106,13 +106,12 @@ export function createMarketingOpsModule() {
       this.mktopsLoading = true;
       try {
         const [summaryRes, taskSummaryRes] = await Promise.all([
-          fetch('/api/marketing-ops', { signal }),
+          fetchReadModel('marketing-ops', { signal }),
           fetch('/api/marketing-ops/tasks/summary').catch(() => null),
         ]);
-        if (summaryRes.ok) {
-          const { data, meta } = unwrapReadModelResponse(await summaryRes.json());
-          this.mktops = data;
-          this.mktopsMeta = meta;
+        if (summaryRes.response.ok && summaryRes.payload) {
+          this.mktops = summaryRes.payload.data;
+          this.mktopsMeta = summaryRes.payload.meta;
           this.mktopsLastRefresh = new Date();
           this.runNotificationChecks?.('marketing');
         }

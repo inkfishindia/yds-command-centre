@@ -1,8 +1,17 @@
+import {
+  fetchReadModel,
+  formatReadModelFreshness,
+  getReadModelSummary,
+  getReadModelTone,
+} from './read-models.js';
+
 export function createDashboardModule() {
   return {
     // Dashboard
     dashboard: null,
+    dashboardMeta: null,
     dashboardLoading: false,
+    actionQueueMeta: null,
     upcomingCommitments: [],
     expandedDecision: null,
     expandedCommitmentRow: null,
@@ -59,13 +68,14 @@ export function createDashboardModule() {
       }
       try {
         const [dashboardRes, pipelineRes, actionQueueRes] = await Promise.allSettled([
-          fetch('/api/notion/dashboard', { signal }),
+          fetchReadModel('dashboard', { signal }),
           fetch('/api/sheets/pipeline', { signal }),
-          fetch('/api/notion/action-queue', { signal }),
+          fetchReadModel('action-queue', { signal }),
         ]);
 
-        if (dashboardRes.status === 'fulfilled' && dashboardRes.value.ok) {
-          this.dashboard = await dashboardRes.value.json();
+        if (dashboardRes.status === 'fulfilled' && dashboardRes.value.response.ok && dashboardRes.value.payload) {
+          this.dashboard = dashboardRes.value.payload.data;
+          this.dashboardMeta = dashboardRes.value.payload.meta;
           this.upcomingCommitments = this.dashboard.upcoming || [];
           this.morningBrief = this.dashboard.morningBrief || null;
           this.lastRefresh = new Date();
@@ -80,8 +90,9 @@ export function createDashboardModule() {
           console.warn('Pipeline load failed:', pipelineRes.reason?.message || pipelineRes.reason);
         }
 
-        if (actionQueueRes.status === 'fulfilled' && actionQueueRes.value.ok) {
-          this.actionQueue = await actionQueueRes.value.json();
+        if (actionQueueRes.status === 'fulfilled' && actionQueueRes.value.response.ok && actionQueueRes.value.payload) {
+          this.actionQueue = actionQueueRes.value.payload.data;
+          this.actionQueueMeta = actionQueueRes.value.payload.meta;
           this.runNotificationChecks?.('action-queue');
         } else if (actionQueueRes.status === 'rejected' && !this.isAbortError(actionQueueRes.reason)) {
           console.error('Action queue failed:', actionQueueRes.reason);
@@ -100,9 +111,10 @@ export function createDashboardModule() {
       const signal = this.beginRequest('actionQueue');
       if (!silent) this.actionQueueLoading = true;
       try {
-        const res = await fetch('/api/notion/action-queue', { signal });
-        if (res.ok) {
-          this.actionQueue = await res.json();
+        const { response, payload } = await fetchReadModel('action-queue', { signal });
+        if (response.ok && payload) {
+          this.actionQueue = payload.data;
+          this.actionQueueMeta = payload.meta;
           this.runNotificationChecks?.('action-queue');
         }
       } catch (e) {
@@ -206,6 +218,30 @@ export function createDashboardModule() {
       if (active >= 8) return 'overloaded';
       if (active >= 5) return 'moderate';
       return 'light';
+    },
+
+    getDashboardMetaTone() {
+      return getReadModelTone(this.dashboardMeta);
+    },
+
+    getDashboardMetaSummary() {
+      return getReadModelSummary(this.dashboardMeta, 'All primary dashboard sources loaded');
+    },
+
+    getDashboardFreshnessLabel() {
+      return formatReadModelFreshness(this.dashboardMeta);
+    },
+
+    getActionQueueMetaTone() {
+      return getReadModelTone(this.actionQueueMeta);
+    },
+
+    getActionQueueMetaSummary() {
+      return getReadModelSummary(this.actionQueueMeta, 'All primary action queue sources loaded');
+    },
+
+    getActionQueueFreshnessLabel() {
+      return formatReadModelFreshness(this.actionQueueMeta);
     },
 
     getSortedPersonCommitments(commitments) {

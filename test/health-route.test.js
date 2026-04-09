@@ -9,6 +9,7 @@ const CONFIG_PATH = path.join(__dirname, '../server/config.js');
 const STORE_PATH = path.join(__dirname, '../server/services/read-model-store.js');
 const SYNC_PATH = path.join(__dirname, '../server/services/read-model-sync.js');
 const SCHEDULER_PATH = path.join(__dirname, '../server/services/read-model-scheduler.js');
+const JOB_STORE_PATH = path.join(__dirname, '../server/services/projection-job-store.js');
 
 function stubModule(modulePath, exports) {
   require.cache[modulePath] = {
@@ -36,6 +37,7 @@ describe('Health Route', () => {
     delete require.cache[STORE_PATH];
     delete require.cache[SYNC_PATH];
     delete require.cache[SCHEDULER_PATH];
+    delete require.cache[JOB_STORE_PATH];
   });
 
   it('registers the expected health endpoints', () => {
@@ -49,6 +51,9 @@ describe('Health Route', () => {
     stubModule(SYNC_PATH, {
       syncAllReadModels: async () => ({ results: [] }),
       syncReadModel: async () => ({ ok: true }),
+    });
+    stubModule(JOB_STORE_PATH, {
+      loadProjectionJobs: async () => [],
     });
     stubModule(SCHEDULER_PATH, {
       getStatus: () => ({ enabled: false, nextRunAt: null }),
@@ -74,6 +79,9 @@ describe('Health Route', () => {
       syncAllReadModels: async () => ({ results: [] }),
       syncReadModel: async () => ({ ok: true }),
     });
+    stubModule(JOB_STORE_PATH, {
+      loadProjectionJobs: async () => [{ id: '1', trigger: 'manual', status: 'completed' }],
+    });
     stubModule(SCHEDULER_PATH, {
       getStatus: () => ({ enabled: true, nextRunAt: '2026-04-08T00:15:00.000Z' }),
       runScheduledSync: async () => ({ results: [] }),
@@ -94,6 +102,7 @@ describe('Health Route', () => {
 
     assert.equal(jsonPayload.status, 'ok');
     assert.equal(jsonPayload.syncRuns.length, 1);
+    assert.equal(jsonPayload.projectionJobs.length, 1);
     assert.equal(jsonPayload.syncRuns[0].name, 'overview');
     assert.equal(jsonPayload.syncSummary[0].name, 'overview');
     assert.equal(jsonPayload.syncSchedule.enabled, true);

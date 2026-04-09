@@ -4,6 +4,15 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
 describe('Frontend Read Model Helpers', () => {
+  it('builds stable read model URLs', async () => {
+    const helpers = await import('../src/js/modules/read-models.js');
+
+    assert.equal(
+      helpers.getReadModelUrl('marketing-ops'),
+      '/api/read-models/marketing-ops',
+    );
+  });
+
   it('unwraps read model responses into data and meta', async () => {
     const helpers = await import('../src/js/modules/read-models.js');
     const payload = helpers.unwrapReadModelResponse({

@@ -82,6 +82,13 @@ export function createCommandShellModule() {
       if (action === 'marketingOps') {
         await this._ensureModule('competitor-intel');
       }
+      if (action === 'actionQueue') {
+        // Action Queue cards reuse helpers from these lazy modules.
+        await Promise.all([
+          this._ensureModule('notion'),
+          this._ensureModule('commitments'),
+        ]);
+      }
       if (partialViews.includes(action)) {
         await this._loadPartial(action);
       }

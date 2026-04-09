@@ -1,6 +1,8 @@
 'use strict';
 
 const readModelStore = require('./read-model-store');
+const actionQueueReadModel = require('../read-model/action-queue');
+const dashboardReadModel = require('../read-model/dashboard');
 const overviewReadModel = require('../read-model/overview');
 const opsReadModel = require('../read-model/ops');
 const crmReadModel = require('../read-model/crm');
@@ -8,6 +10,8 @@ const marketingOpsReadModel = require('../read-model/marketing-ops');
 const techTeamReadModel = require('../read-model/tech-team');
 
 const REGISTRY = {
+  'action-queue': actionQueueReadModel,
+  dashboard: dashboardReadModel,
   overview: overviewReadModel,
   ops: opsReadModel,
   crm: crmReadModel,

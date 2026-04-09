@@ -5,10 +5,23 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
+const DB_PATH = path.join(__dirname, '../server/services/db.js');
 const STORE_PATH = path.join(__dirname, '../server/services/read-model-store.js');
 const READ_MODELS_DIR = path.join(__dirname, '../server/data/read-models');
 const SOURCE_HEALTH_PATH = path.join(__dirname, '../server/data/source-health.json');
 const SYNC_RUNS_PATH = path.join(__dirname, '../server/data/sync-runs.json');
+
+function stubModule(modulePath, exports) {
+  require.cache[modulePath] = {
+    id: modulePath,
+    filename: modulePath,
+    loaded: true,
+    exports,
+    parent: null,
+    children: [],
+    paths: [],
+  };
+}
 
 async function cleanup() {
   await fs.rm(READ_MODELS_DIR, { recursive: true, force: true, maxRetries: 3, retryDelay: 25 }).catch(() => {});
@@ -18,6 +31,7 @@ async function cleanup() {
 
 describe('Read Model Store', () => {
   afterEach(async () => {
+    delete require.cache[DB_PATH];
     delete require.cache[STORE_PATH];
     await cleanup();
   });
@@ -74,5 +88,51 @@ describe('Read Model Store', () => {
     assert.equal(overview.lastSuccessAt, '2026-04-08T00:01:00.000Z');
     assert.equal(overview.lastError, 'offline');
     assert.equal(ops.lastStatus, 'partial');
+  });
+
+  it('uses database-backed read model records when available', async () => {
+    stubModule(DB_PATH, {
+      isDatabaseEnabled: () => true,
+      query: async (text) => {
+        if (/FROM app_read_models/i.test(text)) {
+          return {
+            rows: [{
+              name: 'dashboard',
+              persisted_at: '2026-04-09T00:00:00.000Z',
+              payload_json: {
+                data: { ok: true },
+                meta: { generatedAt: '2026-04-09T00:00:00.000Z' },
+              },
+            }],
+          };
+        }
+        return { rows: [] };
+      },
+    });
+
+    const store = require(STORE_PATH);
+    const record = await store.loadReadModel('dashboard');
+
+    assert.equal(record.name, 'dashboard');
+    assert.equal(record.payload.data.ok, true);
+  });
+
+  it('writes read model records to the database when configured', async () => {
+    const queries = [];
+    stubModule(DB_PATH, {
+      isDatabaseEnabled: () => true,
+      query: async (text, params) => {
+        queries.push({ text, params });
+        return { rows: [] };
+      },
+    });
+
+    const store = require(STORE_PATH);
+    await store.saveReadModel('ops', {
+      data: { ok: true },
+      meta: { generatedAt: '2026-04-08T00:00:00.000Z', partial: false, degradedSources: [] },
+    });
+
+    assert.ok(queries.some((entry) => /INSERT INTO app_read_models/i.test(entry.text)));
   });
 });

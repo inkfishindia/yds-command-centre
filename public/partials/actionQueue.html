@@ -23,6 +23,18 @@
           </div>
         </div>
 
+        <div
+          class="read-model-banner"
+          x-show="actionQueueMeta"
+          :class="'read-model-banner--' + getActionQueueMetaTone()"
+        >
+          <div class="read-model-banner-copy">
+            <strong x-text="getActionQueueMetaSummary()"></strong>
+            <span x-show="getActionQueueFreshnessLabel()" x-text="getActionQueueFreshnessLabel()"></span>
+            <span x-show="actionQueueMeta?.lastSyncedAt" x-text="'Last sync ' + formatRelativeDate(actionQueueMeta.lastSyncedAt)"></span>
+          </div>
+        </div>
+
         <template x-if="actionQueueLoading && !actionQueue">
           <div class="queue-panels">
             <div class="queue-panel">

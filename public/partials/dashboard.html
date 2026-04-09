@@ -16,6 +16,17 @@
             </button>
           </div>
         </div>
+        <div
+          class="read-model-banner"
+          x-show="dashboardMeta"
+          :class="'read-model-banner--' + getDashboardMetaTone()"
+        >
+          <div class="read-model-banner-copy">
+            <strong x-text="getDashboardMetaSummary()"></strong>
+            <span x-show="getDashboardFreshnessLabel()" x-text="getDashboardFreshnessLabel()"></span>
+            <span x-show="dashboardMeta?.lastSyncedAt" x-text="'Last sync ' + formatRelativeDate(dashboardMeta.lastSyncedAt)"></span>
+          </div>
+        </div>
         <div class="dashboard-mobile-shortcuts" x-show="dashboard">
           <button class="dashboard-mobile-shortcut" @click="view = 'actionQueue'; loadActionQueue()">
             <span class="dashboard-mobile-shortcut-label">Action Queue</span>

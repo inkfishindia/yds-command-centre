@@ -1,4 +1,4 @@
-import { formatReadModelFreshness, getReadModelSummary, getReadModelTone, unwrapReadModelResponse } from './read-models.js';
+import { fetchReadModel, formatReadModelFreshness, getReadModelSummary, getReadModelTone } from './read-models.js';
 
 export function createTechTeamModule() {
   return {
@@ -24,15 +24,14 @@ export function createTechTeamModule() {
       this.techTeamLoading = true;
       try {
         const [summaryRes, githubRes, agentsRes, strategyRes] = await Promise.all([
-          fetch('/api/tech-team', { signal }),
+          fetchReadModel('tech-team', { signal }),
           fetch('/api/tech-team/github').catch(() => null),
           fetch('/api/tech-team/agents').catch(() => null),
           fetch('/api/tech-team/strategy').catch(() => null),
         ]);
-        if (summaryRes.ok) {
-          const { data, meta } = unwrapReadModelResponse(await summaryRes.json());
-          this.techTeam = data;
-          this.techTeamMeta = meta;
+        if (summaryRes.response.ok && summaryRes.payload) {
+          this.techTeam = summaryRes.payload.data;
+          this.techTeamMeta = summaryRes.payload.meta;
           this.techTeamLastRefresh = new Date();
           this.runNotificationChecks?.('tech');
         }

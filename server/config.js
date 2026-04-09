@@ -33,6 +33,8 @@ module.exports = {
   READ_MODEL_SYNC_ENABLED: process.env.READ_MODEL_SYNC_ENABLED !== 'false',
   READ_MODEL_SYNC_INTERVAL_MS: Number(process.env.READ_MODEL_SYNC_INTERVAL_MS || 15 * 60 * 1000),
   READ_MODEL_SYNC_STARTUP_DELAY_MS: Number(process.env.READ_MODEL_SYNC_STARTUP_DELAY_MS || 5 * 1000),
+  DATABASE_URL: process.env.DATABASE_URL || '',
+  DATABASE_SSL: process.env.DATABASE_SSL === 'true',
 
   // Colin's workspace paths
   COLIN_WORKSPACE,

@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "build": "node scripts/build-assets.mjs",
+    "db:migrate": "node scripts/db-migrate.js",
     "sync:readmodels": "node scripts/sync-read-models.mjs",
     "start": "npm run build && node server.js",
     "dev": "npm run build && node --watch server.js",
@@ -20,7 +21,9 @@
     "express": "^4.21.0",
     "express-rate-limit": "^8.2.1",
     "googleapis": "^171.4.0",
-    "helmet": "^8.1.0"
+    "helmet": "^8.1.0",
+    "pg": "^8.20.0",
+    "pg-types": "^4.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

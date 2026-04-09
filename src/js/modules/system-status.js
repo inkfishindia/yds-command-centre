@@ -40,6 +40,12 @@ export function createSystemStatusModule() {
         if (this.view === 'overview') {
           await this.loadOverview();
         }
+        if (this.view === 'dashboard') {
+          await this.loadDashboard(true);
+        }
+        if (this.view === 'actionQueue') {
+          await this.loadActionQueue({ silent: true });
+        }
       } catch (err) {
         console.error('Read model sync error:', err);
         this.systemSyncMessage = err.message || 'Sync failed';
@@ -75,6 +81,10 @@ export function createSystemStatusModule() {
       return Array.isArray(this.systemStatus?.syncRuns) ? this.systemStatus.syncRuns : [];
     },
 
+    getSystemProjectionJobs() {
+      return Array.isArray(this.systemStatus?.projectionJobs) ? this.systemStatus.projectionJobs : [];
+    },
+
     getSystemSyncSchedule() {
       return this.systemStatus?.syncSchedule || null;
     },
@@ -101,6 +111,7 @@ export function createSystemStatusModule() {
         partial: readModels.filter((item) => item?.partial).length,
         degradedSources: sources.filter((item) => item?.status !== 'ok').length,
         failedSyncs: syncRuns.filter((item) => item?.ok === false).length,
+        jobs: this.getSystemProjectionJobs().length,
       };
     },
 

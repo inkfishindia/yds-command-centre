@@ -2,6 +2,7 @@
 
 const config = require('../config');
 const readModelSync = require('./read-model-sync');
+const projectionJobStore = require('./projection-job-store');
 
 const state = {
   enabled: false,
@@ -50,7 +51,7 @@ function scheduleNextInterval() {
   }, state.intervalMs);
 }
 
-async function runScheduledSync(trigger = 'manual') {
+async function runScheduledSync(trigger = 'manual', names) {
   if (state.running) {
     return {
       ok: false,
@@ -64,11 +65,36 @@ async function runScheduledSync(trigger = 'manual') {
   state.currentTrigger = trigger;
   state.lastRunStartedAt = new Date().toISOString();
   state.nextRunAt = null;
+  const requestedModels = Array.isArray(names) && names.length > 0 ? names : undefined;
+  const job = await projectionJobStore.createProjectionJob({
+    trigger,
+    requestedModels: requestedModels || [],
+    startedAt: state.lastRunStartedAt,
+  });
 
   try {
-    const result = await readModelSync.syncAllReadModels();
+    const result = await readModelSync.syncAllReadModels(requestedModels);
     state.lastRunFinishedAt = new Date().toISOString();
+    const failed = Array.isArray(result?.results) ? result.results.filter((item) => item.ok === false).length : 0;
+    await projectionJobStore.updateProjectionJob(job.id, {
+      status: failed > 0 ? 'partial' : 'completed',
+      finishedAt: state.lastRunFinishedAt,
+      resultSummary: {
+        total: Array.isArray(result?.results) ? result.results.length : 0,
+        failed,
+        trigger,
+      },
+    });
     return result;
+  } catch (err) {
+    state.lastRunFinishedAt = new Date().toISOString();
+    await projectionJobStore.updateProjectionJob(job.id, {
+      status: 'failed',
+      finishedAt: state.lastRunFinishedAt,
+      errorMessage: err.message || String(err),
+      resultSummary: { trigger },
+    });
+    throw err;
   } finally {
     state.running = false;
     state.currentTrigger = null;

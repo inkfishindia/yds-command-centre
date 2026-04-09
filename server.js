@@ -31,6 +31,7 @@ app.use('/api', (req, res, next) => {
 
   const requestPath = req.path || '';
   const shortCachePaths = [
+    '/read-models',
     '/overview',
     '/ceo-dashboard',
     '/notion/dashboard',
@@ -121,6 +122,7 @@ app.use('/api/bmc', require('./server/routes/bmc'));
 app.use('/api/crm', require('./server/routes/crm'));
 app.use('/api/overview', require('./server/routes/overview'));
 app.use('/api/ops', require('./server/routes/ops'));
+app.use('/api/read-models', require('./server/routes/read-models'));
 app.use('/api/competitor-intel', require('./server/routes/competitor-intel'));
 app.use('/api/ceo-dashboard', require('./server/routes/ceo-dashboard'));
 app.use('/api/health', require('./server/routes/health'));

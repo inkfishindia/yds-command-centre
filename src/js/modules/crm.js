@@ -1,4 +1,4 @@
-import { formatReadModelFreshness, getReadModelSummary, getReadModelTone, unwrapReadModelResponse } from './read-models.js';
+import { fetchReadModel, formatReadModelFreshness, getReadModelSummary, getReadModelTone } from './read-models.js';
 
 export function createCrmModule() {
   return {
@@ -37,11 +37,10 @@ export function createCrmModule() {
       const signal = this.beginRequest('crm');
       this.crmLoading = true;
       try {
-        const res = await fetch('/api/crm', { signal });
-        if (res.ok) {
-          const { data, meta } = unwrapReadModelResponse(await res.json());
-          this.crm = data;
-          this.crmMeta = meta;
+        const { response, payload } = await fetchReadModel('crm', { signal });
+        if (response.ok && payload) {
+          this.crm = payload.data;
+          this.crmMeta = payload.meta;
           this.crmLastRefresh = new Date();
           this.runNotificationChecks?.('crm');
         }

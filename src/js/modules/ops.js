@@ -1,4 +1,4 @@
-import { formatReadModelFreshness, getReadModelSummary, getReadModelTone, unwrapReadModelResponse } from './read-models.js';
+import { fetchReadModel, formatReadModelFreshness, getReadModelSummary, getReadModelTone } from './read-models.js';
 
 export function createOpsModule() {
   return {
@@ -33,11 +33,10 @@ export function createOpsModule() {
       const signal = this.beginRequest('ops');
       this.opsLoading = true;
       try {
-        const res = await fetch('/api/ops', { signal });
-        if (res.ok) {
-          const { data, meta } = unwrapReadModelResponse(await res.json());
-          this.ops = data;
-          this.opsMeta = meta;
+        const { response, payload } = await fetchReadModel('ops', { signal });
+        if (response.ok && payload) {
+          this.ops = payload.data;
+          this.opsMeta = payload.meta;
           this.opsLastRefresh = new Date();
           this.runNotificationChecks?.('ops');
         }
