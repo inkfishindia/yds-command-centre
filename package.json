@@ -1,30 +1,45 @@
 {
   "name": "yds-command-centre",
-  "version": "1.0.0",
-  "description": "YDS Command Centre — Web interface for Colin (Chief of Staff)",
+  "version": "2.0.0",
+  "description": "YDS Command Centre — Unified ERP + AI backend",
   "main": "server.js",
   "scripts": {
-    "build": "node scripts/build-assets.mjs",
-    "sync:readmodels": "node scripts/sync-read-models.mjs",
+    "dev:server": "node --watch server.js",
+    "dev:client": "vite",
+    "dev": "npm run dev:server & npm run dev:client",
+    "build": "vite build",
     "start": "npm run build && node server.js",
-    "dev": "npm run build && node --watch server.js",
     "test": "node --test 'test/*.test.js'",
-    "lint": "eslint server.js server/ test/ src/js/"
+    "lint": "eslint server.js server/ test/"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@google/genai": "^1.27.0",
     "@notionhq/client": "^2.2.15",
+    "clsx": "^2.1.1",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
+    "date-fns": "^4.1.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "express-rate-limit": "^8.2.1",
-    "googleapis": "^171.4.0",
-    "helmet": "^8.1.0"
+    "googleapis": "^164.1.0",
+    "helmet": "^8.1.0",
+    "lucide-react": "^1.8.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "recharts": "^3.8.1",
+    "swr": "^2.2.5",
+    "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
     "esbuild": "^0.28.0",
-    "eslint": "^10.1.0"
+    "eslint": "^10.1.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
   }
 }

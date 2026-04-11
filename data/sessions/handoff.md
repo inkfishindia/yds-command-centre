@@ -39,3 +39,23 @@ Ran `npm run build` — clean, chunk hashes unchanged (source JS untouched).
 8. **Carryover**: code-reviewer + ux-auditor results from x-show→x-if fix never received.
 9. **Carryover**: verify all 14 converted views render correctly.
 10. **Carryover**: clean up ~150 stale unknown entries in activity-log.md.
+
+## 2026-04-11 21:15
+**Accomplished:** Monorepo merge complete. Cloned CC from GitHub to `~/Projects/yds-command-centre`, moved ERP React source into `app/` folder, created `vite.config.ts` (Vite on :5173 proxies `/api` to Express on :3000), updated `server.js` to serve `dist/` instead of `public/`, merged `package.json` deps (React, Vite, Tailwind, Recharts + existing Express/Notion/Claude). Fixed `NexusAIAgent` Gemini crash (graceful fallback when no API key). Verified: API health returns 200, React dashboard renders at localhost:5173.
+**Decisions:** Monorepo — ERP React frontend lives in `app/`, replaces Alpine.js `public/` frontend. One repo, one deploy.
+**Next:** Dan to push merged repo via GitHub Desktop. Old Alpine.js frontend (`public/`, `src/js/`) can be archived/deleted. Add `.env.local` with `GEMINI_API_KEY` for AI features. Wire pages to live CC API endpoints (same-origin now, no proxy prefix needed).
+
+## 2026-04-11 21:23
+**Accomplished:** Guided Dan through switching GitHub Desktop from Google Drive path to `~/Projects/yds-command-centre` (remove old repo from app, add new local path). No code changes.
+**Decisions:** none
+**Next:** Dan to remove old Google Drive repo from GitHub Desktop, add `~/Projects/yds-command-centre`, and push the monorepo merge.
+
+## 2026-04-11 21:24
+**Accomplished:** Session handoff documentation updates (21:15 monorepo merge, 21:23 GitHub Desktop guidance). Also updated Google Drive CC copy handoff/decisions earlier in session.
+**Decisions:** none
+**Next:** Dan to push monorepo via GitHub Desktop from `~/Projects/yds-command-centre`.
+
+## 2026-04-11 21:25
+**Accomplished:** No new code changes — session idle, waiting for Dan to push monorepo via GitHub Desktop.
+**Decisions:** none
+**Next:** Dan to push `~/Projects/yds-command-centre` via GitHub Desktop, then wire ERP pages to live CC API endpoints.

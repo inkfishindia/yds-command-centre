@@ -125,40 +125,22 @@ app.use('/api/competitor-intel', require('./server/routes/competitor-intel'));
 app.use('/api/ceo-dashboard', require('./server/routes/ceo-dashboard'));
 app.use('/api/health', require('./server/routes/health'));
 
-// Static file serving — Alpine.js frontend from public/
-// Cache JS/CSS for 1 hour (assets are rebuilt on deploy); HTML always revalidates.
-app.use(express.static(path.join(__dirname, 'public'), {
+// Static file serving — React frontend from dist/ (built by Vite)
+app.use(express.static(path.join(__dirname, 'dist'), {
   setHeaders(res, filePath) {
-    const normalized = filePath.replace(/\\/g, '/');
-    const isHashedChunk = /\/public\/js\/chunks\/.+-[A-Z0-9]{8}\.js$/i.test(normalized);
-
-    if (normalized.endsWith('/public/js/app.js')) {
-      // The app shell points at lazy chunks whose names change on every deploy.
-      // Force revalidation so browsers do not keep an old shell after a new deploy.
+    if (filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache');
-    } else if (normalized.endsWith('.css')) {
-      // CSS filenames are stable across deploys, so avoid stale UI after release.
-      res.setHeader('Cache-Control', 'no-cache');
-    } else if (isHashedChunk) {
+    } else if (/\.[a-f0-9]{8}\.(js|css)$/i.test(filePath)) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    } else if (normalized.endsWith('.js')) {
+    } else {
       res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=60');
-    } else if (filePath.endsWith('.html')) {
-      res.setHeader('Cache-Control', 'no-cache');
     }
   },
 }));
 
-app.get(['/ceo', '/ceo/*'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'ceo', 'index.html'));
-});
-
+// SPA fallback — all non-API routes serve the React app
 app.get('*', (req, res) => {
-  if (req.hostname && req.hostname.startsWith('ceo.')) {
-    res.sendFile(path.join(__dirname, 'public', 'ceo', 'index.html'));
-    return;
-  }
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 // Vercel uses module.exports; local dev uses app.listen()

@@ -39,6 +39,10 @@ function authGate(req, res, next) {
     return next();
   }
 
+  // Check API key header (for service-to-service calls from ERP/other apps)
+  const apiKey = process.env.CC_API_KEY;
+  if (apiKey && req.headers['x-api-key'] === apiKey) return next();
+
   // Check cookie
   if (hasValidAuthCookie(req.headers.cookie || '', password)) return next();
 
