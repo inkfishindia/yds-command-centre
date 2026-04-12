@@ -263,6 +263,7 @@ const SPREADSHEET_KEYS = {
   OPS_PRODUCTS: 'OPS_PRODUCTS',
   OPS_WAREHOUSE: 'OPS_WAREHOUSE',
   COMPETITOR_INTEL: 'COMPETITOR_INTEL',
+  ERP_PORTFOLIO: 'ERP_PORTFOLIO',
 };
 
 // Maps spreadsheet keys to config env var values
@@ -280,6 +281,7 @@ function getSpreadsheetId(spreadsheetKey) {
     OPS_PRODUCTS: config.OPS_PRODUCTS_SPREADSHEET_ID,
     OPS_WAREHOUSE: config.OPS_WAREHOUSE_SPREADSHEET_ID,
     COMPETITOR_INTEL: config.COMPETITOR_INTEL_SPREADSHEET_ID,
+    ERP_PORTFOLIO: config.ERP_PORTFOLIO_SPREADSHEET_ID,
   };
   return map[spreadsheetKey] || '';
 }
@@ -303,6 +305,17 @@ const SHEET_REGISTRY = {
   CUSTOMER_SEGMENT: { spreadsheetKey: 'STRATEGY', sheetName: 'Customer Segment & foundation', gid: '1469082015' },
   TOUCHPOINTS: { spreadsheetKey: 'STRATEGY', sheetName: 'TOUCHPOINTS', gid: '1839538407' },
   APP_STORES: { spreadsheetKey: 'STRATEGY', sheetName: 'APP STORES', gid: '1447819195' },
+  // ERP Portfolio (YDS Design Lab — 1y1rke6X...)
+  ERP_PROJECTS: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'Project' },
+  ERP_TASKS: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'task' },
+  ERP_PEOPLE: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'People' },
+  ERP_PROGRAMS: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'PROGRAMS' },
+  ERP_MILESTONES: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'Milestones' },
+  ERP_GOALS: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'GOALS' },
+  ERP_STRATEGIC_INITIATIVES: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'STRATEGIC INITIATIVES' },
+  ERP_STRATEGIC_OBJECTIVES: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'strategic_objectives' },
+  ERP_QUARTERLY_INITIATIVES: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'quarterly_initiatives' },
+  ERP_RESOURCE_BUDGET: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'RESOURCE_ALLOCATION_BUDGET' },
   // App Logging
   LOGIN: { spreadsheetKey: 'APP_LOGGING', sheetName: 'Login', gid: '288121377' },
   BRAIN_DUMP: { spreadsheetKey: 'APP_LOGGING', sheetName: 'BrainDump', gid: '0' },

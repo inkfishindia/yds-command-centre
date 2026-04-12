@@ -95,6 +95,26 @@ Ran `npm run build` — clean, chunk hashes unchanged (source JS untouched).
 **Decisions:** Use CC service-account Sheets access via `/api/sheets/*` instead of browser OAuth. Cleaner: same-origin, no user auth needed.
 **Next:** Wait for deploy, verify Orders Pipeline page shows 19,881 orders. Then wire Inventory (OPS_*), Competitor Landscape (CI_COMPETITORS). For Portfolio/BMC, Dan needs to share those sheets with service account `155749101771-compute@developer.gserviceaccount.com` or add to CC's SHEET_REGISTRY.
 
+## 2026-04-12 06:30
+**Accomplished:** Wired 2 more contexts via CC service-account sheets: `InventoryContext` → OPS_PRODUCTS_INVENTORY (2295 products) + OPS_VENDORS (6 vendors), and `CompetitorLandscapeContext` → CI_COMPETITORS (45 brands) + CI_ANALYSIS/POSITIONING/NOTES/CAPABILITIES/UX_PRODUCT. Removed "Secure Research Portal" OAuth gate on Competitor Landscape page. **Total live pages: 13** (7 Notion + 1 Orders context serving 8 pages + 1 Inventory context serving Stock Levels + Suppliers + 1 Competitor). Pushed, Vercel deploying.
+**Decisions:** none
+**Next:** Share Portfolio sheet (`1y1rke6X...`) and BMC sheet (`1eh1jb2D...`) with service account `155749101771-compute@developer.gserviceaccount.com` to unlock ~11 more pages (Programs, Projects, Tasks, Milestones, Strategic Initiatives, Objectives, Goals, Quarterly Sprints, Budget Matrix, BMC, Users). Phase 2: wire remaining CC Notion pages (Ops Execution, Strategy Command, Content Calendar, Customer Directory, Deal Pipeline, Workload). Phase 3: Supabase for Google Ads, GA4, Instagram.
+
+## 2026-04-12 06:36
+**Accomplished:** Discovered sheet ID mismatch. CC's `EXECUTION_SPREADSHEET_ID=156rACoJheFPD4lftBrvVqXScxDp1y8d3msB1tFWbEAc` points to a DIFFERENT sheet than the ERP's portfolio sheet (`1y1rke6X...`). BMC sheet matches but still returns 'entity not found' — likely the sheet share hasn't propagated or tab name mismatch. Confirmed service account email: `155749101771-compute@developer.gserviceaccount.com` (project `gen-lang-client-0910892311`).
+**Decisions:** none — awaiting Dan's choice on path forward
+**Next:** Option 1: update Vercel env `EXECUTION_SPREADSHEET_ID` to `1y1rke6X...` and verify both sheets are shared with service account. Option 2: share CC's existing `156rACoJ...` sheet (different data). Recommended: Option 1 for single source of truth.
+
+## 2026-04-12 06:40
+**Accomplished:** Dan chose Option 1. Removed and re-added `EXECUTION_SPREADSHEET_ID=1y1rke6XG8SIs9O6bjOFhronEyzMhOsnsIDydTiop-wA` on Vercel production. Pushed empty commit to trigger redeploy. Monitoring deploy + PROJECTS endpoint to verify service account access.
+**Decisions:** Use ERP's portfolio sheet (`1y1rke6X...`) as single source of truth for CC's EXECUTION data.
+**Next:** Once deploy is live, verify `/api/sheets/PROJECTS` returns data. If still 'permission denied', service account `155749101771-compute@...` needs Viewer access granted on `1y1rke6X...`. Then wire Portfolio pages (Programs, Projects, Tasks, Milestones).
+
+## 2026-04-12 06:43
+**Accomplished:** Deploy live — service account now has access to `1y1rke6X...`. Error shifted from 'permission denied' to 'Requested entity was not found'. Diagnosed as tab name mismatch: CC's SHEET_REGISTRY expects `PROJECTS`/`TASKS`/`PEOPLE` (uppercase), but ERP's portfolio sheet uses `Project`/`task`/`People` plus `PROGRAMS`/`Milestones`/`GOALS`/`STRATEGIC INITIATIVES`/`strategic_objectives`/`quarterly_initiatives`/`RESOURCE_ALLOCATION_BUDGET`.
+**Decisions:** none — awaiting Dan's choice between adding ERP_* keys to CC's SHEET_REGISTRY vs renaming sheet tabs
+**Next:** Option 1 (recommended): add new registry entries in `server/services/sheets.js` (ERP_PROJECTS → 'Project', ERP_TASKS → 'task', etc.) and wire ERP pages. Option 2: rename tabs on `1y1rke6X...` to uppercase. Option 1 is safer (no sheet edits).
+
 ## 2026-04-11 21:25
 **Accomplished:** No new code changes — session idle, waiting for Dan to push monorepo via GitHub Desktop.
 **Decisions:** none
