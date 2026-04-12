@@ -54,14 +54,6 @@ const CompetitorLandscapePage: React.FC = () => {
     </div>
   );
 
-  if (!isSignedIn && !isMockMode) {
-    return (
-      <ManagerEditorLayout title="Competitor Intelligence">
-        <EmptyState title="Secure Research Portal" description="Authentication required to access market mapping." action={<Button variant="accent" onClick={signIn} disabled={isAuthActionInProgress}>Authorize 🚀</Button>} />
-      </ManagerEditorLayout>
-    );
-  }
-
   return (
     <ManagerEditorLayout title="Competitor Intelligence" toolbar={toolbar}>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

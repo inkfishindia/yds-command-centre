@@ -90,6 +90,11 @@ Ran `npm run build` — clean, chunk hashes unchanged (source JS untouched).
 **Decisions:** Skip user OAuth for Sheets data. Route ERP browser → CC `/api/sheets/*` → CC server-side service account → Google Sheets. Zero user auth needed.
 **Next:** Check CC's `/api/sheets/*` endpoint shape, update ERP `dataClient.ts` to call it instead of `sheets.googleapis.com`, wire up 20 Sheets-backed pages (Orders, Portfolio, BMC, Users, Competitors).
 
+## 2026-04-12 06:26
+**Accomplished:** Tested CC's `/api/sheets/*` endpoint. Available sheets (70+ keys) include OPS_SALES_ORDERS, OPS_PRODUCTS_INVENTORY, OPS_VENDORS, CI_COMPETITORS, CRM_LEADS. Blocked: PROJECTS/TASKS/PEOPLE (permission errors), BMC_SEGMENTS (404). Rewrote `OrderContext.tsx` to fetch from `/api/sheets/OPS_SALES_ORDERS` (19,881 real orders). Removed browser-side Google Sheets OAuth dependency. Pushed monorepo, Vercel auto-deploying.
+**Decisions:** Use CC service-account Sheets access via `/api/sheets/*` instead of browser OAuth. Cleaner: same-origin, no user auth needed.
+**Next:** Wait for deploy, verify Orders Pipeline page shows 19,881 orders. Then wire Inventory (OPS_*), Competitor Landscape (CI_COMPETITORS). For Portfolio/BMC, Dan needs to share those sheets with service account `155749101771-compute@developer.gserviceaccount.com` or add to CC's SHEET_REGISTRY.
+
 ## 2026-04-11 21:25
 **Accomplished:** No new code changes — session idle, waiting for Dan to push monorepo via GitHub Desktop.
 **Decisions:** none
