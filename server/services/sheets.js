@@ -308,7 +308,7 @@ const SHEET_REGISTRY = {
   // ERP Portfolio (YDS Design Lab — 1y1rke6X...)
   ERP_PROJECTS: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'Project' },
   ERP_TASKS: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'task' },
-  ERP_PEOPLE: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'People' },
+  ERP_PEOPLE: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'People(fetched)' },
   ERP_PROGRAMS: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'PROGRAMS' },
   ERP_MILESTONES: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'Milestones' },
   ERP_GOALS: { spreadsheetKey: 'ERP_PORTFOLIO', sheetName: 'GOALS' },

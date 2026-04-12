@@ -115,6 +115,11 @@ Ran `npm run build` — clean, chunk hashes unchanged (source JS untouched).
 **Decisions:** none — awaiting Dan's choice between adding ERP_* keys to CC's SHEET_REGISTRY vs renaming sheet tabs
 **Next:** Option 1 (recommended): add new registry entries in `server/services/sheets.js` (ERP_PROJECTS → 'Project', ERP_TASKS → 'task', etc.) and wire ERP pages. Option 2: rename tabs on `1y1rke6X...` to uppercase. Option 1 is safer (no sheet edits).
 
+## 2026-04-12 06:49
+**Accomplished:** Executed Option 1. Added `ERP_PORTFOLIO` spreadsheet key to SPREADSHEET_KEYS + getSpreadsheetId map, added 10 new registry entries (ERP_PROJECTS → 'Project', ERP_TASKS → 'task', ERP_PEOPLE → 'People', ERP_PROGRAMS → 'PROGRAMS', ERP_MILESTONES → 'Milestones', ERP_GOALS → 'GOALS', ERP_STRATEGIC_INITIATIVES → 'STRATEGIC INITIATIVES', ERP_STRATEGIC_OBJECTIVES → 'strategic_objectives', ERP_QUARTERLY_INITIATIVES → 'quarterly_initiatives', ERP_RESOURCE_BUDGET → 'RESOURCE_ALLOCATION_BUDGET'). Reverted EXECUTION_SPREADSHEET_ID to original `156rACoJ...` (preserves CC's existing keys) and added new `ERP_PORTFOLIO_SPREADSHEET_ID=1y1rke6X...` on Vercel. Pushed commit d380105. Monitoring deploy + ERP_PROJECTS endpoint.
+**Decisions:** Use separate ERP_* prefix instead of overloading EXECUTION_* — avoids breaking CC's existing functionality.
+**Next:** Once deploy lands, rewrite `PortfolioContext` to fetch from new ERP_* endpoints. Unlocks 10 portfolio pages (Programs, Projects, Tasks, Milestones, Strategic Initiatives, Objectives, Goals, Quarterly Sprints, Budget Matrix, Users).
+
 ## 2026-04-11 21:25
 **Accomplished:** No new code changes — session idle, waiting for Dan to push monorepo via GitHub Desktop.
 **Decisions:** none
