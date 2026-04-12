@@ -60,6 +60,16 @@ Ran `npm run build` — clean, chunk hashes unchanged (source JS untouched).
 **Decisions:** none
 **Next:** Wire more pages: CRM Leads (`/api/crm/leads`), Campaigns (`/api/marketing-ops/campaigns`), Sprint Board (`/api/tech-team/sprint`). Push current state via GitHub Desktop.
 
+## 2026-04-12 04:39
+**Accomplished:** Wired 4 more pages to live data (CRM Leads 969, Campaigns 1, Sprint Board 53, Decisions 19). Fixed campaign budget null-deref. All 7 pages verified in browser. Presented next-step options to Dan (deploy vs more wiring vs Supabase vs cleanup).
+**Decisions:** none — awaiting Dan's choice
+**Next:** Dan to pick: deploy to Vercel (15min, unlocks daily use), wire 10 more CC pages (1-2hr), connect Supabase for analytics (30min), or clean up Alpine.js (5min). Recommended: deploy first.
+
+## 2026-04-12 04:48
+**Accomplished:** Linked local repo to Vercel project `yds-command-centre`. Updated `vercel.json` for monorepo: `buildCommand: vite build`, `outputDirectory: dist`, routes `/api/*` to Express and everything else to React SPA via `filesystem` handler + `index.html` fallback.
+**Decisions:** none
+**Next:** Push updated vercel.json and trigger Vercel deploy (`vercel --prod` or GitHub Desktop push).
+
 ## 2026-04-11 21:25
 **Accomplished:** No new code changes — session idle, waiting for Dan to push monorepo via GitHub Desktop.
 **Decisions:** none
