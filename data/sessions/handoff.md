@@ -70,6 +70,16 @@ Ran `npm run build` — clean, chunk hashes unchanged (source JS untouched).
 **Decisions:** none
 **Next:** Push updated vercel.json and trigger Vercel deploy (`vercel --prod` or GitHub Desktop push).
 
+## 2026-04-12 05:57
+**Accomplished:** Removed `ACCESS_PASSWORD` env var from Vercel production via `vercel env rm`. Triggered redeploy in background. Env change will take effect once new deployment is live (serverless functions cache env at boot).
+**Decisions:** Disable CC password gate entirely rather than setting a new password — simpler auth story for now.
+**Next:** Wait for redeploy, then test that API calls work without auth. If auth still needed, add `CC_API_KEY` on Vercel and frontend sends it in headers.
+
+## 2026-04-12 06:02
+**Accomplished:** Verified live production deploy. API returns full real data (44 waiting on Dan, 15 focus areas, 50 overdue, real team load with Dan/Arun/Nirmal overloaded). Identified Google OAuth `redirect_uri_mismatch` — `https://yds-command-centre.vercel.app` not in authorized JavaScript origins.
+**Decisions:** none — Dan to pick between adding origin to Google Cloud Console or bypassing OAuth on load
+**Next:** Option A: Dan adds `https://yds-command-centre.vercel.app` to OAuth origins in Google Cloud Console (`891059055561-erd5ktjmpad...`). Option B: bypass forced sign-in on app load so Notion-backed pages work without Google auth.
+
 ## 2026-04-11 21:25
 **Accomplished:** No new code changes — session idle, waiting for Dan to push monorepo via GitHub Desktop.
 **Decisions:** none

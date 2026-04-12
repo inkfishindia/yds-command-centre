@@ -52,9 +52,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu, onToggleChat }) => 
             )}
             <Button onClick={signOut} variant="secondary" size="sm">Sign Out</Button>
           </div>
-        ) : (
-          <Button onClick={signIn} variant="primary" size="sm" disabled={isAuthActionInProgress}>Sign In</Button>
-        )}
+        ) : null}
       </div>
     </header>
   )
