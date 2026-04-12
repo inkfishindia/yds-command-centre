@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 interface ActionItem {
   id: string;
@@ -8,22 +8,56 @@ interface ActionItem {
   priority: 'high' | 'medium' | 'low';
   dueDate: string;
   status: 'pending' | 'done' | 'snoozed';
+  isOverdue: boolean;
+  daysOverdue: number;
+  assignedNames: string[];
+  type: string;
 }
 
 interface ActionQueueContextType {
   items: ActionItem[];
+  dansCount: number;
+  runnersCount: number;
+  loading: boolean;
   markDone: (id: string) => void;
   snooze: (id: string, days: number) => void;
+  refresh: () => void;
 }
 
 const ActionQueueContext = createContext<ActionQueueContextType | undefined>(undefined);
 
 export const ActionQueueProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<ActionItem[]>([
-    { id: '1', title: 'Approve Summer Campaign Budget', source: 'Finance', priority: 'high', dueDate: '2026-04-12', status: 'pending' },
-    { id: '2', title: 'Restock Premium Tee - White', source: 'Inventory', priority: 'medium', dueDate: '2026-04-13', status: 'pending' },
-    { id: '3', title: 'Review Q2 Tech Decisions', source: 'Strategy', priority: 'low', dueDate: '2026-04-15', status: 'pending' },
-  ]);
+  const [items, setItems] = useState<ActionItem[]>([]);
+  const [dansCount, setDansCount] = useState(0);
+  const [runnersCount, setRunnersCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const fetchQueue = () => {
+    setLoading(true);
+    fetch('/api/notion/action-queue')
+      .then(r => r.ok ? r.json() : Promise.reject(r.statusText))
+      .then(data => {
+        const allItems = [...(data.dansQueue || []), ...(data.runnersQueue || [])];
+        setItems(allItems.map((item: any) => ({
+          id: item.id,
+          title: item.name,
+          source: item.focusAreaNames?.[0] || item.type || 'General',
+          priority: (item.priority || 'medium').toLowerCase() as 'high' | 'medium' | 'low',
+          dueDate: item.dueDate || '',
+          status: item.status === 'Done' ? 'done' : 'pending',
+          isOverdue: item.isOverdue || false,
+          daysOverdue: item.daysOverdue || 0,
+          assignedNames: item.assignedNames || [],
+          type: item.type || '',
+        })));
+        setDansCount(data.dansQueueCount || 0);
+        setRunnersCount(data.runnersQueueCount || 0);
+      })
+      .catch(err => console.error('[ActionQueue] Failed:', err))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchQueue(); }, []);
 
   const markDone = (id: string) => {
     setItems(prev => prev.map(item => item.id === id ? { ...item, status: 'done' } : item));
@@ -41,7 +75,7 @@ export const ActionQueueProvider: React.FC<{ children: ReactNode }> = ({ childre
   };
 
   return (
-    <ActionQueueContext.Provider value={{ items, markDone, snooze }}>
+    <ActionQueueContext.Provider value={{ items, dansCount, runnersCount, loading, markDone, snooze, refresh: fetchQueue }}>
       {children}
     </ActionQueueContext.Provider>
   );

@@ -29,21 +29,10 @@ const CampaignsPage: React.FC = () => {
   const columns = [
     { header: 'Campaign Name', accessor: 'name' },
     { header: 'Status', accessor: (c: Campaign) => <StatusPill status={c.status} /> },
-    { header: 'Start Date', accessor: 'startDate' },
-    { header: 'End Date', accessor: 'endDate' },
-    { header: 'Budget', accessor: (c: Campaign) => `₹${c.budget.toLocaleString()}` },
-    { 
-      header: 'Spend', 
-      accessor: (c: Campaign) => (
-        <div className="min-w-[120px]">
-          <CapacityBar 
-            current={c.spend} 
-            max={c.budget} 
-            label={`₹${c.spend.toLocaleString()}`}
-          />
-        </div>
-      )
-    },
+    { header: 'Start Date', accessor: (c: any) => c.startDate || '—' },
+    { header: 'Owner', accessor: (c: any) => c.owner || '—' },
+    { header: 'Priority', accessor: (c: any) => c.priority || '—' },
+    { header: 'Budget', accessor: (c: any) => c.budget ? `₹${c.budget.toLocaleString()}` : '—' },
     { 
       header: 'Actions', 
       accessor: (c: Campaign) => (

@@ -1,20 +1,52 @@
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Lead, LeadStatus, Campaign } from '../types';
-import { mockLeads } from '../lib/mockData';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Lead, LeadStatus } from '../types';
 
 interface CrmContextType {
   leads: Lead[];
+  total: number;
+  loading: boolean;
   addLead: (lead: Partial<Lead>) => void;
   updateLead: (id: string, updates: Partial<Lead>) => void;
   deleteLead: (id: string) => void;
   pipelineStages: string[];
+  refresh: () => void;
 }
 
 const CrmContext = createContext<CrmContextType | undefined>(undefined);
 
+function mapApiLead(row: any): Lead {
+  return {
+    id: row.lead_id || row.id || '',
+    name: row.name || '',
+    company: row.company || '',
+    email: row.email || '',
+    phone: row.phone || '',
+    status: (row.Status || 'New Lead') as LeadStatus,
+    source: row.source_refs || row.Category || '',
+    ownerName: row.Category || '',
+    createdAt: row.created_at || new Date().toISOString(),
+  };
+}
+
 export const CrmProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [leads, setLeads] = useState<Lead[]>(mockLeads);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const fetchLeads = () => {
+    setLoading(true);
+    fetch('/api/crm/leads?limit=100')
+      .then(r => r.ok ? r.json() : Promise.reject(r.statusText))
+      .then(data => {
+        setLeads((data.rows || []).map(mapApiLead));
+        setTotal(data.total || 0);
+      })
+      .catch(err => console.error('[CRM] Failed to load leads:', err))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchLeads(); }, []);
 
   const addLead = (lead: Partial<Lead>) => {
     const newLead: Lead = {
@@ -22,11 +54,11 @@ export const CrmProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       name: lead.name || 'New Lead',
       email: lead.email || '',
       phone: lead.phone || '',
-      status: (lead.status as LeadStatus) || LeadStatus.NEW,
+      status: lead.status || LeadStatus.NEW,
       source: lead.source || 'Manual',
       ownerName: lead.ownerName || 'Unassigned',
       createdAt: new Date().toISOString(),
-      ...lead
+      ...lead,
     };
     setLeads(prev => [newLead, ...prev]);
   };
@@ -39,10 +71,10 @@ export const CrmProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setLeads(prev => prev.filter(l => l.id !== id));
   };
 
-  const pipelineStages = ['New', 'Qualified', 'Proposal', 'Negotiation', 'Won', 'Lost'];
+  const pipelineStages = ['New Lead', 'Contacted', 'Qualified', 'Proposal Sent', 'Negotiation', 'Won', 'Lost'];
 
   return (
-    <CrmContext.Provider value={{ leads, addLead, updateLead, deleteLead, pipelineStages }}>
+    <CrmContext.Provider value={{ leads, total, loading, addLead, updateLead, deleteLead, pipelineStages, refresh: fetchLeads }}>
       {children}
     </CrmContext.Provider>
   );

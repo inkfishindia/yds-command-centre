@@ -55,6 +55,11 @@ Ran `npm run build` — clean, chunk hashes unchanged (source JS untouched).
 **Decisions:** none
 **Next:** Dan to push monorepo via GitHub Desktop from `~/Projects/yds-command-centre`.
 
+## 2026-04-11 21:37
+**Accomplished:** Wired 3 ERP pages to live Notion data via CC API. CEO Dashboard (`/api/ceo-dashboard`) shows real hero metrics (44 waiting on Dan, 15 focus areas, 50 overdue), attention rail, focus area health, and velocity stats. Focus Areas page (`/api/notion/focus-areas`) shows all 15 real focus areas with health, owner, goals, blockers. Action Queue context (`/api/notion/action-queue`) fetches 157 real items from Notion. Fixed NexusAIAgent Gemini crash (graceful fallback), fixed null-deref on `commitments.total` in CEO Dashboard. All 3 pages verified in browser with live data.
+**Decisions:** none
+**Next:** Wire more pages: CRM Leads (`/api/crm/leads`), Campaigns (`/api/marketing-ops/campaigns`), Sprint Board (`/api/tech-team/sprint`). Push current state via GitHub Desktop.
+
 ## 2026-04-11 21:25
 **Accomplished:** No new code changes — session idle, waiting for Dan to push monorepo via GitHub Desktop.
 **Decisions:** none

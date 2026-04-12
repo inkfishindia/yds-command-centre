@@ -1,19 +1,56 @@
 
-import React from 'react';
-import { 
-  ManagerEditorLayout, 
-  ProgressRing, 
-  Card 
+import React, { useState, useEffect } from 'react';
+import {
+  ManagerEditorLayout,
+  ProgressRing,
+  Card
 } from '../ui';
 
+interface FocusArea {
+  id: string;
+  Name: string;
+  Health: string;
+  Owner: string;
+  Status: string;
+  'Business Area': string;
+  Goal: string;
+  Blockers: string;
+  Commitments: Array<{ id: string; title: string; status: string }>;
+}
+
 const FocusAreasPage: React.FC = () => {
-  const areas = [
-    { id: '1', name: 'Financial Stability', progress: 85, status: 'healthy', owner: 'Vivek', trend: 'stable' },
-    { id: '2', name: 'Product Quality', progress: 65, status: 'at-risk', owner: 'Surath', trend: 'declining' },
-    { id: '3', name: 'Customer Satisfaction', progress: 92, status: 'healthy', owner: 'Danish', trend: 'improving' },
-    { id: '4', name: 'Market Share', progress: 45, status: 'critical', owner: 'Vivek', trend: 'declining' },
-    { id: '5', name: 'Team Morale', progress: 78, status: 'healthy', owner: 'Danish', trend: 'stable' },
-  ];
+  const [areas, setAreas] = useState<FocusArea[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/notion/focus-areas')
+      .then(r => r.json())
+      .then(d => setAreas(d.focusAreas || []))
+      .catch(err => console.error('[FocusAreas] Failed:', err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const healthToProgress = (health: string) => {
+    if (health === 'On Track') return 80;
+    if (health === 'At Risk') return 50;
+    if (health === 'Off Track') return 25;
+    return 60;
+  };
+
+  const healthToColor = (health: string) => {
+    if (health === 'On Track') return 'var(--color-brand-primary)';
+    if (health === 'At Risk') return '#f59e0b';
+    if (health === 'Off Track') return '#ef4444';
+    return '#6b7280';
+  };
+
+  if (loading) {
+    return (
+      <ManagerEditorLayout title="Focus Areas">
+        <p className="text-sm text-[var(--color-text-secondary)]">Loading focus areas...</p>
+      </ManagerEditorLayout>
+    );
+  }
 
   return (
     <ManagerEditorLayout title="Focus Areas">
@@ -21,37 +58,46 @@ const FocusAreasPage: React.FC = () => {
         {areas.map(area => (
           <Card key={area.id} className="p-6">
             <div className="flex justify-between items-start mb-4">
-              <h3 className="text-sm font-black uppercase tracking-tight text-[var(--color-text-primary)]">
-                {area.name}
-              </h3>
-              <ProgressRing 
-                percent={area.progress} 
-                size={48} 
-                color={
-                  area.status === 'healthy' ? 'var(--color-brand-primary)' :
-                  area.status === 'at-risk' ? '#f59e0b' : '#ef4444'
-                }
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-tight text-[var(--color-text-primary)]">
+                  {area.Name}
+                </h3>
+                <span className="text-[10px] text-[var(--color-text-secondary)]">{area['Business Area']}</span>
+              </div>
+              <ProgressRing
+                percent={healthToProgress(area.Health)}
+                size={48}
+                color={healthToColor(area.Health)}
               />
             </div>
-            
-            <div className="space-y-4">
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-text-secondary)]">Health</span>
+                <span className="text-xs font-bold" style={{ color: healthToColor(area.Health) }}>
+                  {area.Health || 'Unknown'}
+                </span>
+              </div>
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-text-secondary)]">Owner</span>
-                <span className="text-xs font-bold">{area.owner}</span>
+                <span className="text-xs font-bold">{area.Owner || '—'}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-text-secondary)]">Trend</span>
-                <span className={`text-xs font-bold uppercase ${
-                  area.trend === 'improving' ? 'text-green-500' : 
-                  area.trend === 'declining' ? 'text-red-500' : 'text-blue-500'
-                }`}>{area.trend}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-text-secondary)]">Status</span>
+                <span className="text-xs font-bold">{area.Status || '—'}</span>
               </div>
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-[var(--color-border-primary)]">
-              <button className="w-full py-2 text-[10px] font-black uppercase tracking-widest bg-[var(--color-bg-stage)] hover:bg-[var(--color-border-primary)] rounded-lg transition-colors">
-                View Detailed Report
-              </button>
+              {area.Goal && (
+                <div className="mt-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-text-secondary)]">Goal</span>
+                  <p className="text-xs text-[var(--color-text-primary)] mt-1 line-clamp-2">{area.Goal}</p>
+                </div>
+              )}
+              {area.Blockers && (
+                <div className="mt-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-red-400">Blockers</span>
+                  <p className="text-xs text-[var(--color-text-secondary)] mt-1 line-clamp-2">{area.Blockers}</p>
+                </div>
+              )}
             </div>
           </Card>
         ))}

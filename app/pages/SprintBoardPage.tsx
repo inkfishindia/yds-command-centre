@@ -1,79 +1,107 @@
 
-import React, { useState } from 'react';
-import { 
-  ManagerEditorLayout, 
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  ManagerEditorLayout,
   KanbanBoard,
   Button,
   FormDrawer,
   FormField
 } from '../ui';
-import { useTeam } from '../contexts/TeamContext';
+
+interface SprintItem {
+  id: string;
+  Name: string;
+  Status: string;
+  Type: string;
+  Priority: string;
+  System: string;
+  'Assigned To': string;
+}
+
+const statusToColumn: Record<string, string> = {
+  'Backlog': 'backlog',
+  'This Sprint': 'todo',
+  'In Progress': 'in_progress',
+  'In Review': 'in_progress',
+  'Done': 'done',
+  'Shipped': 'done',
+};
+
+const priorityMap: Record<string, 'high' | 'medium' | 'low'> = {
+  'P0': 'high',
+  'P1': 'high',
+  'P2': 'medium',
+  'P3': 'low',
+};
 
 const SprintBoardPage: React.FC = () => {
-  const { members } = useTeam();
+  const [items, setItems] = useState<SprintItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
-  const columns = [
-    {
-      id: 'backlog',
-      title: 'Backlog',
-      items: [
-        { id: '1', title: 'Fix Header Alignment', subtitle: 'UI/UX', priority: 'low' as const, tags: [{ label: 'Bug' }] },
-        { id: '2', title: 'Integrate Stripe API', subtitle: 'Backend', priority: 'high' as const, tags: [{ label: 'Feature' }] },
-      ]
-    },
-    {
-      id: 'todo',
-      title: 'To Do',
-      items: [
-        { id: '3', title: 'Design Summer Banner', subtitle: 'Marketing', priority: 'medium' as const, tags: [{ label: 'Design' }] },
-      ]
-    },
-    {
-      id: 'in_progress',
-      title: 'In Progress',
-      items: [
-        { id: '4', title: 'Lead CRM Dashboard', subtitle: 'Frontend', priority: 'high' as const, tags: [{ label: 'Feature' }] },
-      ]
-    },
-    {
-      id: 'done',
-      title: 'Done',
-      items: [
-        { id: '5', title: 'Nexus AI Integration', subtitle: 'AI/ML', priority: 'high' as const, tags: [{ label: 'Complete' }] },
-      ]
-    }
-  ];
+  useEffect(() => {
+    fetch('/api/tech-team/sprint')
+      .then(r => r.ok ? r.json() : Promise.reject(r.statusText))
+      .then(data => setItems(data.items || []))
+      .catch(err => console.error('[Sprint] Failed:', err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const columns = useMemo(() => {
+    const groups: Record<string, Array<{ id: string; title: string; subtitle: string; priority: 'high' | 'medium' | 'low'; tags: Array<{ label: string }> }>> = {
+      backlog: [],
+      todo: [],
+      in_progress: [],
+      done: [],
+    };
+
+    items.forEach(item => {
+      const col = statusToColumn[item.Status] || 'backlog';
+      groups[col]?.push({
+        id: item.id,
+        title: item.Name,
+        subtitle: item.System || item['Assigned To'] || '',
+        priority: priorityMap[item.Priority] || 'medium',
+        tags: [{ label: item.Type || 'Task' }],
+      });
+    });
+
+    return [
+      { id: 'backlog', title: `Backlog (${groups.backlog.length})`, items: groups.backlog },
+      { id: 'todo', title: `This Sprint (${groups.todo.length})`, items: groups.todo },
+      { id: 'in_progress', title: `In Progress (${groups.in_progress.length})`, items: groups.in_progress },
+      { id: 'done', title: `Done (${groups.done.length})`, items: groups.done },
+    ];
+  }, [items]);
 
   const formFields: FormField[] = [
     { name: 'title', label: 'Task Title', type: 'text', required: true },
-    { name: 'subtitle', label: 'Category', type: 'text' },
-    { 
-      name: 'priority', 
-      label: 'Priority', 
-      type: 'select', 
+    { name: 'subtitle', label: 'System', type: 'text' },
+    {
+      name: 'priority',
+      label: 'Priority',
+      type: 'select',
       options: [
-        { label: 'Low', value: 'low' },
-        { label: 'Medium', value: 'medium' },
-        { label: 'High', value: 'high' },
+        { label: 'P0 - Critical', value: 'P0' },
+        { label: 'P1 - High', value: 'P1' },
+        { label: 'P2 - Medium', value: 'P2' },
+        { label: 'P3 - Low', value: 'P3' },
       ]
-    },
-    { 
-      name: 'assignee', 
-      label: 'Assignee', 
-      type: 'select', 
-      options: members.map(m => ({ label: m.name, value: m.id }))
     },
   ];
 
   return (
-    <ManagerEditorLayout 
-      title="Sprint Board"
+    <ManagerEditorLayout
+      title={`Sprint Board (${items.length} items)`}
       toolbar={<Button onClick={() => setIsFormOpen(true)}>Create Task</Button>}
     >
-      <KanbanBoard columns={columns} />
+      {loading ? (
+        <p className="text-sm text-[var(--color-text-secondary)]">Loading sprint items...</p>
+      ) : (
+        <KanbanBoard columns={columns} />
+      )}
 
-      <FormDrawer 
+      <FormDrawer
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         title="Create New Task"
