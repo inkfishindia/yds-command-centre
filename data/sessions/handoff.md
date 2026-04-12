@@ -80,6 +80,16 @@ Ran `npm run build` — clean, chunk hashes unchanged (source JS untouched).
 **Decisions:** none — Dan to pick between adding origin to Google Cloud Console or bypassing OAuth on load
 **Next:** Option A: Dan adds `https://yds-command-centre.vercel.app` to OAuth origins in Google Cloud Console (`891059055561-erd5ktjmpad...`). Option B: bypass forced sign-in on app load so Notion-backed pages work without Google auth.
 
+## 2026-04-12 06:17
+**Accomplished:** Dan verified 15 focus areas matched Notion — confirmed live data flowing end-to-end. Cleaned up local filesystem: deleted superseded `~/Projects/yds-erp`, old Downloads zips (copy-of-*, yds-claude-code-agents duplicates, yds-leads-manager zips, old CC backup). `~/Projects/` now has just `yds-command-centre` (active monorepo) and `yds-dashboard` (still deployed, not yet absorbed). Presented 4-phase plan: (1) Google OAuth origin fix — unlocks 20 Sheets pages, (2) wire 10 more CC pages, (3) Supabase for analytics, (4) Alpine.js cleanup.
+**Decisions:** none — awaiting Dan's go on Phase 1 (Google OAuth origin fix in Cloud Console)
+**Next:** Dan to add `https://yds-command-centre.vercel.app` + `http://localhost:5173` to authorized JavaScript origins AND redirect URIs in Google Cloud Console (OAuth client `891059055561-erd5ktjmpad005f9r78up0on1mnilcbu`). Then I restore Sign In button and 20 Sheets-backed pages go live.
+
+## 2026-04-12 06:20
+**Accomplished:** Identified that CC already has Sheets access via service account (`155749101771-compute@developer.gserviceaccount.com`) — different Google Cloud project from the browser OAuth client (`891059055561`). Realized better path: skip OAuth entirely for Sheets pages, route ERP's `dataClient.ts` through CC's existing `/api/sheets/*` endpoint (server-side service account auth).
+**Decisions:** Skip user OAuth for Sheets data. Route ERP browser → CC `/api/sheets/*` → CC server-side service account → Google Sheets. Zero user auth needed.
+**Next:** Check CC's `/api/sheets/*` endpoint shape, update ERP `dataClient.ts` to call it instead of `sheets.googleapis.com`, wire up 20 Sheets-backed pages (Orders, Portfolio, BMC, Users, Competitors).
+
 ## 2026-04-11 21:25
 **Accomplished:** No new code changes — session idle, waiting for Dan to push monorepo via GitHub Desktop.
 **Decisions:** none

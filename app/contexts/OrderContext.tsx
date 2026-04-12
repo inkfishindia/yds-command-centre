@@ -1,24 +1,54 @@
 
 import React, { createContext, useState, useContext, useCallback, ReactNode, useEffect } from 'react';
 import { OrderItem, OrderContextType, OrderStatus, AcceptanceStatus, PaymentMode, OrderType, OrderSummaryItem } from '../types';
-import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
-import { fetchValues, updateValues, appendValues, fetchHeaders } from '../lib/sheets';
-import { getEnv } from '../lib/env';
-import { requestAllGoogleApiTokens } from '../lib/googleAuth';
-import { ORDER_SHEET_CONFIG } from '../src/config/orderSheetConfig';
-import { parseOrderData } from '../services/orderSheetsParser';
-import { parseOrderSummaryData } from '../services/orderSummarySheetsParser';
-import { bmcRegistry } from '../lib/dataRegistry';
-import { mockOrderItems } from '../lib/mockData';
-
-const ORDERS_SHEET_ID_LS_KEY = 'order_management_sheet_id';
-const DEFAULT_ORDERS_SHEET_ID_ENV_KEY = 'ORDER_MANAGEMENT_SHEET_ID';
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
+/**
+ * Map a CC /api/sheets/OPS_SALES_ORDERS row to an OrderSummaryItem.
+ * The CC API returns rows keyed by the exact sheet header names.
+ */
+function mapRowToSummary(row: any): OrderSummaryItem {
+  return {
+    id: row['Order #'] || String(row.rowIndex),
+    orderNumber: row['Order #'] || '',
+    date: row['Date'] || '',
+    time: row['Time'] || '',
+    gstin: row['GSTIN'] || '',
+    customerName: row['Customer'] || '',
+    email: row['Email'] || '',
+    phone: row['Phone'] || '',
+    partnerOrderNumber: row['Partner Order Number'] || '',
+    orderType: (row['Order Type'] || 'B2C') as OrderType,
+    orderMadeBy: row['Order Made By'] || '',
+    salesChannel: row['Sales Channel'] || '',
+    shippingName: row['Shipping Name'] || '',
+    shippingPhone: row['Shipping Phone'] || '',
+    shippingAddress: row['Shipping Address'] || '',
+    shippingCity: row['Shipping City'] || '',
+    shippingState: row['Shipping State'] || '',
+    shippingCountry: row['Shipping Country'] || '',
+    shippingPincode: row['Shipping Pincode'] || '',
+    billingName: row['Billing Name'] || '',
+    billingPhone: row['Billing Phone'] || '',
+    billingAddress: row['Billing Address'] || '',
+    billingCity: row['Billing City'] || '',
+    billingState: row['Billing State'] || '',
+    billingCountry: row['Billing Country'] || '',
+    billingPincode: row['Billing Pincode'] || '',
+    shippingType: row['Shipping Type'] || '',
+    shippingCost: parseFloat(row['Shipping Cost'] || '0') || 0,
+    totalAmountWithTax: parseFloat(row['Total Amount with tax'] || '0') || 0,
+    totalNoOfProducts: parseInt(row['Total No of Products'] || '0', 10) || 0,
+    totalQuantityOfAllProducts: parseInt(row['Total Quantity of all the products'] || '0', 10) || 0,
+    status: (row['Status'] || 'New') as OrderStatus,
+    acceptanceStatus: (row['Acceptance Status'] || 'Awaiting') as AcceptanceStatus,
+    paymentMode: (row['Payment Mode'] || 'COD') as PaymentMode,
+  };
+}
+
 export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { isSignedIn, isMockMode, signIn } = useAuth();
   const { addToast } = useToast();
 
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -28,160 +58,58 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
   const [selectedOrderNumberForDetail, setSelectedOrderNumberForDetail] = useState<string | null>(null);
-
-  const [orderSheetId, setOrderSheetIdState] = useState<string>(() => {
-    const storedId = localStorage.getItem(ORDERS_SHEET_ID_LS_KEY);
-    if (storedId) return storedId;
-    try {
-      return getEnv(DEFAULT_ORDERS_SHEET_ID_ENV_KEY) || '';
-    } catch (e) {
-      return '';
-    }
-  });
+  const [orderSheetId, setOrderSheetIdState] = useState<string>('');
 
   const setOrderSheetId = useCallback((id: string) => {
-    localStorage.setItem(ORDERS_SHEET_ID_LS_KEY, id);
     setOrderSheetIdState(id);
   }, []);
 
   const loadOrders = useCallback(async (forceRefresh = false) => {
-    if (isMockMode) {
-      setOrderItems(mockOrderItems);
-      const mockSummary = Array.from(
-        mockOrderItems.reduce((map, item) => {
-          if (!map.has(item.orderNumber)) {
-            map.set(item.orderNumber, {
-              id: item.orderNumber,
-              orderNumber: item.orderNumber,
-              date: item.date,
-              time: item.time,
-              customerName: item.customerName,
-              email: item.email,
-              phone: item.phone,
-              gstin: item.gstin,
-              partnerOrderNumber: item.partnerOrderNumber,
-              orderType: item.orderType,
-              orderMadeBy: item.orderMadeBy,
-              salesChannel: item.salesChannel,
-              shippingName: item.shippingName,
-              shippingPhone: item.shippingPhone,
-              shippingAddress: item.shippingAddress,
-              shippingCity: item.shippingCity,
-              shippingState: item.shippingState,
-              shippingCountry: item.shippingCountry,
-              shippingPincode: item.shippingPincode,
-              billingName: item.billingName,
-              billingPhone: item.billingPhone,
-              billingAddress: item.billingAddress,
-              billingCity: item.billingCity,
-              billingState: item.billingState,
-              billingCountry: item.billingCountry,
-              billingPincode: item.billingPincode,
-              shippingType: item.shippingType,
-              shippingCost: item.shippingCost,
-              totalAmountWithTax: 0,
-              status: item.status,
-              acceptanceStatus: item.acceptanceStatus,
-              paymentMode: item.paymentMode,
-              totalNoOfProducts: 0,
-              totalQuantityOfAllProducts: 0,
-            });
-          }
-          const summary = map.get(item.orderNumber)!;
-          summary.totalAmountWithTax = (summary.totalAmountWithTax || 0) + (item.totalAmountWithTax || 0);
-          summary.totalNoOfProducts = (summary.totalNoOfProducts || 0) + 1;
-          summary.totalQuantityOfAllProducts = (summary.totalQuantityOfAllProducts || 0) + (item.quantity || 0);
-          return map;
-        }, new Map<string, OrderSummaryItem>()).values()
-      );
-      setOrderSummaryItems(mockSummary);
-      setInitialLoadComplete(true);
-      return;
-    }
-
-    if (!isSignedIn) return;
-    if (initialLoadComplete && !forceRefresh) return;
-    if (!orderSheetId) return;
-
     setLoading(true);
+    setError(null);
     try {
-      const orderConfig = ORDER_SHEET_CONFIG;
-      const orderSummaryConfig = bmcRegistry.orderSummary;
-      const [orderResponse, orderSummaryResponse] = await Promise.all([
-        fetchValues(orderSheetId, `'${orderConfig.sheetName}'!A:AZ`, { bypassCache: forceRefresh }),
-        fetchValues(orderSheetId, `'${orderSummaryConfig.sheetName}'!A:AZ`, { bypassCache: forceRefresh }),
-      ]);
-
-      if (orderResponse.values) setOrderItems(parseOrderData(orderResponse.values, orderConfig));
-      if (orderSummaryResponse.values) setOrderSummaryItems(parseOrderSummaryData(orderSummaryResponse.values, orderSummaryConfig));
-      
-      setError(null);
+      const res = await fetch('/api/sheets/OPS_SALES_ORDERS');
+      if (!res.ok) throw new Error(`Failed to fetch orders: ${res.status}`);
+      const data = await res.json();
+      if (data.available === false) {
+        setError('Orders sheet not configured on server');
+        return;
+      }
+      const summaries = (data.rows || []).map(mapRowToSummary);
+      setOrderSummaryItems(summaries);
+      // For now, order line items come from the same dataset (one row = one order)
+      setOrderItems([]);
     } catch (err: any) {
-      if (err.message.includes('403') || err.message.includes('401')) setShowPermissionPrompt(true);
+      console.error('[Orders] Failed:', err);
       setError(err.message);
     } finally {
       setInitialLoadComplete(true);
       setLoading(false);
     }
-  }, [isSignedIn, isMockMode, orderSheetId, initialLoadComplete]);
+  }, []);
 
-  const saveItem = useCallback(async (itemData: Partial<OrderItem>) => {
-    // OPTIMISTIC UPDATE
-    if (itemData.id) {
-        setOrderItems(prev => prev.map(item => item.id === itemData.id ? { ...item, ...itemData } : item));
-    }
+  const saveItem = useCallback(async (_itemData: Partial<OrderItem>) => {
+    addToast('Order save not wired to CC API yet', 'info');
+  }, [addToast]);
 
-    if (isMockMode) return;
-
-    try {
-      const config = ORDER_SHEET_CONFIG;
-      const headers = await fetchHeaders(orderSheetId, `'${config.sheetName}'!A:AZ`, config.headerRow);
-      const existingIdx = orderItems.findIndex(item => item.id === itemData.id);
-      const isEditing = existingIdx !== -1;
-      const finalItem = isEditing ? { ...orderItems[existingIdx], ...itemData } : { ...itemData, id: `ORD-${Date.now()}` };
-
-      const rowData = headers.map(header => {
-        const fieldKey = Object.keys(config.fieldToHeaderMap).find(key => config.fieldToHeaderMap[key as keyof OrderItem] === header);
-        return fieldKey ? String((finalItem as any)[fieldKey] || '') : '';
-      });
-
-      if (isEditing) {
-        const rowNumber = config.headerRow + 1 + existingIdx;
-        await updateValues(orderSheetId, `'${config.sheetName}'!A${rowNumber}`, [rowData]);
-      } else {
-        await appendValues(orderSheetId, config.sheetName, [rowData]);
-      }
-      loadOrders(true);
-    } catch (err: any) {
-      addToast(`Save failed: ${err.message}`, 'error');
-      loadOrders(true); // Revert to server state
-    }
-  }, [orderSheetId, orderItems, isMockMode, loadOrders, addToast]);
-
-  const updateOrderSummaryAcceptanceStatus = useCallback(async (orderNumber: string, status: AcceptanceStatus) => {
-    // OPTIMISTIC UPDATE
-    setOrderSummaryItems(prev => prev.map(item => item.orderNumber === orderNumber ? { ...item, acceptanceStatus: status } : item));
-    
-    const itemsToUpdate = orderItems.filter(item => item.orderNumber === orderNumber);
-    try {
-      await Promise.all(itemsToUpdate.map(item => saveItem({ id: item.id, acceptanceStatus: status })));
-      addToast(`Order ${orderNumber} ${status}`, 'success');
-    } catch (err) {
-      loadOrders(true); // Revert
-    }
-  }, [orderItems, saveItem, addToast, loadOrders]);
+  const updateOrderSummaryAcceptanceStatus = useCallback(async (_orderNumber: string, _status: AcceptanceStatus) => {
+    addToast('Order status update not wired to CC API yet', 'info');
+  }, [addToast]);
 
   useEffect(() => {
-    if (isSignedIn || isMockMode) loadOrders();
-  }, [isSignedIn, isMockMode, loadOrders]);
+    loadOrders();
+  }, [loadOrders]);
 
   return (
-    <OrderContext.Provider value={{ 
-      orderItems, orderSummaryItems, orderSheetId, setOrderSheetId, 
-      loading, error, initialLoadComplete, showPermissionPrompt, 
-      loadOrders, handleGrantSheetsAccess: async () => { await requestAllGoogleApiTokens(); loadOrders(true); }, 
-      saveItem, deleteItem: async (i) => {}, 
-      selectedOrderNumberForDetail, setSelectedOrderNumberForDetail, updateOrderSummaryAcceptanceStatus 
+    <OrderContext.Provider value={{
+      orderItems, orderSummaryItems, orderSheetId, setOrderSheetId,
+      loading, error, initialLoadComplete, showPermissionPrompt,
+      loadOrders,
+      handleGrantSheetsAccess: async () => { loadOrders(true); },
+      saveItem,
+      deleteItem: async (_i) => {},
+      selectedOrderNumberForDetail, setSelectedOrderNumberForDetail,
+      updateOrderSummaryAcceptanceStatus
     }}>
       {children}
     </OrderContext.Provider>
