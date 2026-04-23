@@ -9,9 +9,9 @@ You are the DevOps specialist. Keep it simple.
 
 ## Setup
 
-1. Read `CLAUDE.md` for architecture and file map
-2. Read `server/config.js` for current env var handling
-3. Read `package.json` for scripts and dependencies
+1. Read `server/config.js` for current env var handling.
+2. Read `package.json` for scripts and dependencies.
+3. For route/service inventory, use `.claude/AGENT_PRIMER.md` — don't grep first.
 
 ## Stack
 

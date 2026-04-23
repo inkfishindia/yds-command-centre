@@ -2,7 +2,7 @@
 
 **Purpose:** Single source of truth for what exists in the app. Read this before building anything. Update this when you change the app.
 
-**Last updated:** 2026-03-21 (Architecture hardening complete: backend route orchestration extracted into domain services; frontend root app split into chat, commitments, factory, command-shell, BMC, CRM, marketing ops, tech team, registry, projects, team, documents, notion-browser, and dashboard modules; command palette and navigation now use `Cmd/Ctrl+K`, `/`, and `Cmd/Ctrl+Shift+...` shortcuts; build step confirmed via `npm run build`; BMC redesigned as a hybrid executive canvas with summary hero, richer section cards, stronger value-proposition emphasis, and scroll-responsive layout; confirmed local Sheets wiring added for legacy CRM pipeline, execution, app logging, and BMC while strategy remains pending final verification)
+**Last updated:** 2026-04-23 (Dan ↔ Colin Queue backend added: `/api/dan-colin` routes + `server/services/dan-colin-service.js`. Source: Notion DB `00969f07`. GET groups queue by section; POST /:id/answer and POST /drop both SSE + approval-gated. Auto-close logic: non-empty answer on ⚡ Waiting row atomically sets ✅ Closed + Resolved.)
 
 ---
 
@@ -39,6 +39,7 @@
   - `src/js/modules/team.js`
   - `src/js/modules/documents.js`
   - `src/js/modules/notion-browser.js`
+  - `src/js/modules/system-map.js`
 
 ### Build and runtime
 - There is a real frontend asset build step.
@@ -116,6 +117,19 @@
 |--------|------|-------------|
 | GET | `/api/skills` | List 6 available skills |
 
+### System Map (`server/routes/system-map.js`)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/system-map` | Aggregated app structure (routes, modules, Notion DBs, Sheets, docs, agents); cached 60s; query: `?force=true` to bust cache |
+
+### Dan ↔ Colin Queue (`server/routes/dan-colin.js`)
+Source: Notion DB `00969f07-8b4d-4c88-8a45-ec1e95b3bacb`. 5-min in-process cache.
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/dan-colin` | Grouped queue: `{ now, waiting, drop, watch, closed, meta }` — excludes Archived, closed = Resolved OR ✅ Closed within 7d |
+| POST | `/api/dan-colin/:id/answer` | Body: `{ answer: string }` — SSE + approval gate. Auto-closes ⚡ Waiting rows to ✅ Closed + Resolved when answer is non-empty |
+| POST | `/api/dan-colin/drop` | Body: `{ body: string }` — SSE + approval gate. Creates new row with Section=📥 Drop, Owner=Colin, Status=Open |
+
 ### Marketing Ops (`server/routes/marketing-ops.js`)
 | Method | Path | Description |
 |--------|------|-------------|
@@ -188,6 +202,7 @@
 | `techTeam` | Tech | `loadTechTeam()` | GET /api/tech-team + /agents + /strategy + /github |
 | `bmc` | BMC | `loadBMC()` | GET /api/bmc |
 | `crm` | CRM | `loadCRM()` | GET /api/crm + /people + /projects + /tasks |
+| `systemMap` | (not nav visible by default) | `loadSystemMap()` | GET /api/system-map |
 
 ### Dashboard shows:
 - Morning Brief (summary: overdue count, top 3 active, flags, waiting on)
@@ -398,6 +413,20 @@
 ### Factory (`src/js/modules/factory.js`)
 `factoryZoneDetail`, `factorySimOpen`, `factorySimConfig`, `factorySimPreset`, `_factoryBaseCache`, `factoryConfig`, `factoryConfigLoading`, `factoryEditingMachine`, `factoryEditingZone`, `factoryShowFormulas`, `factoryMachineEdits`, `factoryZoneEdits`, `factoryOperatingEdits`, `factoryEditingOperating`, `factoryError`
 
+### System Map (`src/js/modules/system-map.js`)
+`systemMap`, `systemMapLoading`, `systemMapError`, `systemMapFilter`, `systemMapExpanded{repo, routes, notion, sheets, modules, docs}`
+
+#### System Map Methods
+| Method | Purpose |
+|--------|---------|
+| `loadSystemMap(force)` | Fetch GET /api/system-map (with optional cache bust), store in `systemMap` |
+| `toggleSystemMapSection(key)` | Toggle expand/collapse of a collapsible section (repo/routes/notion/sheets/modules/docs) |
+| `copySystemMapId(id)` | Copy shortened ID to clipboard, show toast feedback |
+| `filteredRoutes()` | Return routes filtered by `systemMapFilter` across file and endpoint properties |
+| `filteredNotionDbs()` | Return Notion DBs filtered by name, id, purpose, properties |
+| `filteredSheets()` | Return Sheets filtered by label, key, envVar |
+| `filteredModules()` | Return modules filtered by name and exports |
+
 ---
 
 ## Skills & Experts
@@ -557,6 +586,23 @@ Each hydrated row receives appended columns: `${sourceColumnId}_resolved` with t
 | `isConfigured()` | boolean | — | Check if GITHUB_TOKEN env var is set |
 | `getRepoActivity(owner, repo)` | {available, commits[], openPRs[], openIssues[], stats} OR {available: false} | Yes | 5-min TTL; graceful degradation |
 | `clearCache()` | — | — | Clear in-memory GitHub cache |
+
+---
+
+## System Map Service (`server/services/system-map-service.js`)
+
+### Key Functions
+| Function | Returns | Cached | Notes |
+|----------|---------|--------|-------|
+| `buildSystemMap(force)` | {routes[], modules[], notionDatabases[], sheets[], docs{}, agents[], generatedAt} | Yes, 60s | Scans codebase for routes, modules, Notion DB configs, Sheets IDs, docs inventory, and agent configs; `force=true` busts cache |
+
+### Internals
+- `extractRoutes()` — Scans `server/routes/*.js` for `router.METHOD(path)` statements; pulls preceding JSDoc comments for descriptions
+- `extractModules()` — Scans `src/js/modules/*.js` for module exports; cross-references against `index.html` for which view uses each module
+- `extractNotionDatabases()` — Parses `.claude/docs/notion-hub.md` DATABASE MAP table + per-DB property sections
+- `extractSheets()` — Parses `server/config.js` for `*_SPREADSHEET_ID` references and checks their presence in `process.env`
+- `extractDocs()` — Lists `.claude/docs/` files and recent session headers from `data/sessions/handoff.md`
+- `extractAgents()` — Scans `.claude/agents/*.md` for agent descriptions in frontmatter
 
 ---
 
@@ -721,5 +767,7 @@ Header → Layout → Sidebar Nav → Content → Chat Layout → Messages → C
 | `test/crm.test.js` | Route loading, 8 endpoints (GET /, /people, /projects, /tasks, /campaigns, /business-units, POST /tasks, PATCH /tasks/:rowIdx), optional filters, hydration integration | `server/routes/crm.js`, `server/services/hydration.js`, `server/services/sheets.js` |
 | `test/marketing-tools.test.js` | 4 tool definitions, approval flags (all No), input schemas, customer_psychology_generator, competitor_analysis, content_strategy_generator, campaign_ideator | `server/tools/marketing-tools.js` |
 | `test/store-tools.test.js` | 2 tool definitions, approval flags (store_expert_query No, store_expert_update Yes), input schemas, path traversal protection | `server/tools/store-tools.js` |
+| `test/system-map.test.js` | Module load, buildSystemMap() export, caching behavior (60s TTL), force cache bust | `server/services/system-map-service.js` |
+| `test/integration/system-map-http.test.js` | GET /api/system-map route, response shape (routes[], modules[], notionDatabases[], sheets[], docs, agents[]), cache control | `server/routes/system-map.js` |
 
 Run: `npm test` (Node built-in runner, ~180ms)

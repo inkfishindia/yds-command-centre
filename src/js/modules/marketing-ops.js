@@ -18,6 +18,19 @@ export function createMarketingOpsModule() {
     // Marketing AI Tools inputs
     mktopsAiInputs: { segment: '', context: '', competitor: '', focus: '', topic: '', audience: '', goal: '', product: '', budget: '' },
 
+    // ── UTM Builder ───────────────────────────────────────────
+    utm: {
+      url: '',
+      source: '',
+      medium: '',
+      campaign: '',
+      content: '',
+      term: '',
+      presetName: '',
+      presets: [],
+      copiedRecently: false,
+    },
+
     // Marketing Tasks
     mktopsTasks: null,
     mktopsTasksLoading: false,
@@ -102,6 +115,7 @@ export function createMarketingOpsModule() {
     },
 
     async loadMarketingOps() {
+      this.utmLoadPresetsFromStorage();
       const signal = this.beginRequest('marketingOps');
       this.mktopsLoading = true;
       try {
@@ -438,6 +452,9 @@ export function createMarketingOpsModule() {
       }
       if (section === 'competitors' && !this.ciData) {
         this.loadCompetitorIntel();
+      }
+      if (section === 'utm') {
+        this.utmLoadPresetsFromStorage();
       }
     },
 
@@ -962,6 +979,107 @@ export function createMarketingOpsModule() {
       this.calendarMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
       this._calendarDaysKey = null;
       this.loadCalendar();
+    },
+
+    // ── UTM Builder Methods ────────────────────────────────────
+
+    utmGeneratedUrl() {
+      const base = (this.utm.url || '').trim();
+      if (!base) return '';
+      try {
+        const url = new URL(base);
+        const params = new URLSearchParams(url.search);
+        if (this.utm.source)   params.set('utm_source',   this.utm.source.trim());
+        if (this.utm.medium)   params.set('utm_medium',   this.utm.medium.trim());
+        if (this.utm.campaign) params.set('utm_campaign', this.utm.campaign.trim());
+        if (this.utm.content)  params.set('utm_content',  this.utm.content.trim());
+        if (this.utm.term)     params.set('utm_term',     this.utm.term.trim());
+        url.search = params.toString();
+        return url.toString();
+      } catch {
+        // Invalid URL — return base with params appended manually
+        const params = new URLSearchParams();
+        if (this.utm.source)   params.set('utm_source',   this.utm.source.trim());
+        if (this.utm.medium)   params.set('utm_medium',   this.utm.medium.trim());
+        if (this.utm.campaign) params.set('utm_campaign', this.utm.campaign.trim());
+        if (this.utm.content)  params.set('utm_content',  this.utm.content.trim());
+        if (this.utm.term)     params.set('utm_term',     this.utm.term.trim());
+        const qs = params.toString();
+        if (!qs) return base;
+        return base + (base.includes('?') ? '&' : '?') + qs;
+      }
+    },
+
+    async utmCopy() {
+      const url = this.utmGeneratedUrl();
+      if (!url) {
+        this.showInfo('Enter a destination URL first');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        this.utm.copiedRecently = true;
+        this.showInfo('URL copied to clipboard');
+        setTimeout(() => { this.utm.copiedRecently = false; }, 1500);
+      } catch {
+        this.showInfo('Copy failed — select and copy manually');
+      }
+    },
+
+    utmSavePreset() {
+      const name = (this.utm.presetName || '').trim();
+      if (!name) return;
+      const preset = {
+        name,
+        source:   this.utm.source.trim(),
+        medium:   this.utm.medium.trim(),
+        campaign: this.utm.campaign.trim(),
+        content:  this.utm.content.trim(),
+        term:     this.utm.term.trim(),
+        createdAt: new Date().toISOString(),
+      };
+      this.utm.presets = [...this.utm.presets, preset];
+      this._utmPersistPresets();
+      this.utm.presetName = '';
+      this.showInfo(`Preset "${name}" saved`);
+    },
+
+    utmLoadPreset(preset) {
+      this.utm.source   = preset.source   || '';
+      this.utm.medium   = preset.medium   || '';
+      this.utm.campaign = preset.campaign || '';
+      this.utm.content  = preset.content  || '';
+      this.utm.term     = preset.term     || '';
+      this.showInfo(`Preset "${preset.name}" loaded`);
+    },
+
+    utmDeletePreset(idx) {
+      const name = this.utm.presets[idx]?.name || 'preset';
+      this.utm.presets = this.utm.presets.filter((_, i) => i !== idx);
+      this._utmPersistPresets();
+      this.showInfo(`Preset "${name}" deleted`);
+    },
+
+    _utmPersistPresets() {
+      try {
+        localStorage.setItem('yds.utmPresets', JSON.stringify(this.utm.presets));
+      } catch {
+        // localStorage unavailable (private browsing) — silently ignore
+      }
+    },
+
+    utmLoadPresetsFromStorage() {
+      try {
+        const raw = localStorage.getItem('yds.utmPresets');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            this.utm.presets = parsed;
+          }
+        }
+      } catch {
+        this.utm.presets = [];
+      }
     },
   };
 }

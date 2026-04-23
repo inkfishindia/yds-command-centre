@@ -1,13 +1,16 @@
 const notionService = require('./notion');
+const sheetsService = require('./sheets');
 
 const ACTION_QUEUE_CACHE_TTL = 30 * 1000;
 const TEAM_WORKLOAD_CACHE_TTL = 60 * 1000;
 const RECENT_ACTIVITY_CACHE_TTL = 60 * 1000;
+const DASHBOARD_PAYLOAD_CACHE_TTL = 60 * 1000;
 const DAN_ID = '307247aa0d7b81318999e80042f45d6a';
 
 let actionQueueResponseCache = null;
 let teamWorkloadCache = null;
 let recentActivityCache = null;
+let dashboardPayloadCache = null;
 
 function getFreshCache(entry, ttlMs) {
   if (!entry) return null;
@@ -229,23 +232,41 @@ async function getRecentActivity() {
 }
 
 async function getDashboardPayload() {
-  const [summary, teamWorkload, recentActivity] = await Promise.all([
+  const cached = getFreshCache(dashboardPayloadCache, DASHBOARD_PAYLOAD_CACHE_TTL);
+  if (cached) return cached;
+
+  const [summary, teamWorkload, recentActivity, pipelineResult] = await Promise.all([
     notionService.getDashboardSummary(),
     getTeamWorkload(),
     getRecentActivity(),
+    sheetsService.getPipelineData().catch((err) => {
+      console.warn('[dashboard-service] pipeline fetch failed, degrading gracefully:', err.message);
+      return null;
+    }),
   ]);
-  return {
+
+  // getPipelineData() returns { available: false } on config/API errors rather than
+  // throwing. A thrown error (network failure, etc.) is also caught above → null.
+  // Either way the dashboard stays up; pipeline: null signals unavailability.
+  const pipeline = pipelineResult && pipelineResult.available !== false ? pipelineResult : null;
+
+  const payload = {
     ...summary,
     morningBrief: notionService.buildMorningBriefFromDashboard(summary),
     teamWorkload,
     recentActivity,
+    pipeline,
   };
+
+  dashboardPayloadCache = { data: payload, time: Date.now() };
+  return payload;
 }
 
 function clearCache() {
   actionQueueResponseCache = null;
   teamWorkloadCache = null;
   recentActivityCache = null;
+  dashboardPayloadCache = null;
 }
 
 module.exports = {

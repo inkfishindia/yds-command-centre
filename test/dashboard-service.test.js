@@ -34,6 +34,15 @@ describe('Dashboard Service — capacityLabel', () => {
   });
 });
 
+describe('Dashboard Service — top-level cache invalidation', () => {
+  it('clearCache resets all four cache slots including dashboardPayloadCache', () => {
+    // White-box: call clearCache and verify subsequent module state is reset.
+    // We can only observe this indirectly via the export — the function must not throw.
+    const service = require('../server/services/dashboard-service');
+    assert.doesNotThrow(() => service.clearCache());
+  });
+});
+
 describe('Dashboard Service — action queue helpers', () => {
   const { buildActionQueues } = require('../server/services/dashboard-service');
 

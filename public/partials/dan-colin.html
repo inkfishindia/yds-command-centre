@@ -1,0 +1,560 @@
+<!-- Dan ↔ Colin Queue partial -->
+<!-- Loaded lazily via _loadPartial('dan-colin') -->
+
+<!-- Toast notification -->
+<template x-if="dcToast">
+  <div
+    class="dc-toast"
+    :class="{
+      'dc-toast--error': dcToast.type === 'error',
+      'dc-toast--neutral': dcToast.type === 'neutral'
+    }"
+    x-text="dcToast.message"
+    role="status"
+    aria-live="polite"
+  ></div>
+</template>
+
+<!-- Drop Sheet Backdrop -->
+<template x-if="dropSheetOpen">
+  <div class="dc-sheet-backdrop" @click="closeDropSheet()" aria-hidden="true"></div>
+</template>
+
+<!-- Drop Sheet -->
+<template x-if="dropSheetOpen">
+  <div class="dc-sheet" role="dialog" aria-modal="true" aria-label="Drop into Colin's queue">
+    <p class="dc-sheet-header">Drop into Colin's queue</p>
+
+    <textarea
+      id="dc-drop-textarea"
+      class="dc-sheet-textarea"
+      placeholder="What's on your mind?"
+      x-model="dropDraft"
+      rows="5"
+      :disabled="dropSubmitting"
+      @keydown.escape="closeDropSheet()"
+      aria-label="Message to drop into queue"
+    ></textarea>
+
+    <!-- Stub buttons — non-functional, coming soon -->
+    <div class="dc-sheet-stubs">
+      <button class="dc-sheet-stub-btn" type="button" disabled aria-label="Voice input — coming soon" title="Coming soon">
+        <i data-lucide="mic" style="width:14px;height:14px" aria-hidden="true"></i>
+        Voice
+      </button>
+      <button class="dc-sheet-stub-btn" type="button" disabled aria-label="Attach file — coming soon" title="Coming soon">
+        <i data-lucide="paperclip" style="width:14px;height:14px" aria-hidden="true"></i>
+        Attach
+      </button>
+    </div>
+
+    <div x-show="dropError" class="dc-sheet-error" x-text="dropError" role="alert"></div>
+
+    <div class="dc-sheet-actions">
+      <button
+        class="dc-sheet-btn dc-sheet-btn--cancel"
+        type="button"
+        @click="closeDropSheet()"
+        :disabled="dropSubmitting"
+      >
+        Cancel
+      </button>
+      <button
+        class="dc-sheet-btn"
+        :class="dropSubmitSuccess ? 'dc-sheet-btn--success' : 'dc-sheet-btn--drop'"
+        type="button"
+        @click="submitDrop()"
+        :disabled="dropSubmitting || dropSubmitSuccess"
+        aria-label="Drop message into Colin's queue"
+      >
+        <template x-if="dropSubmitting && !dropSubmitSuccess">
+          <span class="dc-spinner" aria-hidden="true"></span>
+        </template>
+        <template x-if="dropSubmitSuccess">
+          <i data-lucide="check" style="width:16px;height:16px;color:#fff" aria-hidden="true"></i>
+        </template>
+        <span x-text="dropSubmitting && !dropSubmitSuccess ? 'Dropping...' : dropSubmitSuccess ? 'Dropped' : 'Drop'"></span>
+      </button>
+    </div>
+  </div>
+</template>
+
+<!-- §5: Cheatsheet modal backdrop -->
+<template x-if="dcCheatsheetOpen">
+  <div class="dc-cheatsheet-backdrop" @click="dcCheatsheetOpen = false" aria-hidden="true"></div>
+</template>
+
+<!-- §5: Cheatsheet modal -->
+<template x-if="dcCheatsheetOpen">
+  <div class="dc-cheatsheet" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" style="position:fixed">
+    <button class="dc-cheatsheet-close" @click="dcCheatsheetOpen = false" aria-label="Close cheatsheet">
+      <i data-lucide="x" style="width:14px;height:14px" aria-hidden="true"></i>
+    </button>
+
+    <div class="dc-cheatsheet-section">
+      <h3>Navigation</h3>
+      <div class="dc-cheatsheet-row">
+        <span class="dc-cheatsheet-key">j / k</span>
+        <span class="dc-cheatsheet-desc">Next / previous row</span>
+      </div>
+      <div class="dc-cheatsheet-row">
+        <span class="dc-cheatsheet-key">Enter</span>
+        <span class="dc-cheatsheet-desc">Expand or open row</span>
+      </div>
+    </div>
+
+    <div class="dc-cheatsheet-section">
+      <h3>Writing</h3>
+      <div class="dc-cheatsheet-row">
+        <span class="dc-cheatsheet-key">a</span>
+        <span class="dc-cheatsheet-desc">Jump to answer field</span>
+      </div>
+      <div class="dc-cheatsheet-row">
+        <span class="dc-cheatsheet-key">⌘K / Ctrl+K</span>
+        <span class="dc-cheatsheet-desc">Open drop sheet</span>
+      </div>
+      <div class="dc-cheatsheet-row">
+        <span class="dc-cheatsheet-key">Esc</span>
+        <span class="dc-cheatsheet-desc">Close sheet or blur input</span>
+      </div>
+    </div>
+
+    <div class="dc-cheatsheet-section">
+      <h3>Help</h3>
+      <div class="dc-cheatsheet-row">
+        <span class="dc-cheatsheet-key">?</span>
+        <span class="dc-cheatsheet-desc">Toggle this cheatsheet</span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- Floating Action Button -->
+<button
+  class="dc-fab"
+  :class="dcAnswerFocused && 'dc-fab--hidden'"
+  type="button"
+  @click="openDropSheet()"
+  aria-label="Drop a message into Colin's queue"
+  title="Drop into queue (⌘K)"
+>
+  <i data-lucide="plus" style="width:24px;height:24px" aria-hidden="true"></i>
+</button>
+
+<!-- Sticky header — x-init mounts keyboard + scroll-spy; $watch tears down when view changes -->
+<div
+  class="dc-sticky-header"
+  x-init="
+    dcMount();
+    $watch('view', v => { if (v !== 'dan-colin') dcUnmount(); });
+  "
+>
+  <span class="dc-header-date" x-text="dcTodayLabel()"></span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <!-- §4: Legend toggle (mobile) -->
+    <template x-if="danColin">
+      <button
+        class="dc-fa-legend-toggle"
+        type="button"
+        @click="dcFocusAreaLegendOpen = !dcFocusAreaLegendOpen"
+        :aria-expanded="dcFocusAreaLegendOpen"
+        aria-label="Toggle focus area legend"
+        title="Focus area colors"
+      >
+        <i data-lucide="palette" style="width:12px;height:12px;vertical-align:middle" aria-hidden="true"></i>
+      </button>
+    </template>
+    <span class="dc-header-count" x-show="danColin">
+      <span x-text="dcWaitingCount()"></span> waiting
+    </span>
+  </div>
+</div>
+
+<!-- §4: Focus area legend (collapsible) -->
+<template x-if="danColin && dcFocusAreaLegendOpen">
+  <div class="dc-fa-legend" role="list" aria-label="Focus area color legend">
+    <template x-for="item in dcGetFocusAreaLegend()" :key="item.name">
+      <span class="dc-fa-legend-item" role="listitem">
+        <span class="dc-fa-legend-dot" :style="'background:' + item.color" aria-hidden="true"></span>
+        <span x-text="item.name"></span>
+      </span>
+    </template>
+  </div>
+</template>
+
+<!-- §2: Sticky chip nav (mobile only) -->
+<nav class="dc-chip-nav" aria-label="Jump to section" x-show="danColin">
+  <button
+    class="dc-chip"
+    :class="dcChipNav.activeSection === 'waiting' && 'dc-chip--active'"
+    type="button"
+    @click="dcScrollToSection('waiting')"
+    :aria-current="dcChipNav.activeSection === 'waiting' ? 'page' : false"
+    aria-label="Waiting on you"
+  >
+    <span aria-hidden="true">⚡</span>
+    <span x-text="dcWaitingCount()"></span>
+  </button>
+  <button
+    class="dc-chip"
+    :class="dcChipNav.activeSection === 'now' && 'dc-chip--active'"
+    type="button"
+    @click="dcScrollToSection('now')"
+    :aria-current="dcChipNav.activeSection === 'now' ? 'page' : false"
+    aria-label="Now"
+  >
+    <span aria-hidden="true">🔥</span>
+    <span x-text="dcNowCount()"></span>
+  </button>
+  <button
+    class="dc-chip"
+    :class="dcChipNav.activeSection === 'drop' && 'dc-chip--active'"
+    type="button"
+    @click="dcScrollToSection('drop')"
+    :aria-current="dcChipNav.activeSection === 'drop' ? 'page' : false"
+    aria-label="Drop queue"
+  >
+    <span aria-hidden="true">📥</span>
+    <span x-text="dcDropCount()"></span>
+  </button>
+  <button
+    class="dc-chip"
+    :class="dcChipNav.activeSection === 'watch' && 'dc-chip--active'"
+    type="button"
+    @click="dcScrollToSection('watch')"
+    :aria-current="dcChipNav.activeSection === 'watch' ? 'page' : false"
+    aria-label="Watch"
+  >
+    <span aria-hidden="true">👀</span>
+    <span x-text="dcWatchCount()"></span>
+  </button>
+  <button
+    class="dc-chip"
+    :class="dcChipNav.activeSection === 'closed' && 'dc-chip--active'"
+    type="button"
+    @click="dcScrollToSection('closed')"
+    :aria-current="dcChipNav.activeSection === 'closed' ? 'page' : false"
+    aria-label="Closed this week"
+  >
+    <span aria-hidden="true">✅</span>
+    <span x-text="dcClosedCount()"></span>
+  </button>
+</nav>
+
+<!-- Loading state -->
+<div x-show="danColinLoading && !danColin" class="dc-skeleton-section">
+  <div class="dc-section-rows">
+    <div class="dc-skeleton-card"></div>
+    <div class="dc-skeleton-card"></div>
+    <div class="dc-skeleton-card" style="height:50px"></div>
+  </div>
+</div>
+
+<!-- Error state -->
+<div x-show="danColinLoadError && !danColin" style="padding:20px;text-align:center">
+  <p style="color:var(--red,#ef4444);font-size:14px" x-text="danColinLoadError"></p>
+  <button class="btn btn-small" style="margin-top:12px" @click="loadDanColin()">Retry</button>
+</div>
+
+<!-- Queue body -->
+<div x-show="danColin" class="dc-body">
+
+  <!-- Desktop 2-column grid wrapper -->
+  <div class="dc-body--desktop-grid">
+
+    <!-- ── Left column: ⚡ Waiting on You ── -->
+    <div class="dc-column-left">
+
+      <div id="dc-section-waiting" class="dc-section-header dc-section-header--waiting">
+        <span>Waiting on You</span>
+        <div class="dc-section-right">
+          <span x-show="dcWaitingCount() > 0" class="dc-count-badge dc-count-badge--waiting" x-text="dcWaitingCount()" aria-label="Waiting on you count"></span>
+        </div>
+      </div>
+
+      <div class="dc-section-rows">
+        <!-- §6: Empty state -->
+        <div x-show="dcWaitingCount() === 0" class="dc-empty">
+          <p x-text="dcEmptyHeadline('waiting')"></p>
+          <p style="font-size:13px;color:var(--text-muted)" x-text="dcEmptySubheadline('waiting')"></p>
+        </div>
+
+        <template x-for="row in (danColin?.waiting || [])" :key="row.id">
+          <div
+            class="dc-row dc-row--waiting"
+            :class="dcIsExiting(row.id) && 'dc-row--exiting'"
+            :id="'dc-row-' + row.id"
+          >
+            <!-- §4: Focus area color dot -->
+            <span
+              class="dc-row-focus-dot"
+              :style="'background:' + dcGetFocusAreaColor((row.focusAreaNames || [])[0] || '')"
+              aria-hidden="true"
+            ></span>
+
+            <!-- §3: Age pill (replaces timestamp) -->
+            <span
+              class="dc-age-pill"
+              :class="dcIsAgePillStale(row) && 'dc-age-pill--stale'"
+              x-text="dcComputeAgePill(row.updatedAt || row.createdAt)"
+              aria-label="Last updated"
+            ></span>
+
+            <p class="dc-row-body" x-text="row.body"></p>
+
+            <p x-show="row.recommendation" class="dc-row-rec">
+              Rec: <span x-text="row.recommendation"></span>
+            </p>
+
+            <!-- Focus area pills -->
+            <div x-show="row.focusAreaNames && row.focusAreaNames.length > 0" class="dc-focus-pills">
+              <template x-for="areaName in (row.focusAreaNames || [])" :key="areaName">
+                <button
+                  class="dc-focus-pill"
+                  type="button"
+                  @click="openFocusAreaByName(areaName)"
+                  x-text="areaName"
+                  :aria-label="'Open focus area: ' + areaName"
+                ></button>
+              </template>
+            </div>
+
+            <!-- §9: Inline answer textarea + debounce/save microstate -->
+            <div class="dc-answer-wrap">
+              <textarea
+                class="dc-answer-textarea"
+                :placeholder="row.answer ? 'Update answer...' : 'Your answer...'"
+                :value="dcDraftFor(row.id) || row.answer"
+                @input="answerDebounce(row.id, $event.target.value)"
+                @focus="dcAnswerFocused = true"
+                @blur="dcAnswerFocused = false"
+                rows="2"
+                :disabled="dcIsExiting(row.id)"
+                :aria-label="'Answer for: ' + row.body"
+              ></textarea>
+
+              <!-- §9: Answer status row (debounce dot + save indicator inline) -->
+              <div class="dc-answer-status">
+                <!-- Debounce-running dot -->
+                <span
+                  x-show="dcIsDebounceRunning(row.id) && !dcIsSaving(row.id)"
+                  class="dc-debounce-dot"
+                  aria-hidden="true"
+                ></span>
+
+                <!-- Save indicator -->
+                <div
+                  x-show="dcIsSaving(row.id) || dcIsSaved(row.id)"
+                  class="dc-save-indicator"
+                  :class="dcIsSaved(row.id) && 'dc-save-indicator--saved'"
+                  aria-live="polite"
+                >
+                  <template x-if="dcIsSaving(row.id) && !dcIsSaved(row.id)">
+                    <span>Saving...</span>
+                  </template>
+                  <template x-if="dcIsSaved(row.id)">
+                    <span style="display:inline-flex;align-items:center;gap:4px">
+                      <i data-lucide="check" style="width:14px;height:14px;color:var(--green,#22c55e)" aria-hidden="true"></i>
+                      Saved
+                    </span>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ── Right column: Now + Watch ── -->
+    <div class="dc-column-right">
+
+      <!-- 🔥 Now -->
+      <div id="dc-section-now" class="dc-section-header dc-section-header--now">
+        <span>Now</span>
+        <div class="dc-section-right">
+          <span x-show="dcNowCount() > 0" class="dc-count-badge dc-count-badge--now" x-text="dcNowCount()" aria-label="Now count"></span>
+        </div>
+      </div>
+
+      <div class="dc-section-rows">
+        <!-- §6: Empty state -->
+        <div x-show="dcNowCount() === 0" class="dc-empty">
+          <p x-text="dcEmptyHeadline('now')"></p>
+          <p style="font-size:13px;color:var(--text-muted)" x-text="dcEmptySubheadline('now')"></p>
+        </div>
+
+        <template x-for="row in (danColin?.now || [])" :key="row.id">
+          <div
+            class="dc-row dc-row--now"
+            tabindex="0"
+            role="button"
+            :aria-label="'Open in Notion: ' + row.body"
+            @click="openDetailPanel && openDetailPanel(row.id, row.body)"
+            @keydown.enter="openDetailPanel && openDetailPanel(row.id, row.body)"
+          >
+            <!-- §4: Focus dot -->
+            <span
+              class="dc-row-focus-dot"
+              :style="'background:' + dcGetFocusAreaColor((row.focusAreaNames || [])[0] || '')"
+              aria-hidden="true"
+            ></span>
+            <!-- §3: Age pill -->
+            <span
+              class="dc-age-pill"
+              x-text="dcComputeAgePill(row.updatedAt || row.createdAt)"
+              aria-label="Last updated"
+            ></span>
+            <p class="dc-row-body" x-text="row.body"></p>
+            <span style="font-size:12px;color:var(--text-muted,#777);margin-top:4px;display:block">Tap to open</span>
+          </div>
+        </template>
+      </div>
+
+      <!-- 👀 Watch (collapsed by default) -->
+      <div
+        id="dc-section-watch"
+        class="dc-section-header dc-section-header--watch"
+        role="button"
+        tabindex="0"
+        @click="toggleWatch()"
+        @keydown.enter="toggleWatch()"
+        :aria-expanded="watchExpanded"
+        aria-label="Watch section — click to expand or collapse"
+      >
+        <span>Watch</span>
+        <div class="dc-section-right">
+          <span x-show="dcWatchCount() > 0" class="dc-count-badge dc-count-badge--watch" x-text="dcWatchCount()" aria-label="Watch count"></span>
+          <svg class="dc-chevron" :class="watchExpanded && 'dc-chevron--open'" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+      </div>
+
+      <div x-show="watchExpanded" x-transition.duration.200ms>
+        <div class="dc-section-rows">
+          <!-- §6: Empty state -->
+          <div x-show="dcWatchCount() === 0" class="dc-empty">
+            <p x-text="dcEmptyHeadline('watch')"></p>
+            <p style="font-size:13px;color:var(--text-muted)" x-text="dcEmptySubheadline('watch')"></p>
+          </div>
+
+          <template x-for="row in (danColin?.watch || [])" :key="row.id">
+            <div
+              class="dc-row dc-row--watch"
+              tabindex="0"
+              role="button"
+              :aria-label="'Open: ' + row.body"
+              @click="openDetailPanel && openDetailPanel(row.id, row.body)"
+              @keydown.enter="openDetailPanel && openDetailPanel(row.id, row.body)"
+            >
+              <!-- §4: Focus dot -->
+              <span
+                class="dc-row-focus-dot"
+                :style="'background:' + dcGetFocusAreaColor((row.focusAreaNames || [])[0] || '')"
+                aria-hidden="true"
+              ></span>
+              <!-- §3: Age pill -->
+              <span
+                class="dc-age-pill"
+                x-text="dcComputeAgePill(row.updatedAt || row.createdAt)"
+                aria-label="Last updated"
+              ></span>
+              <p class="dc-row-body" x-text="row.body"></p>
+              <p x-show="row.recommendation" class="dc-row-rec" x-text="'Rec: ' + row.recommendation"></p>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 📥 Drop Queue -->
+      <div id="dc-section-drop" class="dc-section-header dc-section-header--drop">
+        <span>Drop Queue</span>
+        <div class="dc-section-right">
+          <span x-show="dcDropCount() > 0" class="dc-count-badge dc-count-badge--drop" x-text="dcDropCount()" aria-label="Drop count"></span>
+        </div>
+      </div>
+
+      <div class="dc-section-rows">
+        <!-- §6: Drop empty state with dashed border + inbox icon -->
+        <div x-show="dcDropCount() === 0" class="dc-empty dc-empty--drop">
+          <i data-lucide="inbox" style="width:16px;height:16px;color:var(--text-muted)" aria-hidden="true"></i>
+          <p x-text="dcEmptyHeadline('drop')" style="font-size:14px;color:var(--text-secondary)"></p>
+          <p x-text="dcEmptySubheadline('drop')" style="font-size:13px;color:var(--text-muted)"></p>
+        </div>
+
+        <template x-for="row in (danColin?.drop || [])" :key="row.id">
+          <div class="dc-row dc-row--drop">
+            <!-- §4: Focus dot -->
+            <span
+              class="dc-row-focus-dot"
+              :style="'background:' + dcGetFocusAreaColor((row.focusAreaNames || [])[0] || '')"
+              aria-hidden="true"
+            ></span>
+            <!-- §3: Age pill -->
+            <span
+              class="dc-age-pill"
+              x-text="dcComputeAgePill(row.updatedAt || row.createdAt)"
+              aria-label="Created"
+            ></span>
+            <p class="dc-row-body" x-text="row.body"></p>
+          </div>
+        </template>
+      </div>
+
+      <!-- ✅ Closed this week (collapsed) -->
+      <div
+        id="dc-section-closed"
+        class="dc-section-header dc-section-header--closed"
+        role="button"
+        tabindex="0"
+        @click="toggleClosed()"
+        @keydown.enter="toggleClosed()"
+        :aria-expanded="closedExpanded"
+        aria-label="Closed this week — click to expand or collapse"
+      >
+        <span>Closed this week</span>
+        <div class="dc-section-right">
+          <!-- §7: Promoted pill chip for closed count -->
+          <span
+            x-show="dcClosedCount() > 0"
+            class="dc-count-badge dc-count-badge--closed"
+            x-text="dcClosedCount()"
+            aria-label="Closed count"
+          ></span>
+          <svg class="dc-chevron" :class="closedExpanded && 'dc-chevron--open'" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+      </div>
+
+      <div x-show="closedExpanded" x-transition.duration.200ms>
+        <div class="dc-section-rows">
+          <!-- §6: Empty state -->
+          <div x-show="dcClosedCount() === 0" class="dc-empty">
+            <p x-text="dcEmptyHeadline('closed')"></p>
+            <p style="font-size:13px;color:var(--text-muted)" x-text="dcEmptySubheadline('closed')"></p>
+          </div>
+
+          <template x-for="row in (danColin?.closed || [])" :key="row.id">
+            <div class="dc-row dc-row--closed">
+              <!-- §3: Age pill -->
+              <span
+                class="dc-age-pill"
+                x-text="dcComputeAgePill(row.updatedAt || row.createdAt)"
+                aria-label="Completed date"
+              ></span>
+              <p class="dc-row-body" x-text="row.body"></p>
+              <div x-show="row.answer" class="dc-row-answer-preview" x-text="row.answer" aria-label="Answer"></div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+    </div>
+    <!-- end right column -->
+  </div>
+  <!-- end desktop grid -->
+
+</div>
+<!-- end dc-body -->

@@ -22,6 +22,34 @@
 
   <section class="system-status-card">
     <div class="system-status-card-head">
+      <h3>Database</h3>
+      <span class="system-status-meta" x-text="getSystemDatabaseSummary()"></span>
+    </div>
+    <div class="system-status-list">
+      <div class="system-status-row">
+        <div class="system-status-main">
+          <div class="system-status-row-head">
+            <span class="system-status-name">Connection</span>
+            <span class="org-status-badge" :class="systemStatusBadgeClass(getSystemDatabaseStatus()?.enabled ? 'ok' : 'neutral')" x-text="getSystemDatabaseStatus()?.enabled ? 'configured' : 'disabled'"></span>
+          </div>
+          <span class="system-status-meta" x-show="getSystemDatabaseStatus()?.enabled">SSL <span x-text="getSystemDatabaseStatus()?.ssl ? 'enabled' : 'disabled'"></span></span>
+        </div>
+      </div>
+      <div class="system-status-row">
+        <div class="system-status-main">
+          <div class="system-status-row-head">
+            <span class="system-status-name">Migrations</span>
+            <span class="org-status-badge" :class="systemStatusBadgeClass((getSystemDatabaseStatus()?.migrations?.pending?.length || 0) > 0 ? 'partial' : 'ok')" x-text="(getSystemDatabaseStatus()?.migrations?.pending?.length || 0) > 0 ? 'pending' : 'current'"></span>
+          </div>
+          <span class="system-status-meta" x-text="'Applied ' + (getSystemDatabaseStatus()?.migrations?.applied?.length || 0) + ' of ' + (getSystemDatabaseStatus()?.migrations?.total || 0)"></span>
+          <span class="system-status-meta" x-show="getSystemDatabaseStatus()?.migrations?.pending?.length" x-text="'Pending: ' + getSystemDatabaseStatus().migrations.pending.join(', ')"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="system-status-card">
+    <div class="system-status-card-head">
       <h3>Sync Policy</h3>
       <span class="system-status-meta" x-text="getSystemScheduleSummary()"></span>
     </div>

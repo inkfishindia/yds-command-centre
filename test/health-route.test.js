@@ -6,6 +6,8 @@ const path = require('node:path');
 
 const ROUTE_PATH = path.join(__dirname, '../server/routes/health.js');
 const CONFIG_PATH = path.join(__dirname, '../server/config.js');
+const DB_PATH = path.join(__dirname, '../server/services/db.js');
+const MIGRATIONS_PATH = path.join(__dirname, '../server/services/db-migrations.js');
 const STORE_PATH = path.join(__dirname, '../server/services/read-model-store.js');
 const SYNC_PATH = path.join(__dirname, '../server/services/read-model-sync.js');
 const SCHEDULER_PATH = path.join(__dirname, '../server/services/read-model-scheduler.js');
@@ -34,6 +36,8 @@ describe('Health Route', () => {
   afterEach(() => {
     delete require.cache[ROUTE_PATH];
     delete require.cache[CONFIG_PATH];
+    delete require.cache[DB_PATH];
+    delete require.cache[MIGRATIONS_PATH];
     delete require.cache[STORE_PATH];
     delete require.cache[SYNC_PATH];
     delete require.cache[SCHEDULER_PATH];
@@ -41,7 +45,9 @@ describe('Health Route', () => {
   });
 
   it('registers the expected health endpoints', () => {
-    stubModule(CONFIG_PATH, { ANTHROPIC_API_KEY: '', NOTION_TOKEN: '', MODEL: 'test-model' });
+    stubModule(CONFIG_PATH, { ANTHROPIC_API_KEY: '', NOTION_TOKEN: '', MODEL: 'test-model', DATABASE_URL: '', DATABASE_SSL: false });
+    stubModule(DB_PATH, { isDatabaseEnabled: () => false });
+    stubModule(MIGRATIONS_PATH, { getMigrationStatus: async () => ({ enabled: false, applied: [], pending: [], total: 0 }) });
     stubModule(STORE_PATH, {
       loadAllReadModelStatuses: async () => [],
       loadSourceHealth: async () => ({ sources: {} }),
@@ -68,7 +74,9 @@ describe('Health Route', () => {
   });
 
   it('returns sync runs in details payload', async () => {
-    stubModule(CONFIG_PATH, { ANTHROPIC_API_KEY: '', NOTION_TOKEN: '', MODEL: 'test-model' });
+    stubModule(CONFIG_PATH, { ANTHROPIC_API_KEY: '', NOTION_TOKEN: '', MODEL: 'test-model', DATABASE_URL: 'postgres://example', DATABASE_SSL: true });
+    stubModule(DB_PATH, { isDatabaseEnabled: () => true });
+    stubModule(MIGRATIONS_PATH, { getMigrationStatus: async () => ({ enabled: true, applied: ['001.sql'], pending: ['002.sql'], total: 2 }) });
     stubModule(STORE_PATH, {
       loadAllReadModelStatuses: async () => [{ name: 'overview' }],
       loadSourceHealth: async () => ({ updatedAt: '2026-04-08T00:00:00.000Z', sources: {} }),
@@ -101,6 +109,9 @@ describe('Health Route', () => {
     });
 
     assert.equal(jsonPayload.status, 'ok');
+    assert.equal(jsonPayload.database.enabled, true);
+    assert.equal(jsonPayload.database.ssl, true);
+    assert.equal(jsonPayload.database.migrations.pending.length, 1);
     assert.equal(jsonPayload.syncRuns.length, 1);
     assert.equal(jsonPayload.projectionJobs.length, 1);
     assert.equal(jsonPayload.syncRuns[0].name, 'overview');

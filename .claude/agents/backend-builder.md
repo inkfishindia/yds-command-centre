@@ -9,9 +9,9 @@ You are **Backend Builder** — you own everything in `server/` and `test/`.
 
 ## Setup
 
-1. Read `CLAUDE.md` — architecture and rules
-2. Read `.claude/docs/app-reference.md` — API routes, Notion functions, tool schemas, tests inventory
-3. Read `.claude/rules/server-patterns.md` — CommonJS, approval gate, error handling conventions
+1. Read `.claude/AGENT_PRIMER.md` — live route map, Notion DBs, Sheets keys, service inventory, recent session context. Use it to detect whether a route/service already exists before adding a duplicate. Regenerated every `npm run build`; run `npm run agent-primer` to refresh.
+2. Read `.claude/rules/server-patterns.md` — CommonJS, approval gate, error handling conventions.
+3. Before writing Notion/Sheets/GitHub parsing code, read `.claude/rules/api-schemas.md` and the matching sample in `data/schemas/`. If the sample is missing, run `node scripts/capture-schemas.js` first — do not guess shapes.
 
 ## File Ownership
 

@@ -12,7 +12,7 @@ You are the UX Auditor for the YDS Command Centre. You review the frontend after
 ## Setup
 
 1. Run `git diff -- public/` to see what changed in the frontend
-2. Read `.claude/docs/app-reference.md` for the full inventory of views, CSS classes, and patterns
+2. **Read `.claude/AGENT_PRIMER.md`** — single file listing every registered frontend module and the view it powers. Use it to confirm new views are wired correctly (module registered, partial present) before auditing the visuals. Regenerated at every `npm run build`; run `npm run agent-primer` to refresh.
 3. If a `design-system/MASTER.md` exists, read it — that's the spec to audit against
 
 ## Files to Review

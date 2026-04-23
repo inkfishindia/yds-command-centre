@@ -77,4 +77,24 @@ describe('Database Migrations', () => {
     assert.ok(queries.some((entry) => /CREATE TABLE IF NOT EXISTS app_projection_jobs/i.test(entry.text)));
     assert.ok(queries.some((entry) => /INSERT INTO schema_migrations/i.test(entry.text)));
   });
+
+  it('reports pending migrations when database is not configured', async () => {
+    stubModule(DB_PATH, {
+      isDatabaseEnabled: () => false,
+      withTransaction: async () => {
+        throw new Error('should not run');
+      },
+    });
+
+    const migrations = require(MIGRATIONS_PATH);
+    const status = await migrations.getMigrationStatus();
+
+    assert.equal(status.enabled, false);
+    assert.equal(status.total, 2);
+    assert.deepEqual(status.applied, []);
+    assert.deepEqual(status.pending, [
+      '001_read_model_foundation.sql',
+      '002_projection_job_tracking.sql',
+    ]);
+  });
 });

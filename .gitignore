@@ -10,4 +10,9 @@ Zreference/
 server/data/read-models/
 server/data/source-health.json
 server/data/sync-runs.json
+server/data/projection-jobs.json
 .vercel
+
+# Captured API samples — shape docs contain live workspace data
+data/schemas/*.json
+

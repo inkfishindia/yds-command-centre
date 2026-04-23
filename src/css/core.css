@@ -9607,3 +9607,258 @@ textarea:focus-visible {
   outline-offset: 1px;
   border-color: var(--accent);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   ACTIVITY FEED SECTION — /api/activity-feed widget
+   ═══════════════════════════════════════════════════════════ */
+
+.activity-feed-section {
+  margin-top: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+}
+
+/* Header -------------------------------------------------- */
+.activity-feed-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.activity-feed-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.activity-feed-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.activity-feed-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.activity-feed-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Day chips ----------------------------------------------- */
+.activity-feed-days-chips {
+  display: flex;
+  gap: 4px;
+}
+
+.activity-feed-day-chip {
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 20px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  line-height: 1.4;
+}
+
+.activity-feed-day-chip:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+.activity-feed-day-chip-active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Source warning banner ----------------------------------- */
+.activity-feed-source-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--amber-dim);
+  border: 1px solid var(--amber-a15);
+  border-radius: var(--radius);
+  color: var(--amber);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+/* Error / empty states ------------------------------------ */
+.activity-feed-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--red);
+  font-size: 13px;
+}
+
+.activity-feed-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Feed list & rows ---------------------------------------- */
+.activity-feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.activity-feed-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: start;
+  gap: 10px;
+  padding: 9px 8px;
+  border-radius: var(--radius);
+  transition: background var(--transition-fast);
+  min-width: 0;
+}
+
+.activity-feed-row:hover {
+  background: var(--bg-hover);
+}
+
+.activity-feed-row--skeleton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 8px;
+}
+
+/* Type icon ----------------------------------------------- */
+.activity-feed-type-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.af-type-decision .activity-feed-type-icon  { background: var(--blue-a08);   color: var(--accent); }
+.af-type-commitment .activity-feed-type-icon { background: var(--green-a08);  color: var(--green); }
+.af-type-queue .activity-feed-type-icon      { background: var(--purple-glow); color: var(--purple); }
+
+/* Body ---------------------------------------------------- */
+.activity-feed-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.activity-feed-title-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  transition: color var(--transition-fast);
+}
+
+.activity-feed-title-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.activity-feed-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+.activity-feed-summary {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+/* Meta ---------------------------------------------------- */
+.activity-feed-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.activity-feed-date {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.activity-feed-owner-pill {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 7px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.activity-feed-status-pill {
+  font-size: 10px;
+}
+
+@media (max-width: 768px) {
+  .activity-feed-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .activity-feed-row {
+    grid-template-columns: 28px 1fr;
+    grid-template-rows: auto auto;
+  }
+
+  .activity-feed-meta {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+}

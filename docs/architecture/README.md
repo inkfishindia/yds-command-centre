@@ -7,6 +7,7 @@ Use these docs in this order:
 1. `target-architecture.md`
 2. `database-schema-plan.md`
 3. `phased-refactor-roadmap.md`
+4. `postgres-test-pass.md`
 
 What this pack assumes:
 

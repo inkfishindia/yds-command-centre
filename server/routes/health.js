@@ -3,6 +3,8 @@
 const express = require('express');
 
 const config = require('../config');
+const db = require('../services/db');
+const dbMigrations = require('../services/db-migrations');
 const readModelStore = require('../services/read-model-store');
 const readModelSync = require('../services/read-model-sync');
 const readModelScheduler = require('../services/read-model-scheduler');
@@ -15,22 +17,29 @@ router.get('/', (req, res) => {
     status: 'ok',
     hasAnthropicKey: !!config.ANTHROPIC_API_KEY,
     hasNotionToken: !!config.NOTION_TOKEN,
+    hasDatabaseUrl: !!config.DATABASE_URL,
     model: config.MODEL,
   });
 });
 
 router.get('/details', async (req, res) => {
   try {
-    const [readModels, sourceHealth, syncRuns, projectionJobs] = await Promise.all([
+    const [readModels, sourceHealth, syncRuns, projectionJobs, migrationStatus] = await Promise.all([
       readModelStore.loadAllReadModelStatuses(),
       readModelStore.loadSourceHealth(),
       readModelStore.loadSyncRuns(),
       projectionJobStore.loadProjectionJobs(),
+      dbMigrations.getMigrationStatus(),
     ]);
     const syncSummary = await readModelStore.loadLatestSyncStates();
 
     res.json({
       status: 'ok',
+      database: {
+        enabled: db.isDatabaseEnabled(),
+        ssl: config.DATABASE_SSL,
+        migrations: migrationStatus,
+      },
       readModels,
       sourceHealth,
       syncRuns: syncRuns.slice(0, 25),

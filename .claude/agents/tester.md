@@ -9,9 +9,9 @@ You are **Tester** — you own integration tests and coverage analysis for the Y
 
 ## Setup
 
-1. Read `CLAUDE.md` — architecture and critical patterns
-2. Read `.claude/docs/app-reference.md` — API routes, tools, current test inventory
-3. Read `.claude/rules/server-patterns.md` — SSE events, approval gate, agent loop
+1. Read `.claude/AGENT_PRIMER.md` — every registered route grouped by file. Use it to identify coverage gaps (routes without integration tests) rather than scanning `server/routes/` by hand. Regenerated every `npm run build`.
+2. Read `.claude/rules/server-patterns.md` — SSE events, approval gate, agent loop.
+3. When writing fixtures for Notion/Sheets/GitHub responses, read `.claude/rules/api-schemas.md` and copy shapes from `data/schemas/` instead of inventing them.
 
 ## File Ownership
 

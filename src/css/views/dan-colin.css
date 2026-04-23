@@ -1,0 +1,991 @@
+/* ============================================================
+   Dan ↔ Colin Queue — view styles
+   Mobile-first, dark-themed, matches CC design system
+   ============================================================ */
+
+/* ── New root tokens (scoped additions only) ── */
+:root {
+  --amber-muted: rgba(245, 158, 11, 0.6);
+  --queue-border-waiting: var(--amber);
+  --queue-border-now: var(--red, #ef4444);
+  --queue-border-watch: var(--amber-muted);
+  --queue-border-drop: var(--accent);
+  --queue-border-closed: var(--text-secondary, #888888);
+
+  /* v2: Focus Area color palette — 8 deterministic colors */
+  --dc-fa-color-1: var(--amber);
+  --dc-fa-color-2: var(--red);
+  --dc-fa-color-3: var(--accent);
+  --dc-fa-color-4: var(--green);
+  --dc-fa-color-5: var(--purple);
+  --dc-fa-color-6: var(--teal);
+  --dc-fa-color-7: var(--yellow);
+  --dc-fa-color-8: color-mix(in srgb, var(--indigo) 60%, var(--accent) 40%);
+
+  /* v2: Age pill stale threshold */
+  --dc-age-stale: var(--red);
+
+  /* v2: Chip nav active state */
+  --dc-chip-active: var(--accent);
+  --dc-chip-active-underline: 2px solid var(--dc-chip-active);
+
+  /* v2: Slow-network toast variant */
+  --dc-toast-neutral: #888888;
+}
+
+/* ── Layout container ── */
+.dan-colin-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  background: var(--bg-primary, #0a0a0a);
+}
+
+/* ── Sticky header ── */
+.dc-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-light, #2a2a2a);
+  background: var(--bg-secondary, #111111);
+  flex-shrink: 0;
+}
+
+.dc-header-date {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #e5e5e5);
+  letter-spacing: 0.01em;
+}
+
+.dc-header-count {
+  font-size: 12px;
+  color: var(--text-muted, #777777);
+}
+
+/* ── Queue body ── */
+.dc-body {
+  flex: 1;
+  padding: 0 0 80px; /* bottom padding for FAB clearance */
+}
+
+/* ── Section headers ── */
+.dc-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-top: 1px solid var(--border-light, #2a2a2a);
+  background: var(--bg-card, #161616);
+  cursor: default;
+  user-select: none;
+}
+
+.dc-section-header--waiting { color: var(--amber, #f59e0b); }
+.dc-section-header--now     { color: var(--red, #ef4444); }
+.dc-section-header--watch   { color: var(--amber-muted); cursor: pointer; }
+.dc-section-header--drop    { color: var(--accent, #3b82f6); }
+.dc-section-header--closed  { color: var(--text-muted, #777777); cursor: pointer; }
+
+.dc-section-header--watch:focus-visible,
+.dc-section-header--closed:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: -2px;
+}
+
+.dc-section-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Count badge */
+.dc-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  color: #fff;
+}
+.dc-count-badge--waiting { background: var(--amber, #f59e0b); color: #000; }
+.dc-count-badge--now     { background: var(--red, #ef4444); }
+.dc-count-badge--watch   { background: var(--amber-muted); }
+.dc-count-badge--drop    { background: var(--accent, #3b82f6); }
+
+/* Chevron */
+.dc-chevron {
+  width: 14px;
+  height: 14px;
+  transition: transform 200ms ease-out;
+  flex-shrink: 0;
+}
+.dc-chevron--open {
+  transform: rotate(90deg);
+}
+
+/* ── Section rows container ── */
+.dc-section-rows {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Row card ── */
+.dc-row {
+  position: relative;
+  background: var(--bg-card, #161616);
+  border: 1px solid var(--border-light, #2a2a2a);
+  border-radius: var(--radius, 6px);
+  border-left-width: 3px;
+  padding: 12px 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background 150ms ease;
+}
+
+.dc-row--waiting { border-left-color: var(--amber, #f59e0b); }
+.dc-row--now     { border-left-color: var(--red, #ef4444); }
+.dc-row--watch   { border-left-color: var(--amber-muted); }
+.dc-row--drop    { border-left-color: var(--accent, #3b82f6); }
+.dc-row--closed  {
+  border-left-width: 1px;
+  border-left-color: var(--text-secondary, #888888);
+  background: var(--bg-primary, #0a0a0a);
+  opacity: 0.75;
+}
+
+.dc-row--now:hover,
+.dc-row--watch:hover {
+  background: var(--bg-hover, #1c1c1c);
+  cursor: pointer;
+}
+.dc-row--now:focus-visible,
+.dc-row--watch:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+
+/* Timestamp — hidden in v2, replaced by age pill */
+.dc-row-timestamp {
+  display: none;
+}
+
+/* ── §3: Age pill ── */
+.dc-age-pill {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted, #777777);
+  background: transparent;
+  white-space: nowrap;
+  line-height: 1;
+}
+.dc-age-pill--stale {
+  color: var(--dc-age-stale, #ef4444);
+  background: var(--red-a08, rgba(239, 68, 68, 0.08));
+}
+
+/* ── §4: Focus area color dot ── */
+.dc-row-focus-dot {
+  position: absolute;
+  top: 12px;
+  left: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+/* Focus area legend */
+.dc-fa-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 16px 8px;
+  border-bottom: 1px solid var(--border-light, #2a2a2a);
+  background: var(--bg-secondary, #111111);
+  animation: dcFadeIn 200ms ease-in-out;
+}
+.dc-fa-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted, #777777);
+  white-space: nowrap;
+}
+.dc-fa-legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dc-fa-legend-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted, #777777);
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: color 150ms ease;
+}
+.dc-fa-legend-toggle:hover {
+  color: var(--text-secondary, #888888);
+}
+.dc-fa-legend-toggle:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+
+/* Body text — §1: line-height bumped to 1.6 */
+.dc-row-body {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--text-primary, #e5e5e5);
+  margin: 0 0 4px;
+  padding-right: 60px; /* avoid age-pill overlap */
+}
+
+/* Closed rows: muted text */
+.dc-row--closed .dc-row-body {
+  color: var(--text-muted, #777777);
+}
+
+/* Recommendation — §1: full opacity (was 60%), promoted to 4.5:1 contrast */
+.dc-row-rec {
+  font-size: 14px;
+  font-style: italic;
+  color: var(--text-secondary, #888888);
+  line-height: 1.5;
+  margin: 0 0 8px;
+  opacity: 1;
+}
+
+/* Focus area pills */
+.dc-focus-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0 8px;
+}
+.dc-focus-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--bg-tertiary, #1e1e1e);
+  color: var(--accent, #3b82f6);
+  border: 1px solid var(--border-light, #2a2a2a);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+.dc-focus-pill:hover {
+  background: var(--accent, #3b82f6);
+  color: #fff;
+}
+.dc-focus-pill:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+
+/* Closed row answer preview */
+.dc-row-answer-preview {
+  margin-top: 6px;
+  padding: 8px;
+  background: var(--bg-input, #1a1a1a);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--text-secondary, #888888);
+  line-height: 1.4;
+  border-left: 2px solid var(--text-secondary, #888888);
+}
+
+/* ── Answer textarea ── */
+.dc-answer-wrap {
+  margin-top: 10px;
+}
+
+.dc-answer-textarea {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px;
+  font-size: 16px;
+  font-family: inherit;
+  line-height: 1.5;
+  color: var(--text-primary, #e5e5e5);
+  background: var(--bg-input, #1a1a1a);
+  border: 1px solid var(--border, #333333);
+  border-radius: 4px;
+  resize: vertical;
+  transition: border-color 150ms ease;
+  box-sizing: border-box;
+}
+.dc-answer-textarea:focus {
+  outline: none;
+  border-color: var(--accent, #3b82f6);
+}
+.dc-answer-textarea:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+.dc-answer-textarea::placeholder {
+  color: var(--text-muted, #777777);
+}
+
+/* Save indicator — §9: inline to the right of textarea */
+.dc-save-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-muted, #777777);
+  animation: dcFadeIn 150ms ease-in-out;
+}
+.dc-save-indicator--saved {
+  color: var(--green, #22c55e);
+}
+.dc-save-indicator-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* ── Row exit animation ── */
+@keyframes dcSlideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+    max-height: 200px;
+    margin-bottom: 8px;
+  }
+  to {
+    transform: translateX(-100%);
+    opacity: 0;
+    max-height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+.dc-row--exiting {
+  animation: dcSlideOut 300ms ease-out forwards;
+  overflow: hidden;
+}
+
+/* Fade-in keyframe shared */
+@keyframes dcFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── §2: Sticky chip nav (mobile only) ── */
+.dc-chip-nav {
+  position: sticky;
+  top: 44px; /* below sticky header (44px) */
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 40px;
+  background: var(--bg-secondary, #111111);
+  border-bottom: 1px solid var(--border-light, #2a2a2a);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.dc-chip-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.dc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #888888);
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  border: none;
+  flex-shrink: 0;
+  min-width: 50px;
+  justify-content: center;
+  transition: color 150ms ease, background 150ms ease;
+  border-bottom: 2px solid transparent;
+}
+.dc-chip:hover {
+  color: var(--text-primary, #e5e5e5);
+}
+.dc-chip:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+.dc-chip--active {
+  color: var(--dc-chip-active, #3b82f6);
+  background: var(--blue-a08, rgba(59, 130, 246, 0.08));
+  border-bottom: var(--dc-chip-active-underline, 2px solid #3b82f6);
+}
+
+/* ── §5: Focused row keyboard highlight ── */
+.dc-row--focused {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 0;
+}
+
+/* ── §5: Cheatsheet modal ── */
+.dc-cheatsheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 54;
+  background: rgba(0, 0, 0, 0.6);
+  animation: dcFadeIn 150ms ease-in-out;
+}
+.dc-cheatsheet {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 55;
+  width: 280px;
+  background: var(--bg-card, #161616);
+  border: 1px solid var(--border-light, #2a2a2a);
+  border-radius: var(--radius-lg, 10px);
+  padding: 20px;
+  box-shadow: var(--shadow-overlay, 0 16px 48px rgba(0,0,0,0.6));
+  animation: dcFadeIn 150ms ease-in-out;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.dc-cheatsheet h3 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #777777);
+  margin: 0 0 10px;
+}
+.dc-cheatsheet-section {
+  margin-bottom: 16px;
+}
+.dc-cheatsheet-section:last-child {
+  margin-bottom: 0;
+}
+.dc-cheatsheet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+.dc-cheatsheet-key {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  background: var(--bg-input, #1a1a1a);
+  border: 1px solid var(--border, #333333);
+  border-radius: 3px;
+  padding: 2px 6px;
+  color: var(--text-secondary, #888888);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.dc-cheatsheet-desc {
+  font-size: 12px;
+  color: var(--text-primary, #e5e5e5);
+  text-align: right;
+}
+.dc-cheatsheet-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #777777);
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 150ms ease;
+}
+.dc-cheatsheet-close:hover {
+  color: var(--text-primary, #e5e5e5);
+}
+.dc-cheatsheet-close:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+
+/* ── §6: Empty states ── */
+.dc-empty {
+  padding: 16px;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--text-secondary, #888888);
+  text-align: center;
+}
+.dc-empty p {
+  margin: 0;
+}
+.dc-empty--drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  border: 1px dashed var(--border-light, #2a2a2a);
+  border-radius: var(--radius, 6px);
+  background: transparent;
+  font-style: normal;
+  animation: dcFadeIn 200ms ease-in-out;
+}
+.dc-empty--drop svg,
+.dc-empty--drop i[data-lucide] {
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted, #777777);
+  margin-bottom: 4px;
+}
+
+/* ── §7: Closed count-badge pill ── */
+.dc-count-badge--closed {
+  background: transparent;
+  border: 1px solid var(--border-light, #2a2a2a);
+  color: var(--text-muted, #777777);
+  font-size: 11px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+}
+
+/* ── §8: Slow-network toast neutral ── */
+.dc-toast--neutral {
+  background: var(--dc-toast-neutral, #888888);
+  color: #fff;
+}
+
+/* ── §9: Debounce dot + inline save indicator ── */
+.dc-answer-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  min-height: 18px;
+}
+.dc-debounce-dot {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-muted, #777777);
+  animation: dcDotPulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes dcDotPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+/* ── §10: Floating Action Button — 20px thumb-reach ── */
+.dc-fab {
+  position: fixed;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  right: calc(20px + env(safe-area-inset-right, 0px));
+  z-index: 50;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  background: var(--accent, #3b82f6);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: opacity 150ms ease, transform 100ms ease;
+}
+
+/* Hide FAB when an answer textarea is focused — §10 (Alpine-driven) */
+.dc-fab.dc-fab--hidden {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-fab.dc-fab--hidden {
+    transition: none;
+  }
+}
+.dc-fab:hover {
+  opacity: 0.9;
+}
+.dc-fab:active {
+  transform: scale(0.96);
+}
+.dc-fab:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 3px;
+}
+.dc-fab svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* ── Drop Sheet ── */
+.dc-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.6);
+  animation: dcBackdropIn 200ms ease-out;
+}
+@keyframes dcBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.dc-sheet-backdrop--out {
+  animation: dcBackdropOut 200ms ease-in forwards;
+}
+@keyframes dcBackdropOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.dc-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 45;
+  background: var(--bg-card, #161616);
+  border-top: 1px solid var(--border-light, #2a2a2a);
+  border-radius: 12px 12px 0 0;
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  animation: dcSheetUp 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+@keyframes dcSheetUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.dc-sheet--out {
+  animation: dcSheetDown 200ms ease-in forwards;
+}
+@keyframes dcSheetDown {
+  from { transform: translateY(0);    opacity: 1; }
+  to   { transform: translateY(100%); opacity: 0; }
+}
+
+.dc-sheet-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent, #3b82f6);
+  margin: 0 0 16px;
+}
+
+.dc-sheet-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px;
+  font-size: 16px;
+  font-family: inherit;
+  line-height: 1.5;
+  color: var(--text-primary, #e5e5e5);
+  background: var(--bg-input, #1a1a1a);
+  border: 1px solid var(--border, #333333);
+  border-radius: 4px;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 150ms ease;
+}
+.dc-sheet-textarea:focus {
+  outline: none;
+  border-color: var(--accent, #3b82f6);
+}
+.dc-sheet-textarea:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+.dc-sheet-textarea::placeholder {
+  color: var(--text-muted, #777777);
+}
+
+/* Sheet stub buttons (voice, attach) */
+.dc-sheet-stubs {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.dc-sheet-stub-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text-muted, #777777);
+  background: transparent;
+  border: 1px solid var(--border-light, #2a2a2a);
+  border-radius: var(--radius, 6px);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.dc-sheet-error {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--red, #ef4444);
+}
+
+/* Sheet action buttons */
+.dc-sheet-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+.dc-sheet-btn {
+  height: 44px;
+  border-radius: var(--radius, 6px);
+  font-size: 15px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: opacity 150ms ease;
+}
+.dc-sheet-btn:hover { opacity: 0.9; }
+.dc-sheet-btn:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+.dc-sheet-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.dc-sheet-btn--cancel {
+  background: var(--bg-input, #1a1a1a);
+  border: 1px solid var(--border, #333333);
+  color: var(--text-primary, #e5e5e5);
+}
+.dc-sheet-btn--drop {
+  background: var(--accent, #3b82f6);
+  color: #fff;
+}
+.dc-sheet-btn--success {
+  background: #22c55e;
+  color: #fff;
+}
+
+/* Small spinner inside button */
+.dc-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: dcSpin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes dcSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Toast notification */
+.dc-toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 10px 20px;
+  border-radius: var(--radius, 6px);
+  background: #22c55e;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  animation: dcFadeIn 150ms ease-in-out;
+  white-space: nowrap;
+}
+.dc-toast--error {
+  background: var(--red, #ef4444);
+}
+
+/* ── Loading skeleton ── */
+.dc-skeleton-section {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dc-skeleton-card {
+  height: 80px;
+  border-radius: var(--radius, 6px);
+  background: var(--bg-card, #161616);
+  border: 1px solid var(--border-light, #2a2a2a);
+  border-left: 3px solid var(--border-light, #2a2a2a);
+  animation: dcPulse 1.5s ease-in-out infinite;
+}
+@keyframes dcPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* ── Reduced motion overrides ── */
+@media (prefers-reduced-motion: reduce) {
+  .dc-row--exiting {
+    animation: dcFadeOut 300ms ease-out forwards;
+  }
+  @keyframes dcFadeOut {
+    from { opacity: 1; }
+    to   { opacity: 0; max-height: 0; margin-bottom: 0; padding: 0; }
+  }
+  .dc-sheet,
+  .dc-sheet--out,
+  .dc-sheet-backdrop,
+  .dc-sheet-backdrop--out,
+  .dc-cheatsheet,
+  .dc-cheatsheet-backdrop {
+    animation: none;
+  }
+  .dc-sheet--out { display: none; }
+  /* Debounce dot: no animation on reduced-motion */
+  .dc-debounce-dot {
+    animation: none;
+    opacity: 0.6;
+  }
+  /* Skeleton pulse: no animation */
+  .dc-skeleton-card {
+    animation: none;
+    opacity: 0.6;
+  }
+  /* dcFadeIn used by empty-drop, save-indicator, etc. — allow fade (opacity only) */
+  .dc-empty--drop,
+  .dc-fa-legend,
+  .dc-save-indicator {
+    animation: none;
+  }
+}
+
+/* ── Desktop ≥768px two-column layout ── */
+@media (min-width: 768px) {
+  /* §2: Hide chip nav on desktop */
+  .dc-chip-nav {
+    display: none;
+  }
+
+  .dc-sticky-header {
+    padding: 0 20px;
+  }
+
+  .dc-body {
+    padding-bottom: 24px;
+  }
+
+  .dc-body--desktop-grid {
+    display: grid;
+    grid-template-columns: 60fr 40fr;
+    gap: 0;
+    align-items: start;
+  }
+
+  .dc-column-left {
+    border-right: 1px solid var(--border-light, #2a2a2a);
+    min-height: calc(100vh - 100px);
+  }
+
+  .dc-column-right {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* On desktop: Watch is expanded by default (handled in JS) */
+
+  .dc-row-body {
+    font-size: 17px;
+  }
+
+  .dc-section-rows {
+    padding: 8px 16px;
+  }
+
+  /* FAB moves to top-right on desktop */
+  .dc-fab {
+    bottom: auto;
+    top: 56px; /* below header */
+    right: 20px;
+  }
+
+  /* Sheet becomes a centered modal on desktop */
+  .dc-sheet {
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 480px;
+    border-radius: 10px;
+    animation: dcModalIn 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 80vh;
+  }
+  @keyframes dcModalIn {
+    from { transform: translate(-50%, -45%); opacity: 0; }
+    to   { transform: translate(-50%, -50%); opacity: 1; }
+  }
+  .dc-sheet--out {
+    animation: dcModalOut 200ms ease-in forwards;
+  }
+  @keyframes dcModalOut {
+    from { transform: translate(-50%, -50%); opacity: 1; }
+    to   { transform: translate(-50%, -55%); opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dc-sheet {
+      animation: none;
+      transform: translate(-50%, -50%);
+    }
+    .dc-sheet--out {
+      animation: none;
+    }
+  }
+}

@@ -66,10 +66,37 @@ async function runMigrations() {
   });
 }
 
+async function getMigrationStatus() {
+  const files = await listMigrationFiles();
+
+  if (!db.isDatabaseEnabled()) {
+    return {
+      enabled: false,
+      applied: [],
+      pending: files,
+      total: files.length,
+    };
+  }
+
+  return db.withTransaction(async (client) => {
+    const appliedVersions = await getAppliedVersions(client);
+    const applied = files.filter((file) => appliedVersions.has(file));
+    const pending = files.filter((file) => !appliedVersions.has(file));
+
+    return {
+      enabled: true,
+      applied,
+      pending,
+      total: files.length,
+    };
+  });
+}
+
 module.exports = {
   MIGRATIONS_DIR,
   ensureMigrationsTable,
   listMigrationFiles,
   readMigration,
   runMigrations,
+  getMigrationStatus,
 };

@@ -1,0 +1,282 @@
+<div class="view-header-bar">
+  <div class="view-header-left">
+    <span class="view-header-emoji" aria-hidden="true">
+      <svg viewBox="0 0 20 20" fill="currentColor" width="22" height="22" aria-hidden="true"><path fill-rule="evenodd" d="M12 1.586l-4 4v12.828l4-4V1.586zM3.707 3.293A1 1 0 002 4v10a1 1 0 00.293.707L6 18.414V5.586L3.707 3.293zM17.707 5.293L14 1.586v12.828l2.293 2.293A1 1 0 0018 16V6a1 1 0 00-.293-.707z" clip-rule="evenodd"/></svg>
+    </span>
+    <div class="view-header-text">
+      <h2 class="view-header-title">System Map</h2>
+      <span class="view-header-subtitle">Self-documenting architecture — file ownership, routes, data sources</span>
+    </div>
+  </div>
+  <div class="view-header-actions">
+    <span class="org-last-refresh" x-show="systemMap?.generatedAt" x-text="'Generated ' + (systemMap?.generatedAt ? new Date(systemMap.generatedAt).toLocaleTimeString() : '')"></span>
+    <button class="btn btn-small btn-icon" :class="systemMapLoading && 'btn-spinning'" @click="loadSystemMap(true)" :disabled="systemMapLoading" aria-label="Refresh system map">
+      <span class="refresh-icon">&#x21bb;</span> Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div class="system-map-filter-row">
+  <input
+    class="system-map-search-input"
+    type="text"
+    placeholder="Search repo, routes, databases, modules..."
+    x-model.debounce.150ms="systemMapFilter"
+    aria-label="Filter system map"
+  />
+  <button class="btn btn-small" x-show="systemMapFilter" @click="systemMapFilter = ''" aria-label="Clear filter">Clear</button>
+</div>
+
+<!-- Loading state -->
+<template x-if="systemMapLoading && !systemMap">
+  <div class="registry-grid" style="margin-top:1rem;">
+    <div class="loading-skeleton skeleton-card"></div>
+    <div class="loading-skeleton skeleton-card"></div>
+    <div class="loading-skeleton skeleton-card"></div>
+  </div>
+</template>
+
+<!-- Error state -->
+<template x-if="systemMapError && !systemMap">
+  <div class="empty-state" style="margin-top:1.5rem;">
+    <span style="color:var(--text-muted);">&#9888; <span x-text="systemMapError"></span></span>
+    <button class="btn btn-small" style="margin-top:0.75rem;" @click="loadSystemMap(true)">Retry</button>
+  </div>
+</template>
+
+<template x-if="systemMap">
+  <div class="system-map-sections">
+
+    <!-- Section A: Repo & File Ownership -->
+    <section class="system-map-section">
+      <button class="system-map-section-header" @click="toggleSystemMapSection('repo')" aria-expanded="systemMapExpanded.repo">
+        <span class="system-map-section-title">Repo &amp; File Ownership</span>
+        <span class="system-map-section-badge" x-text="filteredRepoTree().filter(r => r.level === 0 || r.owner).length + ' entries'"></span>
+        <svg class="system-map-chevron" :class="systemMapExpanded.repo && 'system-map-chevron-open'" viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="system-map-section-body" x-show="systemMapExpanded.repo" x-transition.duration.150ms>
+        <template x-if="filteredRepoTree().length === 0">
+          <div class="empty-state">No entries match your search.</div>
+        </template>
+        <div class="system-map-repo-tree">
+          <template x-for="(row, idx) in filteredRepoTree()" :key="idx">
+            <div class="system-map-dir-row" :style="`padding-left: ${8 + row.level * 20}px`">
+              <span class="system-map-dir-path" x-text="row.path"></span>
+              <template x-if="row.owner">
+                <span class="agent-badge" :class="getAgentBadgeClass(row.owner)" x-text="row.owner"></span>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section B: API Routes -->
+    <section class="system-map-section">
+      <button class="system-map-section-header" @click="toggleSystemMapSection('routes')" aria-expanded="systemMapExpanded.routes">
+        <span class="system-map-section-title">API Routes</span>
+        <span class="system-map-section-badge" x-text="filteredRoutes().length + ' files · ' + getRoutesCount() + ' endpoints'"></span>
+        <svg class="system-map-chevron" :class="systemMapExpanded.routes && 'system-map-chevron-open'" viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="system-map-section-body" x-show="systemMapExpanded.routes" x-transition.duration.150ms>
+        <template x-if="filteredRoutes().length === 0">
+          <div class="empty-state">No routes match your search.</div>
+        </template>
+        <template x-for="group in filteredRoutes()" :key="group.file">
+          <div class="system-map-route-group">
+            <div class="system-map-route-group-header">
+              <span class="system-map-route-group-name" x-text="group.file"></span>
+              <span class="system-map-section-badge" x-text="(group.endpoints || []).length + ' endpoints'"></span>
+            </div>
+            <template x-for="ep in (group.endpoints || [])" :key="ep.method + ep.path">
+              <div class="system-map-route-item" x-data="{ showCopy: false }" @mouseenter="showCopy = true" @mouseleave="showCopy = false">
+                <span class="system-map-method-badge" :class="getMethodBadgeClass(ep.method)" x-text="ep.method"></span>
+                <span class="system-map-route-path" x-text="ep.path"></span>
+                <span class="system-map-route-desc" x-text="ep.description || ''"></span>
+                <button
+                  class="system-map-copy-btn"
+                  x-show="showCopy"
+                  @click.stop="copySystemMapId(ep.path)"
+                  aria-label="Copy path"
+                  title="Copy path"
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" aria-hidden="true"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+                </button>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <!-- Section C: Views & Status -->
+    <section class="system-map-section">
+      <button class="system-map-section-header" @click="toggleSystemMapSection('views')" aria-expanded="systemMapExpanded.views">
+        <span class="system-map-section-title">Views &amp; Status</span>
+        <span class="system-map-section-badge" x-text="getViewStatusCounts().total + ' views · ' + getViewStatusCounts().functional + ' functional' + (getViewStatusCounts().beta > 0 ? ' · ' + getViewStatusCounts().beta + ' beta' : '')"></span>
+        <svg class="system-map-chevron" :class="systemMapExpanded.views && 'system-map-chevron-open'" viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="system-map-section-body" x-show="systemMapExpanded.views" x-transition.duration.150ms>
+        <template x-if="filteredViews().length === 0">
+          <div class="empty-state">No views match your search.</div>
+        </template>
+        <div class="registry-grid">
+          <template x-for="v in filteredViews()" :key="v.id">
+            <div class="system-map-view-card reg-card">
+              <div class="system-map-view-card-header">
+                <div class="system-map-view-card-label-group">
+                  <span class="system-map-view-card-label" x-text="v.label"></span>
+                  <span class="system-map-view-card-id" x-text="v.id"></span>
+                </div>
+                <span class="view-status-pill" :class="getViewStatusClass(v.status)" x-text="v.status"></span>
+              </div>
+              <div class="system-map-view-card-files" x-show="v.hasPartial || v.hasModule">
+                <template x-if="v.hasPartial">
+                  <span class="system-map-view-file-ref" x-text="'partials/' + v.partial"></span>
+                </template>
+                <template x-if="v.hasPartial && v.hasModule">
+                  <span class="system-map-view-file-sep">·</span>
+                </template>
+                <template x-if="v.hasModule">
+                  <span class="system-map-view-file-ref" x-text="'modules/' + v.module + '.js'"></span>
+                </template>
+              </div>
+              <div class="system-map-view-missing" x-show="!v.hasPartial || !v.hasModule">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12" aria-hidden="true"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                <span x-text="(!v.hasPartial && !v.hasModule) ? 'missing partial + module' : (!v.hasPartial ? 'missing partial' : 'missing module')"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section D: Notion Databases -->
+    <section class="system-map-section">
+      <button class="system-map-section-header" @click="toggleSystemMapSection('notion')" aria-expanded="systemMapExpanded.notion">
+        <span class="system-map-section-title">Notion Databases</span>
+        <span class="system-map-section-badge" x-text="filteredNotionDbs().length + ' databases'"></span>
+        <svg class="system-map-chevron" :class="systemMapExpanded.notion && 'system-map-chevron-open'" viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="system-map-section-body" x-show="systemMapExpanded.notion" x-transition.duration.150ms>
+        <template x-if="filteredNotionDbs().length === 0">
+          <div class="empty-state">No databases match your search.</div>
+        </template>
+        <div class="registry-grid">
+          <template x-for="db in filteredNotionDbs()" :key="db.id || db.name">
+            <div class="system-map-db-card reg-card">
+              <div class="system-map-db-title" x-text="db.name"></div>
+              <div class="system-map-db-id" x-data="{ showCopy: false }" @mouseenter="showCopy = true" @mouseleave="showCopy = false">
+                <span class="system-map-id-text" x-text="truncateId(db.id)"></span>
+                <button
+                  class="system-map-copy-btn"
+                  x-show="showCopy && db.id"
+                  @click.stop="copySystemMapId(db.id)"
+                  aria-label="Copy database ID"
+                  title="Copy ID"
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" aria-hidden="true"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+                </button>
+              </div>
+              <div class="system-map-db-purpose" x-text="db.purpose || ''" x-show="db.purpose"></div>
+              <div class="system-map-db-props" x-show="db.propertiesSummary && db.propertiesSummary.length > 0">
+                <span class="system-map-db-props-label">Properties:</span>
+                <span class="system-map-db-props-list" x-text="(db.propertiesSummary || []).slice(0, 5).join(', ') + ((db.propertiesSummary || []).length > 5 ? ' +' + (db.propertiesSummary.length - 5) + ' more' : '')"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section E: Google Sheets -->
+    <section class="system-map-section">
+      <button class="system-map-section-header" @click="toggleSystemMapSection('sheets')" aria-expanded="systemMapExpanded.sheets">
+        <span class="system-map-section-title">Google Sheets</span>
+        <span class="system-map-section-badge" x-text="filteredSheets().length + ' sheets'"></span>
+        <svg class="system-map-chevron" :class="systemMapExpanded.sheets && 'system-map-chevron-open'" viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="system-map-section-body" x-show="systemMapExpanded.sheets" x-transition.duration.150ms>
+        <template x-if="filteredSheets().length === 0">
+          <div class="empty-state">No sheets configured or match your search.</div>
+        </template>
+        <div class="registry-grid">
+          <template x-for="sheet in filteredSheets()" :key="sheet.key">
+            <div class="system-map-sheet-card reg-card">
+              <div class="system-map-sheet-header">
+                <span class="system-map-sheet-title" x-text="sheet.label"></span>
+                <span class="system-map-sheet-status" :class="sheet.idPresent ? 'system-map-status-ok' : 'system-map-status-missing'" x-text="sheet.idPresent ? 'configured' : 'missing'"></span>
+              </div>
+              <div class="system-map-sheet-key" x-text="sheet.envVar"></div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section F: Frontend Modules -->
+    <section class="system-map-section">
+      <button class="system-map-section-header" @click="toggleSystemMapSection('modules')" aria-expanded="systemMapExpanded.modules">
+        <span class="system-map-section-title">Frontend Modules</span>
+        <span class="system-map-section-badge" x-text="filteredModules().length + ' modules'"></span>
+        <svg class="system-map-chevron" :class="systemMapExpanded.modules && 'system-map-chevron-open'" viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="system-map-section-body" x-show="systemMapExpanded.modules" x-transition.duration.150ms>
+        <template x-if="filteredModules().length === 0">
+          <div class="empty-state">No modules match your search.</div>
+        </template>
+        <template x-for="mod in filteredModules()" :key="mod.name">
+          <div class="system-map-module-row">
+            <div class="system-map-module-path" x-text="'src/js/modules/' + mod.name + '.js'"></div>
+            <div class="system-map-module-meta">
+              <span class="system-map-module-exports" x-show="mod.exports && mod.exports.length > 0" x-text="'Exports: ' + (mod.exports || []).join(', ')"></span>
+              <span class="system-map-module-view" x-show="mod.referencedByView" x-text="'Powers: ' + mod.referencedByView + ' view'"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <!-- Section G: Docs & Sessions -->
+    <section class="system-map-section">
+      <button class="system-map-section-header" @click="toggleSystemMapSection('docs')" aria-expanded="systemMapExpanded.docs">
+        <span class="system-map-section-title">Documentation &amp; Sessions</span>
+        <span class="system-map-section-badge" x-text="(filteredDocs().docsFiles || []).length + ' docs · ' + (filteredDocs().recentSessions || []).length + ' sessions'"></span>
+        <svg class="system-map-chevron" :class="systemMapExpanded.docs && 'system-map-chevron-open'" viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="system-map-section-body" x-show="systemMapExpanded.docs" x-transition.duration.150ms>
+        <div class="system-map-docs-subsection">
+          <div class="system-map-subsection-label">Core Docs</div>
+          <template x-if="(filteredDocs().docsFiles || []).length === 0">
+            <div class="empty-state">No documentation found.</div>
+          </template>
+          <template x-for="doc in (filteredDocs().docsFiles || [])" :key="doc">
+            <div class="system-map-doc-card">
+              <span class="system-map-doc-name" x-text="doc"></span>
+              <a
+                class="system-map-doc-link"
+                :href="'.claude/docs/' + doc"
+                target="_blank"
+                rel="noopener"
+                x-show="doc.endsWith('.md')"
+              >View</a>
+            </div>
+          </template>
+        </div>
+        <div class="system-map-docs-subsection" style="margin-top:1rem;">
+          <div class="system-map-subsection-label">Recent Sessions</div>
+          <template x-if="(filteredDocs().recentSessions || []).length === 0">
+            <div class="empty-state">No sessions yet.</div>
+          </template>
+          <template x-for="(session, idx) in (filteredDocs().recentSessions || [])" :key="idx">
+            <div class="system-map-session-row">
+              <span class="system-map-session-text" x-text="session"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</template>

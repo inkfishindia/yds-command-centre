@@ -292,11 +292,7 @@
                     <div class="skeleton skeleton-card" style="height:80px;margin-top:8px;"></div>
                   </template>
 
-                  <template x-if="pipeline && !pipeline.available">
-                    <p class="pipeline-placeholder">Not connected. Set GOOGLE_SERVICE_ACCOUNT_KEY to enable.</p>
-                  </template>
-
-                  <template x-if="pipeline && pipeline.available">
+                  <template x-if="pipeline">
                     <div>
                       <!-- Total leads + status donut -->
                       <div class="dashboard-pipeline-summary">
@@ -773,4 +769,133 @@
             </template>
 
           </div><!-- end dashboard-container-3zone -->
+        </template>
+
+        <!-- ═══════════════════════════════════════════════════════
+             RECENT ACTIVITY FEED — from /api/activity-feed
+        ═══════════════════════════════════════════════════════ -->
+        <template x-if="dashboard">
+          <section class="activity-feed-section">
+
+            <!-- Header row -->
+            <div class="activity-feed-header">
+              <div class="activity-feed-header-left">
+                <h3 class="activity-feed-title">Recent Activity</h3>
+                <p class="activity-feed-subtitle"
+                   x-show="activityFeed && activityFeed.meta"
+                   x-text="(activityFeed?.meta?.counts?.decision || 0) + ' decisions · ' + (activityFeed?.meta?.counts?.commitment || 0) + ' commitments · ' + (activityFeed?.meta?.counts?.queue || 0) + ' queue resolutions in last ' + (activityFeed?.meta?.days || activityFeedDays) + ' days'">
+                </p>
+              </div>
+              <div class="activity-feed-header-right">
+                <!-- Days chips -->
+                <div class="activity-feed-days-chips" role="group" aria-label="Activity window">
+                  <template x-for="d in [7, 14, 30, 90]" :key="d">
+                    <button class="activity-feed-day-chip"
+                            :class="activityFeedDays === d && 'activity-feed-day-chip-active'"
+                            @click="setActivityFeedDays(d)"
+                            :aria-pressed="activityFeedDays === d"
+                            x-text="d + 'd'">
+                    </button>
+                  </template>
+                </div>
+                <!-- Refresh button -->
+                <button class="btn btn-small btn-secondary"
+                        @click="loadActivityFeed(activityFeedDays)"
+                        :disabled="activityFeedLoading"
+                        aria-label="Refresh activity feed">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M13.5 2.5A7 7 0 1 0 14 9"/><path d="M10 1l4 1.5L12.5 6"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Source warning banner -->
+            <template x-if="activityFeed && activityFeed.meta && activityFeed.meta.sources">
+              <div class="activity-feed-source-warning"
+                   x-show="Object.values(activityFeed.meta.sources).some(v => v === false)">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 2L15 14H1z"/><path d="M8 7v3M8 12v.5"/></svg>
+                <span x-text="'Source unavailable: ' + Object.entries(activityFeed.meta.sources).filter(([k,v]) => v === false).map(([k]) => k).join(', ')"></span>
+              </div>
+            </template>
+
+            <!-- Loading skeleton -->
+            <template x-if="activityFeedLoading && !activityFeed">
+              <div class="activity-feed-list">
+                <template x-for="i in 5" :key="i">
+                  <div class="activity-feed-row activity-feed-row--skeleton">
+                    <div class="skeleton" style="width:28px;height:28px;border-radius:50%;flex-shrink:0;"></div>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+                      <div class="skeleton skeleton-text" style="width:60%;height:13px;"></div>
+                      <div class="skeleton skeleton-text" style="width:40%;height:11px;"></div>
+                    </div>
+                    <div class="skeleton skeleton-text" style="width:48px;height:20px;border-radius:10px;"></div>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <!-- Error state -->
+            <template x-if="activityFeedError && !activityFeedLoading">
+              <div class="activity-feed-error">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M8 5v4M8 11v.5"/></svg>
+                <span x-text="activityFeedError"></span>
+                <button class="btn btn-small btn-secondary" @click="loadActivityFeed(activityFeedDays)">Retry</button>
+              </div>
+            </template>
+
+            <!-- Empty state -->
+            <template x-if="!activityFeedLoading && !activityFeedError && activityFeed && activityFeed.items && activityFeed.items.length === 0">
+              <div class="activity-feed-empty">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
+                <span>No activity in the last <span x-text="activityFeedDays"></span> days.</span>
+              </div>
+            </template>
+
+            <!-- Feed list -->
+            <template x-if="activityFeed && activityFeed.items && activityFeed.items.length > 0">
+              <div class="activity-feed-list">
+                <template x-for="item in activityFeed.items" :key="item.id">
+                  <div class="activity-feed-row" :class="activityTypeClass(item.type)">
+
+                    <!-- Type icon -->
+                    <div class="activity-feed-type-icon" :class="activityTypeClass(item.type)" :title="item.type">
+                      <span x-text="activityTypeIcon(item.type)" aria-hidden="true"></span>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="activity-feed-body">
+                      <template x-if="item.pageId && activityNotionUrl(item.pageId)">
+                        <a class="activity-feed-title-link"
+                           :href="activityNotionUrl(item.pageId)"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           x-text="item.title || 'Untitled'">
+                        </a>
+                      </template>
+                      <template x-if="!item.pageId || !activityNotionUrl(item.pageId)">
+                        <span class="activity-feed-item-title" x-text="item.title || 'Untitled'"></span>
+                      </template>
+                      <span class="activity-feed-summary" x-show="item.summary" x-text="item.summary"></span>
+                    </div>
+
+                    <!-- Meta -->
+                    <div class="activity-feed-meta">
+                      <span class="activity-feed-date"
+                            :title="item.date"
+                            x-text="formatActivityRelativeDate(item.date)">
+                      </span>
+                      <span class="activity-feed-owner-pill" x-show="item.owner" x-text="item.owner"></span>
+                      <template x-if="item.type === 'commitment' && item.status">
+                        <span class="badge activity-feed-status-pill"
+                              :data-status="(item.status || '').toLowerCase()"
+                              x-text="item.status">
+                        </span>
+                      </template>
+                    </div>
+
+                  </div>
+                </template>
+              </div>
+            </template>
+
+          </section>
         </template>

@@ -89,6 +89,10 @@ export function createSystemStatusModule() {
       return this.systemStatus?.syncSchedule || null;
     },
 
+    getSystemDatabaseStatus() {
+      return this.systemStatus?.database || null;
+    },
+
     formatSystemStatusDate(value) {
       if (!value) return 'Not available';
       const parsed = new Date(value);
@@ -128,6 +132,19 @@ export function createSystemStatusModule() {
       if (status === 'degraded' || status === 'partial') return 'org-status-risk';
       if (status === 'fallback' || status === 'stale' || status === 'error') return 'org-status-critical';
       return 'org-status-neutral';
+    },
+
+    getSystemDatabaseSummary() {
+      const database = this.getSystemDatabaseStatus();
+      if (!database?.enabled) return 'Database is not configured';
+
+      const pending = database?.migrations?.pending?.length || 0;
+      if (pending > 0) {
+        return `${pending} migration${pending === 1 ? '' : 's'} pending`;
+      }
+
+      const applied = database?.migrations?.applied?.length || 0;
+      return `Database ready with ${applied} migration${applied === 1 ? '' : 's'} applied`;
     },
   };
 }

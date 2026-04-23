@@ -73,11 +73,13 @@ src/js/
   modules/                         # Domain frontend modules (chat, dashboard, commitments, factory, command-shell, CRM, etc.)
 .claude/
   agents/                          # Agent configs (frontend-builder, backend-builder, code-reviewer, devops-infra, ux-auditor, pixel, design-planner, tester, scribe)
-  rules/                           # Coding patterns (frontend, server, token efficiency)
+  rules/                           # Coding patterns (frontend, server, token efficiency, api-schemas, workflow)
   skills/ui-ux-pro-max/            # Design intelligence: 50+ styles, 97 palettes, 57 font pairings, UX guidelines
   docs/app-reference.md            # FULL APP INVENTORY — routes, views, state, methods, CSS, tools. Read before building.
   docs/notion-hub.md               # Notion database IDs, people IDs, property schemas, write templates
   docs/tech-brief.md               # Technical architecture brief
+data/schemas/                      # Captured API response samples (Notion/Sheets/GitHub). Gitignored; regenerate via scripts/capture-schemas.js.
+scripts/capture-schemas.js         # One-shot: calls live services, saves real response shapes to data/schemas/.
 ```
 
 ## Critical Patterns
@@ -134,6 +136,12 @@ The lead session orchestrates — call each agent in order, passing context forw
 - **Always foreground** — never use `run_in_background` for review agents (code-reviewer, ux-auditor, tester, scribe). Background agents orphan when sessions end and burn tokens indefinitely.
 - **Parallel OK** — independent review agents (e.g., code-reviewer + ux-auditor) can run as parallel foreground calls in one message.
 - **Proportional review** — trivial fixes (typos, config, single-line) go straight to code-reviewer only. Full pipeline (design-planner → builder → reviewer → auditor → tester → scribe) is for features and multi-file changes.
+- **Continue agents across pipeline steps via `SendMessage`.** For review gates (code-reviewer, ux-auditor, scribe, tester) running across multiple builds in one session, spawn the agent once and resume with `SendMessage` on subsequent steps rather than respawning. The first spawn pays the pre-flight cost (primer + rules + context); every continuation reuses that warm context. Applies most to: reviewing backend-then-frontend in a full-stack build, writing docs for multiple changes, and iterative test-fix loops.
+
+Worked example — full-stack feature review:
+1. `backend-builder` ships API. Orchestrator spawns `code-reviewer` with `Agent({ subagent_type: "code-reviewer", prompt: "Review backend changes: [diff]" })` — pays pre-flight cost, returns an `agentId`.
+2. `frontend-builder` ships UI. Orchestrator does **not** spawn a new reviewer — instead calls `SendMessage({ to: "<code-reviewer agentId>", prompt: "Now review these frontend changes: [diff]" })`. The reviewer already has the primer, rules, and backend context in its window; it only needs the new diff.
+3. Same pattern for `scribe`: spawn once after the first code change, then `SendMessage` for every subsequent doc update in the session.
 
 ## How to Run
 

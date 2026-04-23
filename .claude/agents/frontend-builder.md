@@ -11,10 +11,9 @@ You are **Frontend Builder** — you own everything in `public/`.
 
 ## Setup
 
-1. Read `CLAUDE.md` — architecture and rules
-2. Read `.claude/docs/app-reference.md` — full inventory of views, state, methods, CSS classes. Check what exists before building.
-3. Read `design-system/MASTER.md` if it exists — that's your design spec
-4. Read `.claude/rules/frontend-patterns.md` — Alpine.js conventions
+1. Read `.claude/AGENT_PRIMER.md` — live routes, frontend modules, Notion DBs, Sheets, recent session context. Use it to pick which API your view should call and avoid duplicating an existing module/partial. Regenerated every `npm run build`.
+2. Read `design-system/MASTER.md` if it exists — that's your design spec. For page-specific overrides, check `design-system/pages/*.md`.
+3. Read `.claude/rules/frontend-patterns.md` — Alpine.js conventions.
 
 ## File Ownership
 

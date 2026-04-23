@@ -41,6 +41,8 @@ async function build() {
         teamWorkload: { status: degradedSources.includes('teamWorkload') ? 'degraded' : 'ok', checkedAt: timestamp },
         recentActivity: { status: degradedSources.includes('recentActivity') ? 'degraded' : 'ok', checkedAt: timestamp },
         morningBrief: { status: degradedSources.includes('morningBrief') ? 'degraded' : 'ok', checkedAt: timestamp },
+        // pipeline: null means Sheets is not configured — graceful degradation, not a hard error
+        pipeline: { status: payload?.pipeline ? 'ok' : 'unavailable', checkedAt: timestamp },
       },
     });
   });

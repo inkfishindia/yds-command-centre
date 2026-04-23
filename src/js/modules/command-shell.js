@@ -71,7 +71,7 @@ export function createCommandShellModule() {
 
     async openNavigationTarget(action) {
       // Load HTML partial for views that have been extracted to separate files
-      const partialViews = ['chat', 'overview', 'dashboard', 'actionQueue', 'focusArea', 'team', 'personView', 'docs', 'notion', 'knowledge', 'decisions', 'projects', 'registry', 'commitments', 'factory', 'marketingOps', 'techTeam', 'bmc', 'crm', 'ops', 'status', 'claude-usage'];
+      const partialViews = ['chat', 'overview', 'dashboard', 'actionQueue', 'focusArea', 'team', 'personView', 'docs', 'notion', 'knowledge', 'decisions', 'projects', 'registry', 'commitments', 'factory', 'marketingOps', 'techTeam', 'bmc', 'crm', 'ops', 'status', 'claude-usage', 'system-map', 'dan-colin'];
       this.view = action;
       this.tableSelectedRow = -1;
       if (partialViews.includes(action)) {
@@ -114,6 +114,8 @@ export function createCommandShellModule() {
       else if (action === 'ops') this.loadOps();
       else if (action === 'status') this.loadSystemStatus();
       else if (action === 'claude-usage') this.loadClaudeUsage();
+      else if (action === 'system-map') this.loadSystemMap();
+      else if (action === 'dan-colin') this.loadDanColin();
     },
 
     openCmdPalette() {
@@ -190,6 +192,7 @@ export function createCommandShellModule() {
         { label: 'Marketing Ops', icon: '▸', type: 'view', view: 'marketingOps', keywords: ['marketing', 'campaigns', 'content'], action: () => this.openNavigationTarget('marketingOps') },
         { label: 'Tech Team', icon: '▸', type: 'view', view: 'techTeam', keywords: ['tech', 'engineering', 'dev', 'sprint'], action: () => this.openNavigationTarget('techTeam') },
         { label: 'System Status', icon: '▸', type: 'view', view: 'status', keywords: ['health', 'status', 'sync', 'read models'], action: () => this.openNavigationTarget('status') },
+        { label: 'System Map', icon: '▸', type: 'view', view: 'system-map', keywords: ['map', 'architecture', 'routes', 'modules', 'databases', 'repo', 'docs'], action: () => this.openNavigationTarget('system-map') },
         { label: 'Action Queue', icon: '▸', type: 'view', view: 'actionQueue', keywords: ['queue', 'actions', 'pending'], action: () => this.openNavigationTarget('actionQueue') },
       ];
     },

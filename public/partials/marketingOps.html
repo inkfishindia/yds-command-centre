@@ -186,6 +186,7 @@
               Competitors
               <span class="filter-pill-count" x-show="ciData" x-text="ciData?.competitorCount || ''" x-cloak></span>
             </button>
+            <button class="filter-pill" :class="mktopsSection === 'utm' && 'filter-pill-active'" @click="openMarketingSection('utm')">UTM Builder</button>
           </div>
 
           <!-- CAMPAIGNS SECTION -->
@@ -1560,6 +1561,188 @@
 
           </div>
           <!-- /COMPETITORS SECTION -->
+
+          <!-- UTM BUILDER SECTION -->
+          <div x-show="mktopsSection === 'utm'" class="utm-builder-section">
+
+            <div class="utm-builder-header">
+              <div class="utm-builder-header-left">
+                <svg class="utm-builder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                <div>
+                  <div class="utm-builder-title">UTM Builder</div>
+                  <div class="utm-builder-subtitle">Tag campaign URLs for IG, WhatsApp, email</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="utm-builder-body">
+
+              <!-- Form -->
+              <div class="utm-builder-form">
+                <div class="utm-builder-field utm-builder-field--full">
+                  <label for="utm-dest-url" class="utm-builder-label">Destination URL <span class="utm-required">*</span></label>
+                  <input
+                    id="utm-dest-url"
+                    type="url"
+                    class="utm-input"
+                    placeholder="https://yourdesignstore.in/..."
+                    x-model.trim="utm.url"
+                    autocomplete="off"
+                  />
+                </div>
+
+                <div class="utm-builder-field">
+                  <label for="utm-source" class="utm-builder-label">UTM Source <span class="utm-required">*</span></label>
+                  <input
+                    id="utm-source"
+                    type="text"
+                    class="utm-input"
+                    placeholder="instagram, whatsapp, newsletter..."
+                    x-model.trim="utm.source"
+                    list="utm-source-list"
+                    autocomplete="off"
+                  />
+                  <datalist id="utm-source-list">
+                    <option value="instagram"></option>
+                    <option value="whatsapp"></option>
+                    <option value="newsletter"></option>
+                    <option value="google"></option>
+                    <option value="facebook"></option>
+                  </datalist>
+                </div>
+
+                <div class="utm-builder-field">
+                  <label for="utm-medium" class="utm-builder-label">UTM Medium <span class="utm-required">*</span></label>
+                  <input
+                    id="utm-medium"
+                    type="text"
+                    class="utm-input"
+                    placeholder="social, cpc, email, direct..."
+                    x-model.trim="utm.medium"
+                    list="utm-medium-list"
+                    autocomplete="off"
+                  />
+                  <datalist id="utm-medium-list">
+                    <option value="social"></option>
+                    <option value="cpc"></option>
+                    <option value="email"></option>
+                    <option value="direct"></option>
+                    <option value="referral"></option>
+                  </datalist>
+                </div>
+
+                <div class="utm-builder-field">
+                  <label for="utm-campaign" class="utm-builder-label">UTM Campaign <span class="utm-required">*</span></label>
+                  <input
+                    id="utm-campaign"
+                    type="text"
+                    class="utm-input"
+                    placeholder="summer-drop-2025"
+                    x-model.trim="utm.campaign"
+                    autocomplete="off"
+                  />
+                </div>
+
+                <div class="utm-builder-field">
+                  <label for="utm-content" class="utm-builder-label">UTM Content <span class="utm-optional">(optional)</span></label>
+                  <input
+                    id="utm-content"
+                    type="text"
+                    class="utm-input"
+                    placeholder="carousel-v1"
+                    x-model.trim="utm.content"
+                    autocomplete="off"
+                  />
+                </div>
+
+                <div class="utm-builder-field">
+                  <label for="utm-term" class="utm-builder-label">UTM Term <span class="utm-optional">(optional)</span></label>
+                  <input
+                    id="utm-term"
+                    type="text"
+                    class="utm-input"
+                    placeholder="custom-tshirt"
+                    x-model.trim="utm.term"
+                    autocomplete="off"
+                  />
+                </div>
+              </div>
+
+              <!-- Live preview -->
+              <div class="utm-builder-preview" x-show="utmGeneratedUrl()">
+                <div class="utm-preview-label">Generated URL</div>
+                <div class="utm-preview-row">
+                  <input
+                    type="text"
+                    class="utm-input utm-preview-input"
+                    readonly
+                    :value="utmGeneratedUrl()"
+                    aria-label="Generated UTM URL"
+                  />
+                  <button
+                    class="btn btn-small"
+                    :class="utm.copiedRecently && 'utm-builder-copied'"
+                    @click="utmCopy()"
+                    aria-label="Copy URL to clipboard"
+                  >
+                    <template x-if="!utm.copiedRecently">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    </template>
+                    <template x-if="utm.copiedRecently">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                    </template>
+                    <span x-text="utm.copiedRecently ? 'Copied' : 'Copy'"></span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Preset manager -->
+              <div class="utm-builder-presets">
+                <div class="utm-presets-header">
+                  <div class="utm-presets-title">Saved Presets</div>
+                  <div class="utm-preset-save-row">
+                    <input
+                      type="text"
+                      class="utm-input utm-preset-name-input"
+                      placeholder="Preset name..."
+                      x-model.trim="utm.presetName"
+                      autocomplete="off"
+                      aria-label="Preset name"
+                      @keydown.enter="utm.presetName && utmSavePreset()"
+                    />
+                    <button
+                      class="btn btn-small"
+                      :disabled="!utm.presetName"
+                      @click="utmSavePreset()"
+                    >Save preset</button>
+                  </div>
+                </div>
+
+                <template x-if="utm.presets.length === 0">
+                  <div class="compact-empty-state">No saved presets yet. Fill the form and save one.</div>
+                </template>
+
+                <template x-if="utm.presets.length > 0">
+                  <div class="utm-preset-list">
+                    <template x-for="(preset, idx) in utm.presets" :key="preset.name + idx">
+                      <div class="utm-preset-row">
+                        <div class="utm-preset-info">
+                          <span class="utm-preset-name" x-text="preset.name"></span>
+                          <span class="utm-preset-meta" x-text="preset.source + ' / ' + preset.medium + (preset.campaign ? ' · ' + preset.campaign : '')"></span>
+                        </div>
+                        <div class="utm-preset-actions">
+                          <button class="mini-action-btn" @click="utmLoadPreset(preset)" aria-label="Load preset">Load</button>
+                          <button class="mini-action-btn mini-action-btn--danger" @click="utmDeletePreset(idx)" aria-label="Delete preset">Delete</button>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+
+            </div>
+          </div>
+          <!-- /UTM BUILDER SECTION -->
 
         </div>
       </template>

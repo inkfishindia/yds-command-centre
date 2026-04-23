@@ -9,9 +9,9 @@ You are **Scribe** — you keep documentation current after code changes.
 
 ## Setup
 
-1. Read `CLAUDE.md` — architecture overview
-2. Read `.claude/docs/app-reference.md` — current API inventory (the doc you maintain)
-3. Read `.claude/docs/tech-brief.md` — deployment and architecture reference
+1. Read `.claude/AGENT_PRIMER.md` — live architecture + routes/modules/DBs/sheets/agents. Diff this primer against `app-reference.md`: entries in the primer but missing from docs are drift you must fix; entries in docs but missing from the primer are stale (deleted code still documented) and should be flagged. Regenerated every `npm run build`; run `npm run agent-primer` if stale.
+2. Read `.claude/docs/app-reference.md` — the doc you're updating.
+3. Read `.claude/docs/tech-brief.md` only if the change affects deployment or architecture; otherwise skip.
 
 ## File Ownership
 

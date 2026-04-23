@@ -9,9 +9,10 @@ You are the Quality Gate. Nothing ships without your APPROVE.
 
 ## Setup
 
-1. Run `git diff` to see exactly what changed
-2. Read `CLAUDE.md` for architecture rules and critical patterns
-3. Focus review on changed files only — don't audit the whole codebase
+1. Run `git diff` to see exactly what changed.
+2. Read `.claude/AGENT_PRIMER.md` — live architecture + route/module/DB/sheets inventory + last 3 session handoffs. Replaces grepping neighbouring files for orientation. Regenerated every `npm run build`; run `npm run agent-primer` if stale.
+3. If the diff touches Notion/Sheets/GitHub parsing, read `.claude/rules/api-schemas.md`.
+4. Focus review on changed files only — don't audit the whole codebase.
 
 ## Review Checklist
 
@@ -50,6 +51,10 @@ You are the Quality Gate. Nothing ships without your APPROVE.
 - CommonJS only (server), Alpine.js only (frontend)?
 - No build tooling references?
 - Notion calls through cache layer?
+
+### 8. API Shape Discipline
+- New Notion/Sheets/GitHub parsing code references the shapes in `data/schemas/` rather than guessing? (See `.claude/rules/api-schemas.md`.)
+- Notion reads use top-level simplified keys from `queryDatabase()`, not raw `page.properties[x].rich_text[0].plain_text` chains?
 
 ## Output
 

@@ -11,9 +11,8 @@ You are the Design Planner for the YDS Command Centre. You run BEFORE the builde
 
 ## Setup
 
-1. Read `CLAUDE.md` for architecture and file map
-2. Read `.claude/docs/app-reference.md` to check existing CSS variables, color scheme, and layout patterns
-3. Read `public/css/styles.css` `:root` section to see current design tokens — don't duplicate or conflict
+1. Read `.claude/AGENT_PRIMER.md` — existing frontend modules + views + recent session context. Scan it to see what patterns are already in use before proposing a new one. Regenerated every `npm run build`.
+2. Read `public/css/styles.css` `:root` section (or `design-system/MASTER.md` if it exists) to see current design tokens — don't duplicate or conflict.
 
 ## Primary Workflow
 

@@ -25,6 +25,12 @@ export function createDashboardModule() {
     collapsedOverdueGroups: {},
     dashboardSavedView: 'today',
 
+    // Activity Feed
+    activityFeed: null,
+    activityFeedLoading: false,
+    activityFeedError: null,
+    activityFeedDays: 14,
+
     // Morning Brief
     morningBrief: null,
     briefLoading: false,
@@ -40,6 +46,11 @@ export function createDashboardModule() {
 
     // Dashboard auto-refresh interval handle
     _dashboardRefreshInterval: null,
+
+    // Memoization caches for render-path getters
+    _cachedSavedViewItems: null,
+    _cachedPriorityCards: null,
+    _cachedActivityFeedItems: null,
 
     startDashboardAutoRefresh() {
       this.stopDashboardAutoRefresh();
@@ -67,9 +78,8 @@ export function createDashboardModule() {
         this.briefLoading = true;
       }
       try {
-        const [dashboardRes, pipelineRes, actionQueueRes] = await Promise.allSettled([
+        const [dashboardRes, actionQueueRes] = await Promise.allSettled([
           fetchReadModel('dashboard', { signal }),
-          fetch('/api/sheets/pipeline', { signal }),
           fetchReadModel('action-queue', { signal }),
         ]);
 
@@ -81,13 +91,8 @@ export function createDashboardModule() {
           this.lastRefresh = new Date();
           this.teamWorkload = this.dashboard.teamWorkload || [];
           this.recentActivity = this.dashboard.recentActivity || null;
+          this.pipeline = this.dashboard.pipeline || null;
           this.runNotificationChecks?.('dashboard');
-        }
-
-        if (pipelineRes.status === 'fulfilled' && pipelineRes.value.ok) {
-          this.pipeline = await pipelineRes.value.json();
-        } else if (pipelineRes.status === 'rejected' && !this.isAbortError(pipelineRes.reason)) {
-          console.warn('Pipeline load failed:', pipelineRes.reason?.message || pipelineRes.reason);
         }
 
         if (actionQueueRes.status === 'fulfilled' && actionQueueRes.value.response.ok && actionQueueRes.value.payload) {
@@ -97,6 +102,9 @@ export function createDashboardModule() {
         } else if (actionQueueRes.status === 'rejected' && !this.isAbortError(actionQueueRes.reason)) {
           console.error('Action queue failed:', actionQueueRes.reason);
         }
+
+        // Load activity feed independently — never blocks main dashboard
+        this.loadActivityFeed(this.activityFeedDays);
       } catch (err) {
         if (this.isAbortError(err)) return;
         console.error('Dashboard error:', err);
@@ -104,6 +112,7 @@ export function createDashboardModule() {
         this.endRequest('dashboard', signal);
         this.dashboardLoading = false;
         this.briefLoading = false;
+        this._invalidateDashboardCaches();
       }
     },
 
@@ -123,6 +132,7 @@ export function createDashboardModule() {
       } finally {
         this.endRequest('actionQueue', signal);
         if (!silent) this.actionQueueLoading = false;
+        this._invalidateDashboardCaches();
       }
     },
 
@@ -165,6 +175,7 @@ export function createDashboardModule() {
       } finally {
         this.endRequest('morningBrief', signal);
         this.briefLoading = false;
+        this._invalidateDashboardCaches();
       }
     },
 
@@ -368,6 +379,7 @@ export function createDashboardModule() {
     },
 
     getDashboardPriorityCards() {
+      if (this._cachedPriorityCards !== null) return this._cachedPriorityCards;
       const overdueItems = (this.dashboard?.overdue || []).slice(0, 3).map((item) => ({
         name: item.name,
         meta: this.formatRelativeDate(item['Due Date']) || `${item.daysOverdue || 0}d overdue`,
@@ -385,7 +397,7 @@ export function createDashboardModule() {
         meta: this.getRelativeTime(item.time),
       }));
 
-      return [
+      this._cachedPriorityCards = [
         {
           id: 'overdue',
           title: 'Overdue Pressure',
@@ -411,6 +423,7 @@ export function createDashboardModule() {
           items: activityItems.length ? activityItems : [{ name: 'No recent activity captured', meta: 'Refresh to pull the latest movement.' }],
         },
       ];
+      return this._cachedPriorityCards;
     },
 
     getDashboardFocusList() {
@@ -445,25 +458,26 @@ export function createDashboardModule() {
 
     applyDashboardSavedView(viewId) {
       this.dashboardSavedView = viewId;
+      this._invalidateDashboardCaches();
     },
 
     getDashboardSavedViewItems() {
+      if (this._cachedSavedViewItems !== null) return this._cachedSavedViewItems;
+      let result;
       if (this.dashboardSavedView === 'overdue') {
-        return (this.dashboard?.overdue || []).slice(0, 6).map((item) => ({
+        result = (this.dashboard?.overdue || []).slice(0, 6).map((item) => ({
           title: item.name,
           detail: this.formatRelativeDate(item['Due Date']) || `${item.daysOverdue || 0}d overdue`,
           action: () => this.openNavigationTarget('actionQueue'),
         }));
-      }
-      if (this.dashboardSavedView === 'waiting') {
-        return (this.morningBrief?.waitingOn || []).slice(0, 6).map((item) => ({
+      } else if (this.dashboardSavedView === 'waiting') {
+        result = (this.morningBrief?.waitingOn || []).slice(0, 6).map((item) => ({
           title: item.name,
           detail: item.blockerDetail || 'Waiting on a blocker to clear',
           action: () => this.openNavigationTarget('actionQueue'),
         }));
-      }
-      if (this.dashboardSavedView === 'overloaded') {
-        return (this.teamWorkload || [])
+      } else if (this.dashboardSavedView === 'overloaded') {
+        result = (this.teamWorkload || [])
           .filter((person) => person.capacity === 'overloaded' || person.capacity === 'moderate')
           .sort((a, b) => b.activeCount - a.activeCount)
           .slice(0, 6)
@@ -472,12 +486,15 @@ export function createDashboardModule() {
             detail: `${person.activeCount} active, ${person.overdueCount} overdue`,
             action: () => this.openPersonView(person),
           }));
+      } else {
+        result = (this.morningBrief?.topThree || []).slice(0, 6).map((item) => ({
+          title: item.name,
+          detail: 'Top priority for today',
+          action: () => this.openNavigationTarget('commitments'),
+        }));
       }
-      return (this.morningBrief?.topThree || []).slice(0, 6).map((item) => ({
-        title: item.name,
-        detail: 'Top priority for today',
-        action: () => this.openNavigationTarget('commitments'),
-      }));
+      this._cachedSavedViewItems = result;
+      return this._cachedSavedViewItems;
     },
 
     getDashboardSavedViewEmptyState() {
@@ -490,12 +507,20 @@ export function createDashboardModule() {
       return labels[this.dashboardSavedView] || 'No items available.';
     },
 
+    // Invalidate all memoized render-path getter caches
+    _invalidateDashboardCaches() {
+      this._cachedSavedViewItems = null;
+      this._cachedPriorityCards = null;
+      this._cachedActivityFeedItems = null;
+    },
+
     // Toggle collapse state for an overdue focus-area group
     toggleOverdueGroup(area) {
       this.collapsedOverdueGroups = {
         ...this.collapsedOverdueGroups,
         [area]: !this.collapsedOverdueGroups[area],
       };
+      this._invalidateDashboardCaches();
     },
 
     isOverdueGroupCollapsed(area) {
@@ -504,8 +529,12 @@ export function createDashboardModule() {
 
     // Returns merged activity feed items from recentActivity, sorted recent-first
     getActivityFeedItems() {
+      if (this._cachedActivityFeedItems !== null) return this._cachedActivityFeedItems;
       const activity = this.recentActivity;
-      if (!activity) return [];
+      if (!activity) {
+        this._cachedActivityFeedItems = [];
+        return this._cachedActivityFeedItems;
+      }
       const items = [];
       for (const c of (activity.completions || []).slice(0, 5)) {
         items.push({ type: 'success', name: c.name, time: c.lastEdited, id: c.id });
@@ -518,8 +547,73 @@ export function createDashboardModule() {
       }
       // Sort by time, recent first
       items.sort((a, b) => new Date(b.time) - new Date(a.time));
-      return items.slice(0, 10);
+      this._cachedActivityFeedItems = items.slice(0, 10);
+      return this._cachedActivityFeedItems;
     },
+
+    // ── Activity Feed ──────────────────────────────────────────────────
+
+    async loadActivityFeed(days) {
+      const d = days || this.activityFeedDays || 14;
+      const signal = this.beginRequest('activityFeed');
+      this.activityFeedLoading = true;
+      this.activityFeedError = null;
+      try {
+        const res = await fetch(`/api/activity-feed?days=${d}`, { signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        this.activityFeed = await res.json();
+      } catch (err) {
+        if (this.isAbortError(err)) return;
+        console.error('Activity feed failed:', err);
+        this.activityFeedError = err.message || 'Failed to load activity feed';
+      } finally {
+        this.endRequest('activityFeed', signal);
+        this.activityFeedLoading = false;
+      }
+    },
+
+    setActivityFeedDays(days) {
+      this.activityFeedDays = days;
+      this.loadActivityFeed(days);
+    },
+
+    // Returns 'now' | 'Xh ago' | 'Yd ago' | 'Nw ago'
+    formatActivityRelativeDate(iso) {
+      if (!iso) return '';
+      const then = new Date(iso);
+      const diffMs = Date.now() - then.getTime();
+      if (isNaN(diffMs)) return iso;
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 2) return 'now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays < 7) return `${diffDays}d ago`;
+      const diffWeeks = Math.floor(diffDays / 7);
+      return `${diffWeeks}w ago`;
+    },
+
+    activityNotionUrl(pageId) {
+      if (!pageId) return '';
+      return `https://www.notion.so/${pageId.replace(/-/g, '')}`;
+    },
+
+    activityTypeIcon(type) {
+      if (type === 'decision') return '◈';
+      if (type === 'commitment') return '✓';
+      if (type === 'queue') return '↔';
+      return '·';
+    },
+
+    activityTypeClass(type) {
+      if (type === 'decision') return 'af-type-decision';
+      if (type === 'commitment') return 'af-type-commitment';
+      if (type === 'queue') return 'af-type-queue';
+      return '';
+    },
+
+    // ── Pipeline donut data ────────────────────────────────────────────
 
     // Pipeline donut data from pipeline state
     getPipelineDonutData() {

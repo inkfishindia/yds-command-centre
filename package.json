@@ -4,7 +4,8 @@
   "description": "YDS Command Centre — Web interface for Colin (Chief of Staff)",
   "main": "server.js",
   "scripts": {
-    "build": "node scripts/build-assets.mjs",
+    "build": "node scripts/build-assets.mjs && node scripts/generate-agent-primer.mjs",
+    "agent-primer": "node scripts/generate-agent-primer.mjs",
     "db:migrate": "node scripts/db-migrate.js",
     "sync:readmodels": "node scripts/sync-read-models.mjs",
     "start": "npm run build && node server.js",

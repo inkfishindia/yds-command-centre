@@ -32,6 +32,8 @@ const LAZY_MODULE_FACTORIES = {
   status: () => import('./modules/system-status.js').then(({ createSystemStatusModule }) => createSystemStatusModule()),
   'competitor-intel': () => import('./modules/competitor-intel.js').then(({ createCompetitorIntelModule }) => createCompetitorIntelModule()),
   'claude-usage': () => import('./modules/claude-usage.js').then(({ createClaudeUsageModule }) => createClaudeUsageModule()),
+  'system-map': () => import('./modules/system-map.js').then(({ createSystemMapModule }) => createSystemMapModule()),
+  'dan-colin': () => import('./modules/dan-colin.js').then(({ createDanColinModule }) => createDanColinModule()),
 };
 
 function app() {
@@ -88,6 +90,8 @@ function app() {
         ops: 'ops',
         status: 'system-status',
         'claude-usage': 'claude-usage',
+        'system-map': 'system-map',
+        'dan-colin': 'dan-colin',
       };
       return fileMap[name] || null;
     },
@@ -184,6 +188,8 @@ function app() {
         knowledge: 'knowledge-view',
         registry: 'registry-view',
         'claude-usage': 'usage-view',
+        'system-map': 'system-map-view',
+        'dan-colin': 'dan-colin-view',
       };
       return classMap[name] || name + '-view';
     },
@@ -270,6 +276,26 @@ function app() {
     opsPOs: [], opsPOsTotal: 0, opsPOsLoading: false,
     // claude-usage
     claudeUsageSessions: [], claudeUsageNewPercent: 50, claudeUsageNewNote: '', claudeUsageMaxWeekly: 1000,
+    // system-map
+    systemMap: null, systemMapLoading: false, systemMapError: null, systemMapFilter: '',
+    systemMapExpanded: { repo: true, routes: false, notion: true, sheets: true, modules: true, docs: true },
+    // dan-colin queue
+    danColin: null, danColinLoading: false, danColinLoadError: null,
+    danColinDraftAnswer: {}, danColinSavingFor: {}, danColinSavedFor: {},
+    _dcDebounceTimers: {}, _dcExitingRows: {},
+    watchExpanded: false, closedExpanded: false,
+    dropSheetOpen: false, dropDraft: '', dropSubmitting: false, dropSubmitSuccess: false, dropError: null,
+    dcToast: null, _dcToastTimer: null,
+    // v2 stub state
+    dcChipNav: { activeSection: 'waiting' },
+    _dcChipObserver: null,
+    dcFocusedRowIndex: null,
+    dcCheatsheetOpen: false,
+    dcKeyboardAttached: false,
+    _dcKeydownHandler: null,
+    dcFocusAreaLegendOpen: false,
+    _dcFocusColorCache: {},
+    _dcSlowNetworkTimer: null,
 
     // Eager modules — always initialized
     ...createDashboardModule(),

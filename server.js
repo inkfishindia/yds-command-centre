@@ -126,6 +126,9 @@ app.use('/api/read-models', require('./server/routes/read-models'));
 app.use('/api/competitor-intel', require('./server/routes/competitor-intel'));
 app.use('/api/ceo-dashboard', require('./server/routes/ceo-dashboard'));
 app.use('/api/health', require('./server/routes/health'));
+app.use('/api/system-map', require('./server/routes/system-map'));
+app.use('/api/dan-colin', require('./server/routes/dan-colin'));
+app.use('/api/activity-feed', require('./server/routes/activity-feed'));
 
 // Static file serving — Alpine.js frontend from public/
 // Cache JS/CSS for 1 hour (assets are rebuilt on deploy); HTML always revalidates.
