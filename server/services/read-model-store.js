@@ -4,6 +4,12 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const db = require('./db');
 
+// Benign FS error codes that mean the filesystem is read-only or unavailable
+// (e.g. Vercel Lambda, Docker read-only layer). Persistence is opportunistic —
+// skip silently. Warn once per process per path to avoid log spam.
+const BENIGN_FS_CODES = new Set(['ENOENT', 'EROFS', 'EACCES', 'EPERM']);
+const _warnedPaths = new Set();
+
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const READ_MODELS_DIR = path.join(DATA_DIR, 'read-models');
 const SOURCE_HEALTH_PATH = path.join(DATA_DIR, 'source-health.json');
@@ -35,13 +41,26 @@ async function readJson(filePath) {
 
 async function writeJson(filePath, value) {
   const dirPath = path.dirname(filePath);
-  await fs.mkdir(dirPath, { recursive: true });
+  try {
+    await fs.mkdir(dirPath, { recursive: true });
+  } catch (mkdirErr) {
+    if (BENIGN_FS_CODES.has(mkdirErr && mkdirErr.code)) {
+      if (!_warnedPaths.has(filePath)) {
+        _warnedPaths.add(filePath);
+        console.warn(`[read-model-store] fs not writable (${mkdirErr.code}), skipping persist: ${filePath}`);
+      }
+      return;
+    }
+    throw mkdirErr;
+  }
   try {
     await fs.writeFile(filePath, JSON.stringify(value, null, 2), 'utf8');
   } catch (err) {
-    if (err && err.code === 'ENOENT') {
-      await fs.mkdir(dirPath, { recursive: true });
-      await fs.writeFile(filePath, JSON.stringify(value, null, 2), 'utf8');
+    if (BENIGN_FS_CODES.has(err && err.code)) {
+      if (!_warnedPaths.has(filePath)) {
+        _warnedPaths.add(filePath);
+        console.warn(`[read-model-store] fs not writable (${err.code}), skipping persist: ${filePath}`);
+      }
       return;
     }
     throw err;
