@@ -310,14 +310,12 @@
       </div>
 
       <!-- Team view -->
-      <template x-if="view === 'team'">
-      <div class="team-view view-panel">
+      <div x-show="view === 'team'" class="team-view view-panel">
         <div x-show="!_partialLoaded.team" class="view-loading">
           <div class="loading-skeleton skeleton-card"></div>
           <div class="loading-skeleton skeleton-card"></div>
         </div>
       </div>
-      </template>
 
       <!-- Person view -->
       <div x-show="view === 'personView'" class="person-view view-panel">
@@ -328,14 +326,12 @@
       </div>
 
       <!-- Documents view -->
-      <template x-if="view === 'docs'">
-      <div class="docs-view view-panel">
+      <div x-show="view === 'docs'" class="docs-view view-panel">
         <div x-show="!_partialLoaded.docs" class="view-loading">
           <div class="loading-skeleton skeleton-card"></div>
           <div class="loading-skeleton skeleton-card"></div>
         </div>
       </div>
-      </template>
 
       <!-- Notion browser view -->
       <div x-show="view === 'notion'" class="notion-view view-panel">
@@ -346,74 +342,60 @@
       </div>
 
       <!-- Knowledge Base view -->
-      <template x-if="view === 'knowledge'">
-      <div class="knowledge-view view-panel">
+      <div x-show="view === 'knowledge'" class="knowledge-view view-panel">
         <div x-show="!_partialLoaded.knowledge" class="view-loading">
           <div class="loading-skeleton skeleton-card"></div>
           <div class="loading-skeleton skeleton-card"></div>
         </div>
       </div>
-      </template>
 
       <!-- Decision Log view -->
-      <template x-if="view === 'decisions'">
-      <div class="decisions-view view-panel">
+      <div x-show="view === 'decisions'" class="decisions-view view-panel">
         <div x-show="!_partialLoaded.decisions" class="view-loading">
           <div class="loading-skeleton skeleton-card"></div>
           <div class="loading-skeleton skeleton-card"></div>
         </div>
       </div>
-      </template>
 
       <!-- Projects view -->
-      <template x-if="view === 'projects'">
-      <div class="projects-view view-panel">
+      <div x-show="view === 'projects'" class="projects-view view-panel">
         <div x-show="!_partialLoaded.projects" class="view-loading">
           <div class="loading-skeleton skeleton-card"></div>
           <div class="loading-skeleton skeleton-card"></div>
         </div>
       </div>
-      </template>
 
       <!-- Registry view -->
-      <template x-if="view === 'registry'">
-      <div class="registry-view view-panel">
+      <div x-show="view === 'registry'" class="registry-view view-panel">
         <div x-show="!_partialLoaded.registry" class="view-loading">
           <div class="loading-skeleton skeleton-card"></div>
           <div class="loading-skeleton skeleton-card"></div>
         </div>
       </div>
-      </template>
 
       <!-- System status view -->
-      <template x-if="view === 'status'">
-      <div class="status-view view-panel">
+      <div x-show="view === 'status'" class="status-view view-panel">
         <div x-show="!_partialLoaded.status" class="view-loading">
           <div class="loading-skeleton skeleton-card"></div>
           <div class="loading-skeleton skeleton-card"></div>
         </div>
       </div>
-      </template>
 
       <!-- System Map view -->
-      <template x-if="view === 'system-map'">
-      <div class="system-map-view view-panel view-scroll-container">
+      <div x-show="view === 'system-map'" class="system-map-view view-panel view-scroll-container">
         <div x-show="!_partialLoaded['system-map']" class="view-loading">
           <div class="loading-skeleton skeleton-card"></div>
           <div class="loading-skeleton skeleton-card"></div>
         </div>
       </div>
-      </template>
 
       <!-- Commitments view -->
-      <template x-if="view === 'commitments'">
-      <div class="commitments-view view-panel">
+      <div x-show="view === 'commitments'" class="commitments-view view-panel">
         <div x-show="!_partialLoaded.commitments" class="view-loading">
           <div class="loading-skeleton skeleton-card"></div>
           <div class="loading-skeleton skeleton-card"></div>
         </div>
       </div>
-      </template>
 
       <!-- Dan ↔ Colin Queue view -->
       <div x-show="view === 'dan-colin'" class="dan-colin-view view-panel">
@@ -482,67 +464,55 @@
     </template>
 
     <!-- Factory view -->
-    <template x-if="view === 'factory'">
-    <div class="factory-view view-panel">
+    <div x-show="view === 'factory'" class="factory-view view-panel">
       <div x-show="!_partialLoaded.factory" class="view-loading">
         <div class="loading-skeleton skeleton-card"></div>
         <div class="loading-skeleton skeleton-card"></div>
       </div>
     </div>
-    </template>
 
     <!-- Marketing Ops view -->
-    <template x-if="view === 'marketingOps'">
-    <div class="mktops-view view-panel">
+    <div x-show="view === 'marketingOps'" class="mktops-view view-panel">
       <div x-show="!_partialLoaded.marketingOps" class="view-loading">
         <div class="loading-skeleton skeleton-card"></div>
         <div class="loading-skeleton skeleton-card"></div>
       </div>
     </div>
-    </template>
 
     <!-- ─── Tech Team ────────────────────────────────────── -->
-    <template x-if="view === 'techTeam'">
-    <div class="tech-view view-panel">
+    <div x-show="view === 'techTeam'" class="tech-view view-panel">
       <div x-show="!_partialLoaded.techTeam" class="view-loading">
         <div class="loading-skeleton skeleton-card"></div>
         <div class="loading-skeleton skeleton-card"></div>
       </div>
     </div>
-    </template>
     <!-- ─── /Tech Team ────────────────────────────────────── -->
 
     <!-- ─── Business Model Canvas ───────────────────────── -->
-    <template x-if="view === 'bmc'">
-    <div class="bmc-view view-panel">
+    <div x-show="view === 'bmc'" class="bmc-view view-panel">
       <div x-show="!_partialLoaded.bmc" class="view-loading">
         <div class="loading-skeleton skeleton-card"></div>
         <div class="loading-skeleton skeleton-card"></div>
       </div>
     </div>
-    </template>
     <!-- ─── /Business Model Canvas ───────────────────────── -->
 
     <!-- ─── CRM / Execution Data ────────────────────────── -->
-    <template x-if="view === 'crm'">
-    <div class="crm-view view-panel">
+    <div x-show="view === 'crm'" class="crm-view view-panel">
       <div x-show="!_partialLoaded.crm" class="view-loading">
         <div class="loading-skeleton skeleton-card"></div>
         <div class="loading-skeleton skeleton-card"></div>
       </div>
     </div>
-    </template>
     <!-- ─── /CRM / Execution Data ─────────────────────────── -->
 
     <!-- ─── Inventory & Sales (Ops) ──────────────────────────────────── -->
-    <template x-if="view === 'ops'">
-    <div class="ops-view view-panel">
+    <div x-show="view === 'ops'" class="ops-view view-panel">
       <div x-show="!_partialLoaded.ops" class="view-loading">
         <div class="loading-skeleton skeleton-card"></div>
         <div class="loading-skeleton skeleton-card"></div>
       </div>
     </div>
-    </template>
     <!-- ─── /Inventory & Sales (Ops) ───────────────────────────────── -->
 
     <!-- Detail Overlay -->
@@ -690,14 +660,12 @@
     </div>
 
     <!-- Claude Usage Tracker -->
-    <template x-if="view === 'claude-usage'">
-    <div class="usage-view view-panel">
+    <div x-show="view === 'claude-usage'" class="usage-view view-panel">
       <div x-show="!_partialLoaded['claude-usage']" class="view-loading">
         <div class="loading-skeleton skeleton-card"></div>
         <div class="loading-skeleton skeleton-card"></div>
       </div>
     </div>
-    </template>
 
     </main>
   </div>
