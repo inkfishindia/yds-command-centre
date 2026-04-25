@@ -59,7 +59,24 @@
               </div>
             </template>
           </div>
-          <div class="chat-input-area">
+
+          <!-- Offline banner — shown when chat is unavailable -->
+          <div class="chat-offline-banner" x-show="!chatAvailable" x-cloak role="status" aria-live="polite">
+            <div class="chat-offline-banner__body">
+              <p class="chat-offline-banner__title">Chat offline</p>
+              <p class="chat-offline-banner__sub">No Anthropic API key. Drop a note and Colin will pick it up next session.</p>
+            </div>
+            <button
+              class="chat-offline-banner__cta"
+              type="button"
+              @click="openChatOfflineComposer()"
+              aria-label="Open drop composer for Colin"
+            >
+              Drop a note for Colin
+            </button>
+          </div>
+
+          <div class="chat-input-area" :class="{ 'chat-input-area--offline': !chatAvailable }">
             <textarea
               class="chat-input"
               x-model="inputText"
@@ -67,15 +84,76 @@
               @input="autoResize($event)"
               placeholder="Message Colin..."
               aria-label="Message Colin"
-              :disabled="streaming"
+              :disabled="streaming || !chatAvailable"
               rows="1"
               x-ref="chatInput"
             ></textarea>
-            <button class="btn btn-send" @click="sendMessage()" :disabled="streaming || !inputText.trim()">
+            <button class="btn btn-send" @click="sendMessage()" :disabled="streaming || !inputText.trim() || !chatAvailable">
               Send
             </button>
           </div>
         </div>
+
+        <!-- Offline drop composer backdrop -->
+        <template x-if="chatOfflineComposerOpen">
+          <div
+            class="chat-offline-sheet-backdrop"
+            @click="closeChatOfflineComposer()"
+            aria-hidden="true"
+          ></div>
+        </template>
+
+        <!-- Offline drop composer sheet -->
+        <template x-if="chatOfflineComposerOpen">
+          <div
+            class="chat-offline-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Drop a note for Colin"
+          >
+            <p class="chat-offline-sheet__header">Drop into Colin's queue</p>
+
+            <textarea
+              id="chat-offline-textarea"
+              class="chat-offline-sheet__textarea"
+              placeholder="What do you want Colin to handle?"
+              x-model="chatOfflineBody"
+              rows="5"
+              :disabled="chatOfflineSubmitting"
+              @keydown.escape="closeChatOfflineComposer()"
+              aria-label="Note to drop into Colin's queue"
+            ></textarea>
+
+            <div
+              class="chat-offline-sheet__error"
+              x-show="chatOfflineError"
+              x-text="chatOfflineError"
+              role="alert"
+            ></div>
+
+            <div class="chat-offline-sheet__actions">
+              <button
+                class="chat-offline-sheet__btn chat-offline-sheet__btn--cancel"
+                type="button"
+                @click="closeChatOfflineComposer()"
+                :disabled="chatOfflineSubmitting"
+              >
+                Cancel
+              </button>
+              <button
+                class="chat-offline-sheet__btn chat-offline-sheet__btn--drop"
+                type="button"
+                @click="submitChatOfflineDrop()"
+                :disabled="chatOfflineSubmitting"
+                aria-label="Drop note into Colin's queue"
+              >
+                <span x-show="chatOfflineSubmitting" class="chat-offline-sheet__spinner" aria-hidden="true"></span>
+                <span x-text="chatOfflineSubmitting ? 'Dropping...' : 'Drop for Colin'"></span>
+              </button>
+            </div>
+          </div>
+        </template>
+
         <div class="chat-sidebar">
           <h3 class="sidebar-title">Skills</h3>
           <template x-for="skill in skills" :key="skill.name">

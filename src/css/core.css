@@ -785,6 +785,241 @@ body {
 .chat-input::placeholder { color: var(--text-muted); }
 .chat-input:disabled { opacity: 0.5; }
 
+/* When offline: dim the input area to reinforce disabled state */
+.chat-input-area--offline {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* === Chat Offline Banner === */
+
+.chat-offline-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  margin: 0 1.5rem 0.75rem;
+  background: var(--bg-secondary, #111111);
+  border: 1px solid var(--border, #333333);
+  border-radius: var(--radius, 6px);
+}
+
+.chat-offline-banner__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-offline-banner__title {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #e5e5e5);
+  line-height: 1.4;
+}
+
+.chat-offline-banner__sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary, #aaaaaa);
+  line-height: 1.5;
+}
+
+.chat-offline-banner__cta {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  color: #fff;
+  background: var(--accent, #3b82f6);
+  border: none;
+  border-radius: var(--radius, 6px);
+  cursor: pointer;
+  transition: opacity 150ms ease;
+  white-space: nowrap;
+}
+
+.chat-offline-banner__cta:hover { opacity: 0.85; }
+.chat-offline-banner__cta:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+
+/* Mobile: stack vertically, full-width button */
+@media (max-width: 480px) {
+  .chat-offline-banner {
+    flex-direction: column;
+    gap: 12px;
+    margin: 0 1rem 0.75rem;
+  }
+  .chat-offline-banner__cta {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* === Chat Offline Composer (bottom sheet) === */
+
+.chat-offline-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.6);
+  animation: chatSheetBackdropIn 200ms ease-out;
+}
+
+@keyframes chatSheetBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.chat-offline-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 45;
+  background: var(--bg-card, #161616);
+  border-top: 1px solid var(--border-light, #2a2a2a);
+  border-radius: 12px 12px 0 0;
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  animation: chatSheetUp 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+@keyframes chatSheetUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.chat-offline-sheet__header {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent, #3b82f6);
+}
+
+.chat-offline-sheet__textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px;
+  font-size: 16px;
+  font-family: inherit;
+  line-height: 1.5;
+  color: var(--text-primary, #e5e5e5);
+  background: var(--bg-input, #1a1a1a);
+  border: 1px solid var(--border, #333333);
+  border-radius: 4px;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 150ms ease;
+}
+
+.chat-offline-sheet__textarea:focus {
+  outline: none;
+  border-color: var(--accent, #3b82f6);
+}
+
+.chat-offline-sheet__textarea:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+
+.chat-offline-sheet__textarea::placeholder {
+  color: var(--text-muted, #777777);
+}
+
+.chat-offline-sheet__error {
+  margin-top: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--error, #ef4444);
+  background: rgba(239, 68, 68, 0.08);
+  border-radius: var(--radius, 6px);
+}
+
+.chat-offline-sheet__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+
+.chat-offline-sheet__btn {
+  padding: 10px 18px;
+  font-size: 14px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius, 6px);
+  cursor: pointer;
+  transition: opacity 150ms ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-offline-sheet__btn:hover { opacity: 0.88; }
+.chat-offline-sheet__btn:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+.chat-offline-sheet__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.chat-offline-sheet__btn--cancel {
+  color: var(--text-secondary, #aaaaaa);
+  background: var(--bg-hover, #1e1e1e);
+}
+
+.chat-offline-sheet__btn--drop {
+  color: #fff;
+  background: var(--accent, #3b82f6);
+}
+
+/* Mobile: full-width stacked buttons */
+@media (max-width: 480px) {
+  .chat-offline-sheet__actions {
+    flex-direction: column-reverse;
+  }
+  .chat-offline-sheet__btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Spinner inside the drop button */
+.chat-offline-sheet__spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: chatSheetSpin 0.7s linear infinite;
+}
+
+@keyframes chatSheetSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .chat-offline-sheet {
+    animation: none;
+  }
+  .chat-offline-sheet-backdrop {
+    animation: none;
+  }
+  .chat-offline-sheet__spinner {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
 /* === Buttons === */
 
 .btn {

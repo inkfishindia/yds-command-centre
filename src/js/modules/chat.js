@@ -12,6 +12,12 @@ export function createChatModule() {
     // Approval countdown timers: { [approvalId]: intervalId }
     _approvalTimers: {},
 
+    // Offline drop composer state
+    chatOfflineComposerOpen: false,
+    chatOfflineBody: '',
+    chatOfflineSubmitting: false,
+    chatOfflineError: null,
+
     async sendMessage() {
       const text = this.inputText.trim();
       if (!text || this.streaming) return;
@@ -248,6 +254,89 @@ export function createChatModule() {
         this.streamingText = '';
       } catch (err) {
         console.error('Clear error:', err);
+      }
+    },
+
+    // ── Offline drop composer ─────────────────────────────────────
+
+    openChatOfflineComposer() {
+      this.chatOfflineComposerOpen = true;
+      this.chatOfflineError = null;
+      this.$nextTick(() => {
+        document.getElementById('chat-offline-textarea')?.focus();
+      });
+    },
+
+    closeChatOfflineComposer() {
+      this.chatOfflineComposerOpen = false;
+      this.chatOfflineBody = '';
+      this.chatOfflineError = null;
+    },
+
+    async submitChatOfflineDrop() {
+      if (this.chatOfflineSubmitting) return;
+      const text = (this.chatOfflineBody || '').trim();
+      if (!text) {
+        this.chatOfflineError = 'Please enter something to drop.';
+        return;
+      }
+      this.chatOfflineError = null;
+      this.chatOfflineSubmitting = true;
+
+      try {
+        const response = await fetch('/api/dan-colin/drop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body: text }),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text().catch(() => '');
+          throw new Error(`HTTP ${response.status}: ${errText}`);
+        }
+
+        // Consume SSE stream (approval/done events)
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let currentEventType = 'message';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              currentEventType = line.slice(7).trim();
+              continue;
+            }
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (currentEventType === 'approval') {
+                  this._addApprovalWithTimer(data);
+                } else if (currentEventType === 'error') {
+                  throw new Error(data.error || 'Drop failed');
+                }
+              } catch (parseErr) {
+                if (parseErr.message && !parseErr.message.startsWith('JSON')) throw parseErr;
+              }
+              currentEventType = 'message';
+            }
+          }
+        }
+
+        // Success
+        this.chatOfflineSubmitting = false;
+        this.closeChatOfflineComposer();
+        this.showSuccess("Dropped to Colin's queue");
+      } catch (err) {
+        console.error('[chat] offline drop error:', err);
+        this.chatOfflineSubmitting = false;
+        this.chatOfflineError = err.message || 'Drop failed. Try again.';
       }
     },
   };
