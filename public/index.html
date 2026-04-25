@@ -416,14 +416,12 @@
       </template>
 
       <!-- Dan ↔ Colin Queue view -->
-      <template x-if="view === 'dan-colin'">
-      <div class="dan-colin-view view-panel">
+      <div x-show="view === 'dan-colin'" class="dan-colin-view view-panel">
         <div x-show="!_partialLoaded['dan-colin']" class="view-loading">
           <div class="loading-skeleton skeleton-card"></div>
           <div class="loading-skeleton skeleton-card"></div>
         </div>
       </div>
-      </template>
 
     <!-- Edit Dropdown -->
     <template x-if="editDropdown">
