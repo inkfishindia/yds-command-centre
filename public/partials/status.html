@@ -8,6 +8,7 @@
       </div>
     </div>
     <div class="view-header-actions">
+      <span class="ai-provider-badge" :class="getAiProvider() === 'deepseek' ? 'badge-deepseek' : 'badge-anthropic'" x-text="getAiProvider().toUpperCase() + ' • ' + getAiModel()"></span>
       <span class="org-last-refresh" x-show="systemStatus?.sourceHealth?.updatedAt" x-text="'Checked ' + formatSystemStatusDate(systemStatus?.sourceHealth?.updatedAt)"></span>
       <button class="btn btn-small btn-icon" :class="systemSyncing && 'btn-spinning'" @click="syncReadModels()" :disabled="systemSyncing">
         <span class="refresh-icon">&#x21bb;</span> Sync All

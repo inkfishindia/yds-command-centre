@@ -1,0 +1,1427 @@
+<!-- Daily Sales Dashboard partial -->
+<!-- Loaded lazily via _loadPartial('daily-sales') -->
+
+<!-- ── View init + ESC key listener (drill sheet / dropdown) ─── -->
+<!-- @keydown.escape.window is bound to this wrapper's lifecycle —
+     Alpine cleans it up automatically if the element ever leaves the DOM,
+     no manual addEventListener / removeEventListener bookkeeping. -->
+<div
+  x-init="
+    $watch('view', v => {
+      if (v === 'daily-sales') {
+        _filterFromHash();
+        loadDailySales();
+      }
+    });
+    if (view === 'daily-sales') {
+      _filterFromHash();
+    }
+  "
+  @keydown.escape.window="
+    if (dailySalesDrill.open) { closeDrillSheet(); return; }
+    if (_dsFilterDropdownOpen) { closeDsFilterDropdown(); }
+  "
+  style="display:contents"
+>
+
+<!-- Page header -->
+<div class="ds-page-header">
+  <h2 class="ds-page-title">Daily Sales</h2>
+  <div class="ds-page-actions">
+    <a
+      x-show="dailySales?.source?.sourceUrl"
+      :href="dailySales?.source?.sourceUrl"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="ds-refresh-btn"
+      aria-label="Open source spreadsheet in new tab"
+    >
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M11 1H3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5l-4-4zm2 12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h6v3a1 1 0 0 0 1 1h2v7z" fill="currentColor" opacity=".4"/>
+        <path d="M9.5 6.5h3M9.5 9h3M9.5 11.5h3M3.5 6.5h4M3.5 9h4M3.5 11.5h4" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity=".7"/>
+      </svg>
+      <span>Open Sheet</span>
+    </a>
+    <button
+      class="ds-refresh-btn"
+      @click="loadDailySales()"
+      :disabled="dailySalesLoading"
+      aria-label="Refresh sales data"
+    >
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M13.65 2.35A8 8 0 1 0 15 8h-2a6 6 0 1 1-1.05-3.36L10 6h5V1l-1.35 1.35z" fill="currentColor"/>
+      </svg>
+      <span x-text="dailySalesLoading ? 'Loading…' : 'Refresh'"></span>
+    </button>
+  </div>
+</div>
+
+<!-- ── v4 Freshness Banner ───────────────────────────────────────── -->
+<!-- Sticky below page header (z-index 8), above filter strip (z-index 9). -->
+<div
+  class="ds-freshness-banner"
+  :class="{ 'ds-freshness-banner--unavailable': !dailySales?.freshness?.dataCutoff }"
+  role="status"
+  aria-live="polite"
+  aria-label="Data freshness"
+  x-show="dailySales"
+>
+  <p class="ds-freshness-banner__primary">
+    <span
+      x-show="dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff"
+      x-text="'Data through ' + formatDataCutoff(dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff)"
+    ></span>
+    <span
+      x-show="!dailySales?.yesterday?.date && !dailySales?.freshness?.dataCutoff"
+    >Data unavailable — Sheets unreachable</span>
+  </p>
+  <p class="ds-freshness-banner__secondary">
+    <span
+      x-show="dailySales?.freshness?.latestOrder?.time"
+      x-text="dailySales?.freshness?.latestOrder?.time + ' ' + (dailySales?.yesterday?.date === dailySales?.freshness?.dataCutoff ? 'yesterday' : 'today')"
+    ></span>
+    <span
+      x-show="!dailySales?.freshness?.latestOrder?.time && dailySales?.freshness?.fetchedAt"
+      x-text="'Fetched ' + formatRelativeTime(dailySales?.freshness?.fetchedAt)"
+    ></span>
+  </p>
+</div>
+
+<!-- ── Phase 2: Filter Strip ─────────────────────────────────────── -->
+<!-- Sticky below page header, above content. z-index 9 (below nav at 10). -->
+<div
+  class="ds-filter-strip"
+  role="region"
+  aria-label="Sales filters"
+  aria-live="polite"
+>
+  <!-- Date range -->
+  <div class="ds-filter-group">
+    <div class="ds-filter-dropdown" x-data>
+      <button
+        class="ds-filter-dropdown__trigger"
+        :class="{ 'ds-filter-dropdown__trigger--active': dailySalesFilters.from || dailySalesFilters.to, 'ds-filter-dropdown__trigger--open': _dsFilterDropdownOpen === 'date' }"
+        @click="toggleDsFilterDropdown('date')"
+        aria-haspopup="listbox"
+        :aria-expanded="_dsFilterDropdownOpen === 'date'"
+        aria-label="Date range filter"
+        :disabled="dailySalesLoading"
+      >
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="1" y="2" width="14" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M5 1v3M11 1v3M1 6h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span x-text="dsDateRangeLabel()"></span>
+        <svg class="ds-filter-dropdown__trigger-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <div
+        x-show="_dsFilterDropdownOpen === 'date'"
+        class="ds-filter-dropdown__panel"
+        @click.outside="closeDsFilterDropdown()"
+        role="listbox"
+        aria-label="Date range options"
+      >
+        <div class="ds-filter-dropdown__panel-header">
+          Date Range
+          <button class="ds-filter-dropdown__close" @click="closeDsFilterDropdown()" aria-label="Close date filter">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('today')" role="option">Today</div>
+        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('yesterday')" role="option">Yesterday</div>
+        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('7d')" role="option">Last 7 days</div>
+        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('30d')" role="option">Last 30 days</div>
+        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('mtd')" role="option">Month to date</div>
+        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('ytd')" role="option">FY Year to date</div>
+        <div class="ds-filter-dropdown__panel-header" style="border-top: 1px solid var(--border); margin-top: 4px;">Custom range</div>
+        <div style="padding: 8px 12px; display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-size: 11px; color: var(--text-secondary);">From
+            <input
+              type="date"
+              class="ds-date-input"
+              :value="dailySalesFilters.from || ''"
+              @change="setDailyFilter('from', $event.target.value || null)"
+            />
+          </label>
+          <label style="font-size: 11px; color: var(--text-secondary);">To
+            <input
+              type="date"
+              class="ds-date-input"
+              :value="dailySalesFilters.to || ''"
+              @change="setDailyFilter('to', $event.target.value || null)"
+            />
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Channel multi-select -->
+  <div class="ds-filter-group">
+    <div class="ds-filter-dropdown">
+      <button
+        class="ds-filter-dropdown__trigger"
+        :class="{ 'ds-filter-dropdown__trigger--active': dailySalesFilters.channels && dailySalesFilters.channels.length > 0, 'ds-filter-dropdown__trigger--open': _dsFilterDropdownOpen === 'channel' }"
+        @click="toggleDsFilterDropdown('channel')"
+        aria-haspopup="listbox"
+        :aria-expanded="_dsFilterDropdownOpen === 'channel'"
+        aria-label="Channel filter"
+        :disabled="dailySalesLoading"
+      >
+        Channel
+        <span
+          class="ds-filter-chip--active-count"
+          x-show="dailySalesFilters.channels && dailySalesFilters.channels.length > 0"
+          x-text="dailySalesFilters.channels.length"
+        ></span>
+        <svg class="ds-filter-dropdown__trigger-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <div
+        x-show="_dsFilterDropdownOpen === 'channel'"
+        class="ds-filter-dropdown__panel"
+        @click.outside="closeDsFilterDropdown()"
+        role="listbox"
+        aria-label="Channel options"
+        aria-multiselectable="true"
+      >
+        <div class="ds-filter-dropdown__panel-header">
+          Channels
+          <button class="ds-filter-dropdown__close" @click="closeDsFilterDropdown()" aria-label="Close channel filter">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <template x-for="ch in (dailySales?.filters?.available?.channels || [])" :key="ch">
+          <label
+            class="ds-filter-dropdown__item"
+            :class="{ 'ds-filter-dropdown__item--selected': isDailyChannelActive(ch) }"
+            role="option"
+            :aria-selected="isDailyChannelActive(ch)"
+          >
+            <input
+              type="checkbox"
+              :checked="isDailyChannelActive(ch)"
+              @change="toggleDailyChannel(ch)"
+            />
+            <span x-text="ch"></span>
+          </label>
+        </template>
+        <div
+          x-show="!dailySales?.filters?.available?.channels?.length"
+          class="ds-filter-dropdown__item"
+          style="color: var(--text-secondary);"
+        >No channels available</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Type pills — rendered dynamically from filters.available.orderTypes
+       so canonical values (B2C / DS / Manual / Stores) auto-appear once tagged in the sheet -->
+  <div class="ds-filter-group" role="group" aria-label="Order type filter">
+    <button
+      class="ds-filter-chip"
+      :class="{ 'ds-filter-chip--active': !dailySalesFilters.orderType || dailySalesFilters.orderType === 'all' }"
+      @click="setDailyFilter('orderType', 'all')"
+      :disabled="dailySalesLoading"
+    >All</button>
+    <template x-for="ot in (dailySales?.filters?.available?.orderTypes ?? []).filter(v => v && v !== '(unknown)')" :key="ot">
+      <button
+        class="ds-filter-chip"
+        :class="{ 'ds-filter-chip--active': dailySalesFilters.orderType === ot }"
+        @click="setDailyFilter('orderType', ot)"
+        :disabled="dailySalesLoading"
+        x-text="ot"
+      ></button>
+    </template>
+  </div>
+
+  <!-- Payment Mode pills -->
+  <div class="ds-filter-group" role="group" aria-label="Payment mode filter">
+    <template x-for="pm in (['all', ...(dailySales?.filters?.available?.paymentModes || [])])" :key="pm">
+      <button
+        class="ds-filter-chip"
+        :class="{ 'ds-filter-chip--active': pm === 'all' ? (!dailySalesFilters.paymentMode || dailySalesFilters.paymentMode === 'all') : dailySalesFilters.paymentMode === pm }"
+        @click="setDailyFilter('paymentMode', pm)"
+        :disabled="dailySalesLoading"
+        x-text="pm === 'all' ? 'All Payments' : pm"
+      ></button>
+    </template>
+  </div>
+
+  <!-- Status dropdown -->
+  <div class="ds-filter-group">
+    <div class="ds-filter-dropdown">
+      <button
+        class="ds-filter-dropdown__trigger"
+        :class="{ 'ds-filter-dropdown__trigger--active': dailySalesFilters.status && dailySalesFilters.status !== 'realized', 'ds-filter-dropdown__trigger--open': _dsFilterDropdownOpen === 'status' }"
+        @click="toggleDsFilterDropdown('status')"
+        aria-haspopup="listbox"
+        :aria-expanded="_dsFilterDropdownOpen === 'status'"
+        aria-label="Status filter"
+        :disabled="dailySalesLoading"
+      >
+        <span x-text="dailySalesFilters.status === 'realized' ? 'Realized' : (dailySalesFilters.status === 'all' ? 'All Statuses' : dailySalesFilters.status)"></span>
+        <svg class="ds-filter-dropdown__trigger-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <div
+        x-show="_dsFilterDropdownOpen === 'status'"
+        class="ds-filter-dropdown__panel"
+        @click.outside="closeDsFilterDropdown()"
+        role="listbox"
+        aria-label="Status options"
+      >
+        <div class="ds-filter-dropdown__panel-header">
+          Status
+          <button class="ds-filter-dropdown__close" @click="closeDsFilterDropdown()" aria-label="Close status filter">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <div
+          class="ds-filter-dropdown__item"
+          :class="{ 'ds-filter-dropdown__item--selected': dailySalesFilters.status === 'realized' }"
+          @click="setDailyFilter('status', 'realized'); closeDsFilterDropdown()"
+          role="option"
+          :aria-selected="dailySalesFilters.status === 'realized'"
+        >Realized (default)</div>
+        <div
+          class="ds-filter-dropdown__item"
+          :class="{ 'ds-filter-dropdown__item--selected': dailySalesFilters.status === 'all' }"
+          @click="setDailyFilter('status', 'all'); closeDsFilterDropdown()"
+          role="option"
+          :aria-selected="dailySalesFilters.status === 'all'"
+        >All Statuses</div>
+        <template x-for="st in (dailySales?.filters?.available?.statuses || [])" :key="st">
+          <div
+            class="ds-filter-dropdown__item"
+            :class="{ 'ds-filter-dropdown__item--selected': dailySalesFilters.status === st }"
+            @click="setDailyFilter('status', st); closeDsFilterDropdown()"
+            role="option"
+            :aria-selected="dailySalesFilters.status === st"
+            x-text="st"
+          ></div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset button — only visible when filters are non-default -->
+  <div class="ds-filter-group" x-show="isDailyFilterActive()">
+    <button
+      class="ds-filter-reset"
+      @click="resetDailyFilters()"
+      :disabled="dailySalesLoading"
+      aria-label="Reset all filters"
+    >
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+        <path d="M2 2l6 6M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      Reset
+    </button>
+  </div>
+</div>
+
+<!-- ── Loading skeleton ─────────────────────────────────────── -->
+<div x-show="dailySalesLoading" class="ds-loading">
+  <div class="loading-skeleton skeleton-stat-card"></div>
+  <div class="loading-skeleton skeleton-stat-card"></div>
+  <div class="loading-skeleton skeleton-stat-card"></div>
+  <div class="loading-skeleton skeleton-chart"></div>
+  <div class="loading-skeleton skeleton-row"></div>
+  <div class="loading-skeleton skeleton-row"></div>
+</div>
+
+<!-- ── Error state ───────────────────────────────────────────── -->
+<div x-show="!dailySalesLoading && dailySalesError" class="ds-content">
+  <div class="ds-error" role="alert">
+    <svg class="ds-error-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+    </svg>
+    <p class="ds-error-message" x-text="dailySalesError"></p>
+    <div class="ds-error-actions">
+      <button @click="loadDailySales()" type="button">Retry</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main content ──────────────────────────────────────────── -->
+<div x-show="!dailySalesLoading && !dailySalesError && dailySales" class="ds-content">
+
+  <!-- Month tab unavailable notice -->
+  <div
+    x-show="dailySales && dailySales.source?.monthTabAvailable === false"
+    class="ds-notice"
+    role="status"
+  >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0zm-9 3.75h.008v.008H12v-.008z"/>
+    </svg>
+    <span>
+      Current month tab not yet created in source sheet
+      (<span x-text="dailySales?.source?.currentMonthTabName" class="ds-footer-source"></span>).
+      Today and MTD figures will show zero until the sheet is created.
+    </span>
+  </div>
+
+  <!-- YTD tab unavailable notice -->
+  <div
+    x-show="dailySales && dailySales.source?.ytdAvailable === false"
+    class="ds-notice"
+    role="status"
+  >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0zm-9 3.75h.008v.008H12v-.008z"/>
+    </svg>
+    <span>
+      Year-to-date tab
+      (<span x-text="dailySales?.source?.ytdDisplayLabel || dailySales?.source?.ytdTabName" class="ds-footer-source"></span>)
+      not found in source sheet. YTD figures will show zero.
+    </span>
+  </div>
+
+  <!-- ── Phase 1: Realized Badge ────────────────────────────── -->
+  <!-- Placement: above YTD strip, right of period label row -->
+  <div
+    x-show="dailySales?.dataQuality"
+    class="ds-realized-badge-wrap"
+  >
+    <button
+      class="ds-realized-badge"
+      @click="toggleRealizedBreakdown()"
+      :aria-expanded="dailySalesRealizedExpanded"
+      aria-label="Toggle realization breakdown"
+    >
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M4.5 7L6.5 9L9.5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="ds-realized-badge__count">
+        <span x-text="dailySales?.dataQuality?.realized?.toLocaleString('en-IN') ?? '—'"></span>
+        of
+        <span x-text="dailySales?.dataQuality?.total?.toLocaleString('en-IN') ?? '—'"></span>
+        realized ·
+        <span x-text="(dailySales?.dataQuality?.realizedPct ?? 0).toFixed(1) + '%'"></span>
+      </span>
+      <svg
+        class="ds-realized-badge__arrow"
+        :class="{ 'ds-realized-badge--expanded': dailySalesRealizedExpanded }"
+        width="16" height="16" viewBox="0 0 16 16" fill="none"
+        aria-hidden="true"
+      >
+        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+
+    <!-- Breakdown panel -->
+    <div
+      class="ds-realized-badge__breakdown"
+      :class="{ 'ds-realized-badge--expanded': dailySalesRealizedExpanded }"
+      aria-live="polite"
+    >
+      <!-- Realized row -->
+      <div class="ds-realized-badge__breakdown-row">
+        <span class="ds-realized-badge__breakdown-status">Realized</span>
+        <div class="ds-realized-badge__breakdown-stats">
+          <span class="ds-realized-badge__breakdown-count" x-text="(dailySales?.dataQuality?.realized ?? 0).toLocaleString('en-IN')"></span>
+          <span class="ds-realized-badge__breakdown-pct" x-text="(dailySales?.dataQuality?.realizedPct ?? 0).toFixed(1) + '%'"></span>
+        </div>
+      </div>
+      <!-- Excluded statuses -->
+      <template x-for="(row, idx) in (dailySales?.dataQuality?.excludedByStatus ?? [])" :key="idx">
+        <div class="ds-realized-badge__breakdown-row">
+          <span class="ds-realized-badge__breakdown-status" x-text="row.status"></span>
+          <div class="ds-realized-badge__breakdown-stats">
+            <span class="ds-realized-badge__breakdown-count" x-text="row.count.toLocaleString('en-IN')"></span>
+            <span class="ds-realized-badge__breakdown-pct" x-text="dsFormatPctOfTotal(row.count, dailySales?.dataQuality?.total)"></span>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ── 1. Yesterday Strip (v4 hero) ─────────────────────────── -->
+  <div>
+    <p class="ds-period-label">
+      Yesterday
+      <span x-show="dailySales?.yesterday?.date" x-text="' · ' + formatCutoffShort(dailySales?.yesterday?.date)"></span>
+    </p>
+    <div class="ds-hero-strip">
+
+      <!-- Orders -->
+      <div class="ds-stat-card ds-stat-card--dual">
+        <span class="ds-stat-label">Orders</span>
+        <!-- Placed (primary) -->
+        <div class="ds-stat-metric-group">
+          <span class="ds-stat-metric-value" x-text="dailySales?.yesterday?.allStatuses?.orders ?? '—'"></span>
+          <span class="ds-stat-metric-label">placed</span>
+        </div>
+        <!-- Realized (secondary) -->
+        <div class="ds-stat-metric-group ds-stat-metric-group--secondary">
+          <span class="ds-stat-metric-value" x-text="dailySales?.yesterday?.orders ?? '—'"></span>
+          <span class="ds-stat-metric-label">realized</span>
+        </div>
+        <!-- Delta vs day before (placed-vs-placed) -->
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.yesterday?.allStatuses?.vsDayBefore?.orders?.delta)"
+          x-show="dailySales?.yesterday?.allStatuses?.vsDayBefore?.orders != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.yesterday?.allStatuses?.vsDayBefore?.orders?.delta)"></span>
+          <span x-text="Math.abs(dailySales?.yesterday?.allStatuses?.vsDayBefore?.orders?.delta ?? 0)"></span>
+          <span>(<span x-text="formatPct(dailySales?.yesterday?.allStatuses?.vsDayBefore?.orders?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs day before</span>
+        </div>
+      </div>
+
+      <!-- Revenue -->
+      <div class="ds-stat-card ds-stat-card--dual">
+        <span class="ds-stat-label">Revenue</span>
+        <!-- Placed (primary) -->
+        <div class="ds-stat-metric-group">
+          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.yesterday?.allStatuses?.revenue)"></span>
+          <span class="ds-stat-metric-label">placed</span>
+        </div>
+        <!-- Realized (secondary) -->
+        <div class="ds-stat-metric-group ds-stat-metric-group--secondary">
+          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.yesterday?.revenue)"></span>
+          <span class="ds-stat-metric-label">realized</span>
+        </div>
+        <!-- Delta vs day before -->
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.yesterday?.allStatuses?.vsDayBefore?.revenue?.delta)"
+          x-show="dailySales?.yesterday?.allStatuses?.vsDayBefore?.revenue != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.yesterday?.allStatuses?.vsDayBefore?.revenue?.delta)"></span>
+          <span x-text="formatINR(Math.abs(dailySales?.yesterday?.allStatuses?.vsDayBefore?.revenue?.delta ?? 0))"></span>
+          <span>(<span x-text="formatPct(dailySales?.yesterday?.allStatuses?.vsDayBefore?.revenue?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs day before</span>
+        </div>
+      </div>
+
+      <!-- AOV -->
+      <div class="ds-stat-card ds-stat-card--dual">
+        <span class="ds-stat-label">AOV</span>
+        <!-- Placed (primary) -->
+        <div class="ds-stat-metric-group">
+          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.yesterday?.allStatuses?.aov)"></span>
+          <span class="ds-stat-metric-label">avg placed</span>
+        </div>
+        <!-- Realized (secondary) -->
+        <div class="ds-stat-metric-group ds-stat-metric-group--secondary">
+          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.yesterday?.aov)"></span>
+          <span class="ds-stat-metric-label">realized</span>
+        </div>
+        <!-- Delta vs day before -->
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.yesterday?.allStatuses?.vsDayBefore?.aov?.delta)"
+          x-show="dailySales?.yesterday?.allStatuses?.vsDayBefore?.aov != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.yesterday?.allStatuses?.vsDayBefore?.aov?.delta)"></span>
+          <span x-text="formatINR(Math.abs(dailySales?.yesterday?.allStatuses?.vsDayBefore?.aov?.delta ?? 0))"></span>
+          <span>(<span x-text="formatPct(dailySales?.yesterday?.allStatuses?.vsDayBefore?.aov?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs day before</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 2. Today Strip (v4.1 — conditional, renders only when data exists) ── -->
+  <div x-show="(dailySales?.today?.allStatuses?.orders ?? 0) > 0">
+    <p class="ds-period-label">Today (in progress)</p>
+    <div class="ds-today-strip">
+
+      <!-- Orders -->
+      <div class="ds-stat-card ds-stat-card--dual">
+        <span class="ds-stat-label">Orders</span>
+        <!-- Placed (primary) -->
+        <div class="ds-stat-metric-group">
+          <span class="ds-stat-metric-value" x-text="dailySales?.today?.allStatuses?.orders ?? '—'"></span>
+          <span class="ds-stat-metric-label">placed</span>
+        </div>
+        <!-- Realized (secondary) -->
+        <div class="ds-stat-metric-group ds-stat-metric-group--secondary">
+          <span class="ds-stat-metric-value" x-text="dailySales?.today?.orders ?? '—'"></span>
+          <span class="ds-stat-metric-label">realized</span>
+        </div>
+        <!-- Delta vs yesterday so far -->
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.today?.allStatuses?.vsYesterday?.orders?.delta)"
+          x-show="dailySales?.today?.allStatuses?.vsYesterday?.orders != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.today?.allStatuses?.vsYesterday?.orders?.delta)"></span>
+          <span x-text="Math.abs(dailySales?.today?.allStatuses?.vsYesterday?.orders?.delta ?? 0)"></span>
+          <span>(<span x-text="formatPct(dailySales?.today?.allStatuses?.vsYesterday?.orders?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs yesterday so far</span>
+        </div>
+      </div>
+
+      <!-- Revenue -->
+      <div class="ds-stat-card ds-stat-card--dual">
+        <span class="ds-stat-label">Revenue</span>
+        <!-- Placed (primary) -->
+        <div class="ds-stat-metric-group">
+          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.today?.allStatuses?.revenue)"></span>
+          <span class="ds-stat-metric-label">placed</span>
+        </div>
+        <!-- Realized (secondary) -->
+        <div class="ds-stat-metric-group ds-stat-metric-group--secondary">
+          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.today?.revenue)"></span>
+          <span class="ds-stat-metric-label">realized</span>
+        </div>
+        <!-- Delta vs yesterday so far -->
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.today?.allStatuses?.vsYesterday?.revenue?.delta)"
+          x-show="dailySales?.today?.allStatuses?.vsYesterday?.revenue != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.today?.allStatuses?.vsYesterday?.revenue?.delta)"></span>
+          <span x-text="formatINR(Math.abs(dailySales?.today?.allStatuses?.vsYesterday?.revenue?.delta ?? 0))"></span>
+          <span>(<span x-text="formatPct(dailySales?.today?.allStatuses?.vsYesterday?.revenue?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs yesterday so far</span>
+        </div>
+      </div>
+
+      <!-- AOV -->
+      <div class="ds-stat-card ds-stat-card--dual">
+        <span class="ds-stat-label">AOV</span>
+        <!-- Placed (primary) -->
+        <div class="ds-stat-metric-group">
+          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.today?.allStatuses?.aov)"></span>
+          <span class="ds-stat-metric-label">avg placed</span>
+        </div>
+        <!-- Realized (secondary) -->
+        <div class="ds-stat-metric-group ds-stat-metric-group--secondary">
+          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.today?.aov)"></span>
+          <span class="ds-stat-metric-label">realized</span>
+        </div>
+        <!-- Delta vs yesterday so far -->
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.today?.allStatuses?.vsYesterday?.aov?.delta)"
+          x-show="dailySales?.today?.allStatuses?.vsYesterday?.aov != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.today?.allStatuses?.vsYesterday?.aov?.delta)"></span>
+          <span x-text="formatINR(Math.abs(dailySales?.today?.allStatuses?.vsYesterday?.aov?.delta ?? 0))"></span>
+          <span>(<span x-text="formatPct(dailySales?.today?.allStatuses?.vsYesterday?.aov?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs yesterday so far</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 3. Month-to-Date Strip ─────────────────────────────── -->
+  <div>
+    <p class="ds-period-label">
+      Month-to-Date
+      <span x-show="dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff" x-text="' · through ' + formatCutoffShort(dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff)"></span>
+    </p>
+    <div class="ds-mtd-strip">
+
+      <div class="ds-stat-card">
+        <span class="ds-stat-label">Orders</span>
+        <span class="ds-stat-value" x-text="dailySales?.mtd?.orders ?? '—'"></span>
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.mtd?.vsLastMonthSameDate?.orders?.delta)"
+          x-show="dailySales?.mtd?.vsLastMonthSameDate?.orders != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.mtd?.vsLastMonthSameDate?.orders?.delta)"></span>
+          <span x-text="Math.abs(dailySales?.mtd?.vsLastMonthSameDate?.orders?.delta ?? 0)"></span>
+          <span>(<span x-text="formatPct(dailySales?.mtd?.vsLastMonthSameDate?.orders?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs last month</span>
+        </div>
+      </div>
+
+      <div class="ds-stat-card">
+        <span class="ds-stat-label">Revenue</span>
+        <span class="ds-stat-value" x-text="formatINR(dailySales?.mtd?.revenue)"></span>
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.mtd?.vsLastMonthSameDate?.revenue?.delta)"
+          x-show="dailySales?.mtd?.vsLastMonthSameDate?.revenue != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.mtd?.vsLastMonthSameDate?.revenue?.delta)"></span>
+          <span x-text="formatINR(Math.abs(dailySales?.mtd?.vsLastMonthSameDate?.revenue?.delta ?? 0))"></span>
+          <span>(<span x-text="formatPct(dailySales?.mtd?.vsLastMonthSameDate?.revenue?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs last month</span>
+        </div>
+      </div>
+
+      <div class="ds-stat-card">
+        <span class="ds-stat-label">AOV</span>
+        <span class="ds-stat-value" x-text="formatINR(dailySales?.mtd?.aov)"></span>
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.mtd?.vsLastMonthSameDate?.aov?.delta)"
+          x-show="dailySales?.mtd?.vsLastMonthSameDate?.aov != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.mtd?.vsLastMonthSameDate?.aov?.delta)"></span>
+          <span x-text="formatINR(Math.abs(dailySales?.mtd?.vsLastMonthSameDate?.aov?.delta ?? 0))"></span>
+          <span>(<span x-text="formatPct(dailySales?.mtd?.vsLastMonthSameDate?.aov?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs last month</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 3. Year-to-Date Strip ──────────────────────────────── -->
+  <div>
+    <p class="ds-period-label">
+      <span x-text="(dailySales?.source?.ytdDisplayLabel || 'FY') + ' Year-to-Date'"></span>
+      <span x-show="dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff" x-text="' · through ' + formatCutoffShort(dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff)"></span>
+    </p>
+    <div class="ds-ytd-strip">
+
+      <div class="ds-stat-card">
+        <span class="ds-stat-label">Orders</span>
+        <span class="ds-stat-value" x-text="dailySales?.ytd?.orders ?? '—'"></span>
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.ytd?.vsLastFY?.orders?.delta)"
+          x-show="dailySales?.ytd?.vsLastFY?.orders != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.ytd?.vsLastFY?.orders?.delta)"></span>
+          <span x-text="Math.abs(dailySales?.ytd?.vsLastFY?.orders?.delta ?? 0)"></span>
+          <span>(<span x-text="formatPct(dailySales?.ytd?.vsLastFY?.orders?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs <span x-text="dailySales?.ytd?.vsLastFY?.lastFYDisplayLabel"></span> same period</span>
+        </div>
+      </div>
+
+      <div class="ds-stat-card">
+        <span class="ds-stat-label">Revenue</span>
+        <span class="ds-stat-value" x-text="formatINR(dailySales?.ytd?.revenue)"></span>
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.ytd?.vsLastFY?.revenue?.delta)"
+          x-show="dailySales?.ytd?.vsLastFY?.revenue != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.ytd?.vsLastFY?.revenue?.delta)"></span>
+          <span x-text="formatINR(Math.abs(dailySales?.ytd?.vsLastFY?.revenue?.delta ?? 0))"></span>
+          <span>(<span x-text="formatPct(dailySales?.ytd?.vsLastFY?.revenue?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs <span x-text="dailySales?.ytd?.vsLastFY?.lastFYDisplayLabel"></span> same period</span>
+        </div>
+      </div>
+
+      <div class="ds-stat-card">
+        <span class="ds-stat-label">AOV</span>
+        <span class="ds-stat-value" x-text="formatINR(dailySales?.ytd?.aov)"></span>
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.ytd?.vsLastFY?.aov?.delta)"
+          x-show="dailySales?.ytd?.vsLastFY?.aov != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.ytd?.vsLastFY?.aov?.delta)"></span>
+          <span x-text="formatINR(Math.abs(dailySales?.ytd?.vsLastFY?.aov?.delta ?? 0))"></span>
+          <span>(<span x-text="formatPct(dailySales?.ytd?.vsLastFY?.aov?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs <span x-text="dailySales?.ytd?.vsLastFY?.lastFYDisplayLabel"></span> same period</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 4. 30-Day Trend Chart ──────────────────────────────── -->
+  <div class="ds-trend-section">
+    <div class="ds-trend-header">
+      <p class="ds-period-label">30-Day Trend</p>
+      <div class="ds-trend-toggle" role="group" aria-label="Trend metric toggle">
+        <button
+          class="ds-trend-toggle-btn"
+          :class="{ 'ds-trend-toggle-btn--active': _dsTrendMetric === 'revenue' }"
+          @click="setDsTrendMetric('revenue')"
+        >Revenue</button>
+        <button
+          class="ds-trend-toggle-btn"
+          :class="{ 'ds-trend-toggle-btn--active': _dsTrendMetric === 'orders' }"
+          @click="setDsTrendMetric('orders')"
+        >Orders</button>
+        <button
+          class="ds-trend-toggle-btn"
+          :class="{ 'ds-trend-toggle-btn--active': _dsTrendMetric === 'aov' }"
+          @click="setDsTrendMetric('aov')"
+        >AOV</button>
+      </div>
+    </div>
+
+    <!-- No trend data -->
+    <div
+      x-show="!_dsTrendPaths && dailySales?.trend30d?.length === 0"
+      class="ds-empty"
+    >
+      <svg class="ds-empty-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125z"/>
+      </svg>
+      <p class="ds-empty-title">No trend data</p>
+      <p class="ds-empty-text">30-day history will appear once data is available.</p>
+    </div>
+
+    <!-- Chart -->
+    <div
+      x-show="_dsTrendPaths"
+      class="ds-trend-chart"
+      @mouseleave="dsTrendHideTooltip()"
+    >
+      <svg
+        class="ds-trend-svg"
+        :viewBox="`0 0 ${_dsTrendPaths?.W ?? 800} ${_dsTrendPaths?.H ?? 260}`"
+        preserveAspectRatio="xMidYMid meet"
+        aria-label="30-day revenue and orders trend"
+        role="img"
+      >
+        <!-- Grid lines -->
+        <g x-show="_dsTrendPaths?.gridLines">
+          <template x-for="(gl, gi) in (_dsTrendPaths?.gridLines || [])" :key="gi">
+            <g>
+              <line
+                class="ds-trend-grid-line"
+                :x1="(_dsTrendPaths?.W ?? 800) - (_dsTrendPaths?.W ?? 800)"
+                :x2="_dsTrendPaths?.W ?? 800"
+                :y1="gl.y"
+                :y2="gl.y"
+              ></line>
+              <!-- Left Y-axis label (revenue) -->
+              <text
+                class="ds-trend-axis-text ds-trend-axis-text--left"
+                :x="48"
+                :y="Number(gl.y) + 3"
+                x-text="gl.revenueLabel"
+              ></text>
+            </g>
+          </template>
+        </g>
+
+        <!-- Revenue area fill -->
+        <path
+          x-show="_dsTrendPaths?.revenueFill"
+          class="ds-trend-fill--revenue"
+          :d="_dsTrendPaths?.revenueFill"
+        ></path>
+
+        <!-- Orders area fill -->
+        <path
+          x-show="_dsTrendPaths?.ordersFill"
+          class="ds-trend-fill--orders"
+          :d="_dsTrendPaths?.ordersFill"
+        ></path>
+
+        <!-- Revenue / primary line -->
+        <path
+          x-show="_dsTrendPaths?.primaryPath"
+          class="ds-trend-line--revenue"
+          :d="_dsTrendPaths?.primaryPath"
+        ></path>
+
+        <!-- Orders / secondary line -->
+        <path
+          x-show="_dsTrendPaths?.secondaryPath"
+          class="ds-trend-line--orders"
+          :d="_dsTrendPaths?.secondaryPath"
+        ></path>
+
+        <!-- X-axis labels -->
+        <g x-show="_dsTrendPaths?.xLabels">
+          <template x-for="(xl, xi) in (_dsTrendPaths?.xLabels || [])" :key="xi">
+            <text
+              class="ds-trend-axis-text"
+              :x="xl.x"
+              :y="(_dsTrendPaths?.H ?? 260) - 4"
+              x-text="xl.label"
+            ></text>
+          </template>
+        </g>
+
+        <!-- Invisible hover columns (one per data point) -->
+        <g x-show="_dsTrendPaths?.hoverCols">
+          <template x-for="(col, ci) in (_dsTrendPaths?.hoverCols || [])" :key="ci">
+            <rect
+              class="ds-trend-hover-col"
+              :x="col.x"
+              :y="0"
+              :width="col.width"
+              :height="_dsTrendPaths?.H ?? 260"
+              @mousemove="dsTrendShowTooltip(col, $event)"
+            ></rect>
+          </template>
+        </g>
+      </svg>
+
+      <!-- Tooltip -->
+      <div
+        x-show="_dsTrendTooltip.visible"
+        class="ds-trend-tooltip"
+        :style="`left:${_dsTrendTooltip.x}px; top:${_dsTrendTooltip.y}px`"
+        role="tooltip"
+        aria-live="polite"
+      >
+        <div class="ds-trend-tooltip-date" x-text="_dsTrendTooltip.date"></div>
+        <template x-if="_dsTrendMetric === 'revenue'">
+          <div class="ds-trend-tooltip-revenue" x-text="'Rev: ' + _dsTrendTooltip.revenue"></div>
+        </template>
+        <template x-if="_dsTrendMetric === 'orders'">
+          <div class="ds-trend-tooltip-orders" x-text="'Orders: ' + _dsTrendTooltip.orders"></div>
+        </template>
+        <template x-if="_dsTrendMetric === 'aov'">
+          <div class="ds-trend-tooltip-revenue" x-text="'AOV: ' + _dsTrendTooltip.aov"></div>
+        </template>
+        <!-- Always show both metrics for context -->
+        <div class="ds-trend-tooltip-metric" x-show="_dsTrendMetric !== 'revenue'" x-text="'Rev: ' + _dsTrendTooltip.revenue"></div>
+        <div class="ds-trend-tooltip-metric" x-show="_dsTrendMetric !== 'orders'" x-text="'Orders: ' + _dsTrendTooltip.orders"></div>
+      </div>
+
+      <!-- Legend -->
+      <div class="ds-trend-legend">
+        <div class="ds-trend-legend-item">
+          <div class="ds-trend-legend-dot ds-trend-legend-dot--revenue"></div>
+          <span x-text="_dsTrendMetric === 'aov' ? 'AOV' : (_dsTrendMetric === 'orders' ? 'Orders' : 'Revenue')"></span>
+        </div>
+        <div class="ds-trend-legend-item">
+          <div class="ds-trend-legend-dot ds-trend-legend-dot--orders"></div>
+          <span x-text="_dsTrendMetric === 'revenue' ? 'Orders' : 'Revenue'"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. Mix Breakdowns ──────────────────────────────────── -->
+  <!-- Each row is now drillable -->
+  <div>
+    <p class="ds-period-label">Mix Breakdown</p>
+    <div class="ds-mix-grid">
+
+      <!-- Sales Channel -->
+      <div class="ds-mix-card">
+        <p class="ds-mix-title">Sales Channel</p>
+        <template x-for="(item, idx) in (dailySales?.mix?.salesChannel ?? [])" :key="idx">
+          <div
+            class="ds-mix-row ds-mix-row--drillable"
+            role="button"
+            tabindex="0"
+            :aria-label="`Drill into ${item.name} channel orders`"
+            @click="openDrillSheet({ type: 'channel', value: item.name }, $event.currentTarget)"
+            @keydown.enter="openDrillSheet({ type: 'channel', value: item.name }, $event.currentTarget)"
+          >
+            <span class="ds-mix-name" x-text="item.name"></span>
+            <div class="ds-mix-bar-wrap" aria-hidden="true">
+              <div class="ds-mix-bar" :style="`width:${item.pctRevenue ?? 0}%`"></div>
+            </div>
+            <span class="ds-mix-percent" x-text="`${(item.pctRevenue ?? 0).toFixed(0)}%`"></span>
+          </div>
+        </template>
+        <div x-show="!(dailySales?.mix?.salesChannel?.length)" class="ds-mix-row" style="color: var(--text-secondary)">No data</div>
+      </div>
+
+      <!-- Order Type -->
+      <div class="ds-mix-card">
+        <p class="ds-mix-title">Order Type</p>
+        <template x-for="(item, idx) in (dailySales?.mix?.orderType ?? [])" :key="idx">
+          <div
+            class="ds-mix-row ds-mix-row--drillable"
+            role="button"
+            tabindex="0"
+            :aria-label="`Drill into ${item.name} order type`"
+            @click="openDrillSheet({ type: 'orderType', value: item.name }, $event.currentTarget)"
+            @keydown.enter="openDrillSheet({ type: 'orderType', value: item.name }, $event.currentTarget)"
+          >
+            <span class="ds-mix-name" x-text="item.name"></span>
+            <div class="ds-mix-bar-wrap" aria-hidden="true">
+              <div class="ds-mix-bar" :style="`width:${item.pctRevenue ?? 0}%`"></div>
+            </div>
+            <span class="ds-mix-percent" x-text="`${(item.pctRevenue ?? 0).toFixed(0)}%`"></span>
+          </div>
+        </template>
+        <div x-show="!(dailySales?.mix?.orderType?.length)" class="ds-mix-row" style="color: var(--text-secondary)">No data</div>
+      </div>
+
+      <!-- Print Method -->
+      <div class="ds-mix-card">
+        <p class="ds-mix-title">Print Method</p>
+        <template x-for="(item, idx) in (dailySales?.mix?.printMethod ?? [])" :key="idx">
+          <div
+            class="ds-mix-row ds-mix-row--drillable"
+            role="button"
+            tabindex="0"
+            :aria-label="`Drill into ${item.name} print method`"
+            @click="openDrillSheet({ type: 'printMethod', value: item.name }, $event.currentTarget)"
+            @keydown.enter="openDrillSheet({ type: 'printMethod', value: item.name }, $event.currentTarget)"
+          >
+            <span class="ds-mix-name" x-text="item.name"></span>
+            <div class="ds-mix-bar-wrap" aria-hidden="true">
+              <div class="ds-mix-bar" :style="`width:${item.pctRevenue ?? 0}%`"></div>
+            </div>
+            <span class="ds-mix-percent" x-text="`${(item.pctRevenue ?? 0).toFixed(0)}%`"></span>
+          </div>
+        </template>
+        <div x-show="!(dailySales?.mix?.printMethod?.length)" class="ds-mix-row" style="color: var(--text-secondary)">No data</div>
+      </div>
+
+      <!-- Payment Mode -->
+      <div class="ds-mix-card">
+        <p class="ds-mix-title">Payment Mode</p>
+        <template x-for="(item, idx) in (dailySales?.mix?.paymentMode ?? [])" :key="idx">
+          <div
+            class="ds-mix-row ds-mix-row--drillable"
+            role="button"
+            tabindex="0"
+            :aria-label="`Drill into ${item.name} payment mode`"
+            @click="openDrillSheet({ type: 'paymentMode', value: item.name }, $event.currentTarget)"
+            @keydown.enter="openDrillSheet({ type: 'paymentMode', value: item.name }, $event.currentTarget)"
+          >
+            <span class="ds-mix-name" x-text="item.name"></span>
+            <div class="ds-mix-bar-wrap" aria-hidden="true">
+              <div class="ds-mix-bar" :style="`width:${item.pctRevenue ?? 0}%`"></div>
+            </div>
+            <span class="ds-mix-percent" x-text="`${(item.pctRevenue ?? 0).toFixed(0)}%`"></span>
+          </div>
+        </template>
+        <div x-show="!(dailySales?.mix?.paymentMode?.length)" class="ds-mix-row" style="color: var(--text-secondary)">No data</div>
+      </div>
+
+      <!-- Status -->
+      <div class="ds-mix-card">
+        <p class="ds-mix-title">Status</p>
+        <template x-for="(item, idx) in (dailySales?.mix?.status ?? [])" :key="idx">
+          <div
+            class="ds-mix-row ds-mix-row--drillable"
+            role="button"
+            tabindex="0"
+            :aria-label="`Drill into ${item.name} status`"
+            @click="openDrillSheet({ type: 'status', value: item.name }, $event.currentTarget)"
+            @keydown.enter="openDrillSheet({ type: 'status', value: item.name }, $event.currentTarget)"
+          >
+            <span class="ds-mix-name" x-text="item.name"></span>
+            <div class="ds-mix-bar-wrap" aria-hidden="true">
+              <div class="ds-mix-bar" :style="`width:${item.pctRevenue ?? 0}%`"></div>
+            </div>
+            <span class="ds-mix-percent" x-text="`${(item.pctRevenue ?? 0).toFixed(0)}%`"></span>
+          </div>
+        </template>
+        <div x-show="!(dailySales?.mix?.status?.length)" class="ds-mix-row" style="color: var(--text-secondary)">No data</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 6. Geographic Top 10 States ───────────────────────── -->
+  <div>
+    <p class="ds-period-label">Top States</p>
+
+    <div x-show="!(dailySales?.topStates?.length)" class="ds-empty">
+      <svg class="ds-empty-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0z"/>
+      </svg>
+      <p class="ds-empty-title">No geographic data</p>
+    </div>
+
+    <div x-show="dailySales?.topStates?.length" class="ds-geo-container">
+      <table class="ds-geo-table" aria-label="Top states by revenue">
+        <thead>
+          <tr>
+            <th scope="col">State</th>
+            <th scope="col" class="ds-geo-col-count">Orders</th>
+            <th scope="col">Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="(state, idx) in (dailySales?.topStates ?? [])" :key="idx">
+            <tr
+              class="ds-geo-row ds-geo-row--drillable"
+              role="button"
+              tabindex="0"
+              :aria-label="`Drill into ${state.state} orders`"
+              @click="openDrillSheet({ type: 'state', value: state.state }, $event.currentTarget)"
+              @keydown.enter="openDrillSheet({ type: 'state', value: state.state }, $event.currentTarget)"
+            >
+              <td class="ds-geo-state" x-text="state.state"></td>
+              <td class="ds-geo-count ds-geo-col-count" x-text="state.orders"></td>
+              <td class="ds-geo-revenue" x-text="formatINR(state.revenue)"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── 7. Today's Orders Feed ─────────────────────────────── -->
+  <div>
+    <p class="ds-period-label">Today's Orders</p>
+
+    <!-- Empty state -->
+    <div x-show="!(dailySales?.todaysOrders?.length)" class="ds-empty">
+      <svg class="ds-empty-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0z"/>
+      </svg>
+      <p class="ds-empty-title">No orders yet today</p>
+      <p class="ds-empty-text">Orders will appear here as they come in.</p>
+    </div>
+
+    <!-- Feed -->
+    <div x-show="dailySales?.todaysOrders?.length" class="ds-orders-feed">
+      <div class="ds-orders-feed-header">
+        <span>Orders</span>
+        <span x-text="dailySales?.todaysOrders?.length"></span>
+      </div>
+      <div class="ds-orders-list" role="list">
+        <template x-for="(order, idx) in (dailySales?.todaysOrders ?? [])" :key="idx">
+          <div
+            class="ds-order-row ds-order-row--drillable"
+            role="listitem button"
+            tabindex="0"
+            :aria-label="`View details for order ${order.orderNumber}`"
+            @click="openDrillSheet({ type: 'state', value: order.shipping?.state || order.state || '' }, $event.currentTarget)"
+            @keydown.enter="openDrillSheet({ type: 'state', value: order.shipping?.state || order.state || '' }, $event.currentTarget)"
+          >
+            <div class="ds-order-row-top">
+              <span class="ds-order-number" x-text="order.orderNumber"></span>
+              <span class="ds-order-customer" x-text="order.customer"></span>
+              <span class="ds-order-amount" x-text="formatINR(order.amount)"></span>
+            </div>
+            <div class="ds-order-row-bottom">
+              <span class="ds-order-time" x-text="order.time"></span>
+              <span
+                class="ds-status-badge"
+                :class="dsStatusClass(order.status)"
+                x-text="order.status"
+              ></span>
+              <span x-show="order.salesChannel" class="ds-channel-pill" x-text="order.salesChannel"></span>
+              <span x-show="order.tag" class="ds-tag-method" x-text="order.tag"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 8. Concerns Block ──────────────────────────────────── -->
+  <div x-show="(dailySales?.concerns?.pendingAcceptance?.length || 0) + (dailySales?.concerns?.stuckOrders?.length || 0) > 0">
+    <p class="ds-period-label">Concerns</p>
+
+    <div class="ds-concerns" role="region" aria-label="Orders needing attention">
+      <div class="ds-concerns-header">
+        <svg class="ds-concern-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+        </svg>
+        <span>Needs Attention</span>
+        <span class="ds-concerns-sub" x-text="`(${(dailySales?.concerns?.pendingAcceptance?.length || 0) + (dailySales?.concerns?.stuckOrders?.length || 0)} items)`"></span>
+      </div>
+
+      <!-- Pending Acceptance -->
+      <div x-show="dailySales?.concerns?.pendingAcceptance?.length">
+        <p class="ds-concerns-group-label">Pending Acceptance</p>
+        <template x-for="(item, idx) in (dailySales?.concerns?.pendingAcceptance ?? [])" :key="idx">
+          <div class="ds-concern-item">
+            <svg class="ds-concern-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+            </svg>
+            <div class="ds-concern-body">
+              <span class="ds-concern-number" x-text="item.orderNumber"></span>
+              <span class="ds-concern-customer" x-text="item.customer"></span>
+              <span class="ds-concern-amount" x-text="formatINR(item.amount)"></span>
+              <span class="ds-concern-badge">Pending</span>
+              <span class="ds-concern-days" x-text="`${item.daysAgo}d ago`"></span>
+              <span x-show="item.channel" class="ds-channel-pill" x-text="item.channel" style="margin-left:4px"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Stuck Orders -->
+      <div x-show="dailySales?.concerns?.stuckOrders?.length">
+        <p class="ds-concerns-group-label">Stuck Orders</p>
+        <template x-for="(item, idx) in (dailySales?.concerns?.stuckOrders ?? [])" :key="idx">
+          <div class="ds-concern-item">
+            <svg class="ds-concern-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0zm-9 3.75h.008v.008H12v-.008z"/>
+            </svg>
+            <div class="ds-concern-body">
+              <span class="ds-concern-number" x-text="item.orderNumber"></span>
+              <span class="ds-concern-customer" x-text="item.customer"></span>
+              <span class="ds-concern-amount" x-text="formatINR(item.amount)"></span>
+              <span
+                class="ds-concern-badge"
+                x-text="item.status || 'Stuck'"
+              ></span>
+              <span class="ds-concern-days" x-text="`${item.daysAgo}d ago`"></span>
+              <span x-show="item.channel" class="ds-channel-pill" x-text="item.channel" style="margin-left:4px"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 9. Data Quality Section (Phase 1) ─────────────────── -->
+  <div x-show="dailySales?.dataQuality">
+    <p class="ds-period-label">Data Quality</p>
+
+    <div class="ds-data-quality">
+      <div class="ds-data-quality-title">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true" title="Data quality indicators for this dataset">
+          <circle cx="7" cy="7" r="6"/>
+          <path d="M7 6v4M7 4.5v.5" stroke-linecap="round"/>
+        </svg>
+        Acceptance Mix
+      </div>
+
+      <!-- Stacked bar -->
+      <div
+        class="ds-acceptance-bar"
+        role="img"
+        :aria-label="`Accepted: ${dailySales?.dataQuality?.acceptanceMix?.accepted ?? 0}, Rejected: ${dailySales?.dataQuality?.acceptanceMix?.rejected ?? 0}, Awaiting: ${dailySales?.dataQuality?.acceptanceMix?.awaiting ?? 0}`"
+      >
+        <!-- Accepted -->
+        <div
+          class="ds-acceptance-bar__segment ds-acceptance-bar__segment--accepted"
+          :style="`flex-basis: ${dailySales?.dataQuality?.acceptanceMix?.total ? ((dailySales.dataQuality.acceptanceMix.accepted / dailySales.dataQuality.acceptanceMix.total) * 100).toFixed(1) : 0}%`"
+          x-show="dailySales?.dataQuality?.acceptanceMix?.accepted > 0"
+        >
+          <span class="ds-acceptance-bar__segment-tooltip">
+            Accepted:
+            <span x-text="(dailySales?.dataQuality?.acceptanceMix?.accepted ?? 0).toLocaleString('en-IN')"></span>
+            (<span x-text="dailySales?.dataQuality?.acceptanceMix?.total ? ((dailySales.dataQuality.acceptanceMix.accepted / dailySales.dataQuality.acceptanceMix.total) * 100).toFixed(1) + '%' : '0%'"></span>)
+          </span>
+        </div>
+        <!-- Rejected -->
+        <div
+          class="ds-acceptance-bar__segment ds-acceptance-bar__segment--rejected"
+          :style="`flex-basis: ${dailySales?.dataQuality?.acceptanceMix?.total ? ((dailySales.dataQuality.acceptanceMix.rejected / dailySales.dataQuality.acceptanceMix.total) * 100).toFixed(1) : 0}%`"
+          x-show="dailySales?.dataQuality?.acceptanceMix?.rejected > 0"
+        >
+          <span class="ds-acceptance-bar__segment-tooltip">
+            Rejected:
+            <span x-text="(dailySales?.dataQuality?.acceptanceMix?.rejected ?? 0).toLocaleString('en-IN')"></span>
+            (<span x-text="dailySales?.dataQuality?.acceptanceMix?.total ? ((dailySales.dataQuality.acceptanceMix.rejected / dailySales.dataQuality.acceptanceMix.total) * 100).toFixed(1) + '%' : '0%'"></span>)
+          </span>
+        </div>
+        <!-- Awaiting -->
+        <div
+          class="ds-acceptance-bar__segment ds-acceptance-bar__segment--awaiting"
+          :style="`flex-basis: ${dailySales?.dataQuality?.acceptanceMix?.total ? ((dailySales.dataQuality.acceptanceMix.awaiting / dailySales.dataQuality.acceptanceMix.total) * 100).toFixed(1) : 0}%`"
+          x-show="dailySales?.dataQuality?.acceptanceMix?.awaiting > 0"
+        >
+          <span class="ds-acceptance-bar__segment-tooltip">
+            Awaiting:
+            <span x-text="(dailySales?.dataQuality?.acceptanceMix?.awaiting ?? 0).toLocaleString('en-IN')"></span>
+            (<span x-text="dailySales?.dataQuality?.acceptanceMix?.total ? ((dailySales.dataQuality.acceptanceMix.awaiting / dailySales.dataQuality.acceptanceMix.total) * 100).toFixed(1) + '%' : '0%'"></span>)
+          </span>
+        </div>
+      </div>
+
+      <!-- Labels -->
+      <div class="ds-acceptance-bar-labels">
+        <div class="ds-acceptance-bar-label">
+          <span class="ds-acceptance-bar-label-dot ds-acceptance-bar-label-dot--accepted"></span>
+          <div class="ds-acceptance-bar-label-text">
+            <span class="ds-acceptance-bar-label-count" x-text="(dailySales?.dataQuality?.acceptanceMix?.accepted ?? 0).toLocaleString('en-IN')"></span>
+            <span class="ds-acceptance-bar-label-pct">
+              (<span x-text="dailySales?.dataQuality?.acceptanceMix?.total ? ((dailySales.dataQuality.acceptanceMix.accepted / dailySales.dataQuality.acceptanceMix.total) * 100).toFixed(0) + '%' : '0%'"></span>)
+            </span>
+          </div>
+          <span style="font-size:11px; color: var(--text-secondary); margin-left: 4px;">Accepted</span>
+        </div>
+        <div class="ds-acceptance-bar-label">
+          <span class="ds-acceptance-bar-label-dot ds-acceptance-bar-label-dot--rejected"></span>
+          <div class="ds-acceptance-bar-label-text">
+            <span class="ds-acceptance-bar-label-count" x-text="(dailySales?.dataQuality?.acceptanceMix?.rejected ?? 0).toLocaleString('en-IN')"></span>
+            <span class="ds-acceptance-bar-label-pct">
+              (<span x-text="dailySales?.dataQuality?.acceptanceMix?.total ? ((dailySales.dataQuality.acceptanceMix.rejected / dailySales.dataQuality.acceptanceMix.total) * 100).toFixed(0) + '%' : '0%'"></span>)
+            </span>
+          </div>
+          <span style="font-size:11px; color: var(--text-secondary); margin-left: 4px;">Rejected</span>
+        </div>
+        <div class="ds-acceptance-bar-label">
+          <span class="ds-acceptance-bar-label-dot ds-acceptance-bar-label-dot--awaiting"></span>
+          <div class="ds-acceptance-bar-label-text">
+            <span class="ds-acceptance-bar-label-count" x-text="(dailySales?.dataQuality?.acceptanceMix?.awaiting ?? 0).toLocaleString('en-IN')"></span>
+            <span class="ds-acceptance-bar-label-pct">
+              (<span x-text="dailySales?.dataQuality?.acceptanceMix?.total ? ((dailySales.dataQuality.acceptanceMix.awaiting / dailySales.dataQuality.acceptanceMix.total) * 100).toFixed(0) + '%' : '0%'"></span>)
+            </span>
+          </div>
+          <span style="font-size:11px; color: var(--text-secondary); margin-left: 4px;">Awaiting</span>
+        </div>
+      </div>
+
+      <!-- Duplicate orders list — capped at 50, hidden when empty -->
+      <div
+        class="ds-duplicate-list"
+        x-show="dailySales?.dataQuality?.duplicates?.length > 0"
+      >
+        <div class="ds-duplicate-list-title">
+          Duplicate Order #s
+          <span
+            class="ds-duplicate-list-badge"
+            x-text="Math.min(dailySales?.dataQuality?.duplicates?.length ?? 0, 50)"
+          ></span>
+          <span
+            x-show="(dailySales?.dataQuality?.duplicates?.length ?? 0) > 50"
+            style="font-size:11px; color: var(--text-secondary); font-weight: 400;"
+          >(showing top 50)</span>
+        </div>
+        <template x-for="(dup, idx) in (dailySales?.dataQuality?.duplicates ?? []).slice(0, 50)" :key="idx">
+          <div class="ds-duplicate-list-item">
+            <span class="ds-duplicate-list-number" x-text="dup.orderNumber"></span>
+            <span class="ds-duplicate-list-customer" x-text="dup.sourceTab || '—'"></span>
+            <span class="ds-duplicate-list-amount" x-text="`${dup.count}×`"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end ds-content -->
+
+<!-- ── 10. Data Freshness Footer ──────────────────────────────── -->
+<div x-show="dailySales" class="ds-footer" role="contentinfo">
+  <span class="ds-footer-timestamp">
+    Updated <span x-text="dsFormatDate(dailySales?.freshness?.fetchedAt)"></span>
+  </span>
+  <span class="ds-footer-source">
+    Source: <span x-text="dailySales?.source?.workbookTitle"></span>
+    &rsaquo;
+    <span x-text="dailySales?.source?.currentMonthTabName"></span>
+  </span>
+</div>
+
+<!-- ── Phase 2: Drill Sheet (fixed overlay, always in DOM) ────── -->
+<!-- Uses div x-show (not template x-if) per project standard -->
+<div
+  class="ds-drill-sheet"
+  :class="{ 'ds-drill-sheet--visible': dailySalesDrill.open }"
+  role="dialog"
+  aria-modal="true"
+  :aria-label="dailySalesDrill.title"
+  x-show="dailySalesDrill.open"
+>
+  <!-- Backdrop — click to close -->
+  <div
+    class="ds-drill-sheet__backdrop"
+    @click="closeDrillSheet()"
+    aria-hidden="true"
+  ></div>
+
+  <!-- Panel -->
+  <div class="ds-drill-sheet__panel">
+
+    <!-- Sticky header -->
+    <div class="ds-drill-sheet__header">
+      <div style="flex:1; min-width:0;">
+        <div class="ds-drill-sheet__header-title" x-text="dailySalesDrill.title"></div>
+        <div class="ds-drill-sheet__header-meta">
+          <span x-show="!dailySalesDrill.loading">
+            <span x-text="(dailySalesDrill.total || 0).toLocaleString('en-IN')"></span> orders
+          </span>
+          <span x-show="!dailySalesDrill.loading && dailySalesDrill.orders.length > 0">
+            · <span x-text="formatINR(dsDrillTotalRevenue())"></span>
+          </span>
+          <span x-show="dailySalesDrill.loading" style="color: var(--text-muted);">Loading…</span>
+        </div>
+      </div>
+      <button
+        id="ds-drill-close-btn"
+        class="ds-drill-sheet__header-close"
+        @click="closeDrillSheet()"
+        aria-label="Close drill sheet"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Scrollable body -->
+    <div class="ds-drill-sheet__body">
+
+      <!-- Loading skeletons -->
+      <div x-show="dailySalesDrill.loading && dailySalesDrill.orders.length === 0">
+        <div class="ds-drill-sheet__order-row ds-drill-skeleton">
+          <div class="ds-drill-skeleton-line ds-drill-skeleton-line--title"></div>
+          <div class="ds-drill-skeleton-line ds-drill-skeleton-line--sub"></div>
+        </div>
+        <div class="ds-drill-sheet__order-row ds-drill-skeleton">
+          <div class="ds-drill-skeleton-line ds-drill-skeleton-line--title"></div>
+          <div class="ds-drill-skeleton-line ds-drill-skeleton-line--sub"></div>
+        </div>
+        <div class="ds-drill-sheet__order-row ds-drill-skeleton">
+          <div class="ds-drill-skeleton-line ds-drill-skeleton-line--title"></div>
+          <div class="ds-drill-skeleton-line ds-drill-skeleton-line--sub"></div>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div
+        x-show="!dailySalesDrill.loading && dailySalesDrill.orders.length === 0"
+        class="ds-drill-sheet__empty"
+      >
+        <svg class="ds-drill-sheet__empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0z"/>
+        </svg>
+        <p class="ds-drill-sheet__empty-text">No orders match this filter.</p>
+        <p style="font-size:12px; color: var(--text-muted); margin-top:4px;">Try adjusting your date range or filters.</p>
+      </div>
+
+      <!-- Orders list -->
+      <div x-show="dailySalesDrill.orders.length > 0" role="list">
+        <template x-for="(order, idx) in dailySalesDrill.orders" :key="idx">
+          <div class="ds-drill-sheet__order-row" role="listitem">
+            <div class="ds-order-row-top">
+              <span class="ds-order-number" x-text="order.orderNumber"></span>
+              <span class="ds-order-customer" x-text="order.customer"></span>
+              <span class="ds-order-amount" x-text="formatINR(order.amountWithTax)"></span>
+            </div>
+            <div class="ds-order-row-bottom">
+              <span class="ds-order-time" x-text="order.time || order.date"></span>
+              <span
+                class="ds-status-badge"
+                :class="dsStatusClass(order.status)"
+                x-text="order.status"
+              ></span>
+              <span x-show="order.salesChannel" class="ds-channel-pill" x-text="order.salesChannel"></span>
+              <span x-show="order.printMethod" class="ds-tag-method" x-text="order.printMethod"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Load more -->
+      <div
+        x-show="dailySalesDrill.hasMore && !dailySalesDrill.loading"
+        style="padding: 12px 16px; text-align: center;"
+      >
+        <button
+          class="ds-refresh-btn"
+          @click="loadMoreDrillOrders()"
+          style="margin: 0 auto;"
+        >Load more</button>
+      </div>
+
+      <!-- Loading more indicator -->
+      <div
+        x-show="dailySalesDrill.loading && dailySalesDrill.orders.length > 0"
+        style="padding: 12px 16px; text-align: center; color: var(--text-secondary); font-size: 12px;"
+      >Loading more…</div>
+
+    </div>
+  </div>
+</div>
+
+</div><!-- end x-init wrapper -->
