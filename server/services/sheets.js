@@ -1,6 +1,11 @@
 // Google Sheets service — gracefully degrades when GOOGLE_SERVICE_ACCOUNT_KEY
 // and GOOGLE_SHEETS_ID are not configured.
 // Cache pattern mirrors server/services/notion.js (5-min TTL, Map-based).
+//
+// Dynamic sheetName: SHEET_REGISTRY entries may set `sheetName` to a function
+// `(now: Date) => string` instead of a plain string. Call `resolveSheetName(entry)`
+// to get the final name at request time. This avoids having to edit the registry
+// entry every time a month rolls over (e.g. "April 2026" → "May 2026").
 
 const config = require('../config');
 
@@ -21,6 +26,25 @@ function getCached(key) {
 
 function setCache(key, data) {
   cache.set(key, { data, timestamp: Date.now() });
+}
+
+// ── Dynamic sheetName resolver ────────────────────────────────────────────────
+
+/**
+ * Resolves a registry entry's sheetName, which may be a plain string or a
+ * function `(now: Date) => string`. Returns the resolved string.
+ *
+ * @param {object} entry  - SHEET_REGISTRY entry
+ * @param {Date|number} [now] - Optional Date (or ms epoch) to use as "now".
+ *   Defaults to `new Date()` (server local time). Pass an IST-adjusted Date
+ *   when the resolved name depends on the Indian calendar month.
+ */
+function resolveSheetName(entry, now) {
+  if (typeof entry.sheetName === 'function') {
+    const d = now instanceof Date ? now : (now != null ? new Date(now) : new Date());
+    return entry.sheetName(d);
+  }
+  return entry.sheetName;
 }
 
 // ── Auth / client ─────────────────────────────────────────────────────────────
@@ -263,6 +287,7 @@ const SPREADSHEET_KEYS = {
   OPS_PRODUCTS: 'OPS_PRODUCTS',
   OPS_WAREHOUSE: 'OPS_WAREHOUSE',
   COMPETITOR_INTEL: 'COMPETITOR_INTEL',
+  DAILY_SALES: 'DAILY_SALES',
 };
 
 // Maps spreadsheet keys to config env var values
@@ -280,6 +305,7 @@ function getSpreadsheetId(spreadsheetKey) {
     OPS_PRODUCTS: config.OPS_PRODUCTS_SPREADSHEET_ID,
     OPS_WAREHOUSE: config.OPS_WAREHOUSE_SPREADSHEET_ID,
     COMPETITOR_INTEL: config.COMPETITOR_INTEL_SPREADSHEET_ID,
+    DAILY_SALES: config.DAILY_SALES_SPREADSHEET_ID,
   };
   return map[spreadsheetKey] || '';
 }
@@ -357,6 +383,55 @@ const SHEET_REGISTRY = {
   OPS_WAREHOUSE_BINS: { spreadsheetKey: 'OPS_WAREHOUSE', sheetName: 'Bin Location Master (Main Sheet)' },
   OPS_WAREHOUSE_COLORS: { spreadsheetKey: 'OPS_WAREHOUSE', sheetName: 'Color Code Master' },
   OPS_PRODUCT_CODE_MASTER: { spreadsheetKey: 'OPS_WAREHOUSE', sheetName: 'Product Code Master' },
+  // Daily Sales (YDC - sales report workbook)
+  //
+  // SALES_YTD resolves to the Indian FY end-year tab (e.g. FY Apr 2026–Mar 2027 → tab "2027").
+  // Indian FY starts April 1: months April–December belong to FY ending next year;
+  // months January–March belong to FY ending current year.
+  // Rotates automatically at midnight IST on April 1 (caller passes IST-shifted Date).
+  // gid varies by FY tab — null means "let API resolve by name".
+  //
+  // SALES_LAST_FY resolves to the prior FY end-year tab (e.g. "2026" when current is "2027").
+  // Used for like-for-like YTD comparisons.
+  SALES_YTD: {
+    spreadsheetKey: 'DAILY_SALES',
+    sheetName: (now) => {
+      const d = now instanceof Date ? now : new Date(now ?? Date.now());
+      // caller passes IST-shifted Date, so getUTCMonth/getUTCFullYear = IST calendar values
+      const m = d.getUTCMonth(); // April = 3
+      const y = d.getUTCFullYear();
+      return String(m >= 3 ? y + 1 : y); // April–Dec → FY ends next year; Jan–Mar → FY ends this year
+    },
+    gid: null,
+  },
+  SALES_LAST_FY: {
+    spreadsheetKey: 'DAILY_SALES',
+    sheetName: (now) => {
+      const d = now instanceof Date ? now : new Date(now ?? Date.now());
+      const m = d.getUTCMonth();
+      const y = d.getUTCFullYear();
+      const currentFYEndYear = m >= 3 ? y + 1 : y;
+      return String(currentFYEndYear - 1);
+    },
+    gid: null,
+  },
+  SALES_CURRENT_MONTH: {
+    spreadsheetKey: 'DAILY_SALES',
+    // Dynamic: resolves to "<Month name> YYYY" at request time (e.g. "April 2026").
+    // When called from daily-sales-service, `now` is an IST-shifted Date so
+    // getUTCMonth/getUTCFullYear read the correct Indian calendar month even when
+    // the server runs in UTC and it's after 18:30 UTC on the last day of a month.
+    sheetName: (now) => {
+      const MONTH_NAMES = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December',
+      ];
+      const month = MONTH_NAMES[now.getUTCMonth()];
+      const year = now.getUTCFullYear();
+      return `${month} ${year}`;
+    },
+    gid: null,
+  },
   // Competitor Intelligence
   CI_COMPETITORS: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Competitors_Master' },
   CI_ANALYSIS: { spreadsheetKey: 'COMPETITOR_INTEL', sheetName: 'Competitor analysis' },
@@ -412,7 +487,8 @@ async function getSheetHeaders(sheetKey) {
   const client = getReadWriteClient();
   if (!client) throw new Error('Sheets client not available');
 
-  const sheetName = entry.sheetName.includes(' ') ? `'${entry.sheetName}'` : entry.sheetName;
+  const resolvedName = resolveSheetName(entry);
+  const sheetName = resolvedName.includes(' ') ? `'${resolvedName}'` : resolvedName;
   const response = await client.spreadsheets.values.get({
     spreadsheetId,
     range: `${sheetName}!1:1`,
@@ -423,7 +499,16 @@ async function getSheetHeaders(sheetKey) {
   return headers;
 }
 
-async function fetchSheet(sheetKey) {
+/**
+ * Fetch a sheet by registry key.
+ *
+ * @param {string} sheetKey - Key in SHEET_REGISTRY (e.g. 'SALES_CURRENT_MONTH')
+ * @param {Date|number} [now] - Optional "now" forwarded to resolveSheetName for
+ *   dynamic tab names. Pass an IST-adjusted Date so month-boundary resolution
+ *   uses the correct Indian calendar month rather than the server's local TZ.
+ *   Backward-compatible: omit for existing callers, they get current behavior.
+ */
+async function fetchSheet(sheetKey, now) {
   const entry = SHEET_REGISTRY[sheetKey];
   if (!entry) throw new Error(`Unknown sheet key: ${sheetKey}`);
   if (!isSpreadsheetConfigured(entry.spreadsheetKey)) {
@@ -438,11 +523,13 @@ async function fetchSheet(sheetKey) {
   const client = getReadWriteClient();
   if (!client) return { available: false, reason: 'not_configured' };
 
+  const resolvedSheetName = resolveSheetName(entry, now);
+
   try {
-    const sheetName = entry.sheetName.includes(' ') ? `'${entry.sheetName}'` : entry.sheetName;
+    const quotedName = resolvedSheetName.includes(' ') ? `'${resolvedSheetName}'` : resolvedSheetName;
     const response = await client.spreadsheets.values.get({
       spreadsheetId,
-      range: sheetName,
+      range: quotedName,
     });
 
     const rows = response.data.values || [];
@@ -463,6 +550,18 @@ async function fetchSheet(sheetKey) {
     setCache(cacheKey, result);
     return result;
   } catch (err) {
+    // Sheets API returns "Unable to parse range" or "Requested entity was not found"
+    // when a tab name doesn't exist. Convert to a structured unavailable response
+    // so callers (e.g. daily-sales-service) can degrade gracefully.
+    const msg = err.message || '';
+    if (msg.includes('Unable to parse range') || msg.includes('Requested entity was not found')) {
+      console.warn(`[sheets] fetchSheet("${sheetKey}") tab not found: "${resolvedSheetName}"`);
+      return {
+        available: false,
+        reason: 'tab_not_found_for_month',
+        expectedTabName: resolvedSheetName,
+      };
+    }
     console.warn(`[sheets] fetchSheet("${sheetKey}") API error:`, err.message);
     return { available: false, reason: 'api_error', error: err.message };
   }
@@ -481,7 +580,8 @@ async function appendRow(sheetKey, rowData) {
   const headers = await getSheetHeaders(sheetKey);
   const rowArray = headers.map(h => rowData[h] ?? '');
 
-  const sheetName = entry.sheetName.includes(' ') ? `'${entry.sheetName}'` : entry.sheetName;
+  const resolvedName = resolveSheetName(entry);
+  const sheetName = resolvedName.includes(' ') ? `'${resolvedName}'` : resolvedName;
   const response = await client.spreadsheets.values.append({
     spreadsheetId,
     range: sheetName,
@@ -508,7 +608,8 @@ async function updateRow(sheetKey, rowIndex, rowData) {
   const headers = await getSheetHeaders(sheetKey);
   const rowArray = headers.map(h => rowData[h] ?? '');
 
-  const sheetName = entry.sheetName.includes(' ') ? `'${entry.sheetName}'` : entry.sheetName;
+  const resolvedName = resolveSheetName(entry);
+  const sheetName = resolvedName.includes(' ') ? `'${resolvedName}'` : resolvedName;
   const response = await client.spreadsheets.values.update({
     spreadsheetId,
     range: `${sheetName}!A${rowIndex}`,
@@ -561,4 +662,6 @@ module.exports = {
   fetchSheet, appendRow, updateRow, deleteRow, getSheetHeaders,
   // New — internal (for hydration service)
   parseRows,
+  // Dynamic sheetName resolver
+  resolveSheetName,
 };

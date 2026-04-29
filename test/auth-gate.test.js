@@ -10,6 +10,7 @@ describe('Auth Gate', () => {
   afterEach(() => {
     delete process.env.ACCESS_PASSWORD;
     delete process.env.VERCEL_ENV;
+    delete process.env.SESSION_SECRET;
     delete require.cache[AUTH_GATE_PATH];
   });
 
@@ -136,53 +137,29 @@ describe('Auth Gate', () => {
     assert.match(String(sentBody || ''), /YDS Command Centre/);
   });
 
-  it('accepts a legacy raw auth cookie value', () => {
-    process.env.ACCESS_PASSWORD = 'secret%2Fvalue';
+  it('rejects legacy raw auth cookie value (old format)', () => {
+    process.env.ACCESS_PASSWORD = 'secret';
     const { authGate } = require(AUTH_GATE_PATH);
     let nextCalled = false;
+    let statusCalled = false;
 
     authGate({
       method: 'GET',
       path: '/',
       headers: {
-        cookie: 'yds_cc_auth=secret%2Fvalue',
+        cookie: 'yds_cc_auth=secret',
       },
     }, {
-      status() {
-        throw new Error('Did not expect a status response');
+      status(code) {
+        statusCalled = true;
+        return this;
       },
-      send() {
-        throw new Error('Did not expect a login page response');
-      },
+      send() {},
     }, () => {
       nextCalled = true;
     });
 
-    assert.equal(nextCalled, true);
-  });
-
-  it('accepts a URL-encoded auth cookie value', () => {
-    process.env.ACCESS_PASSWORD = 'secret/value';
-    const { authGate } = require(AUTH_GATE_PATH);
-    let nextCalled = false;
-
-    authGate({
-      method: 'GET',
-      path: '/',
-      headers: {
-        cookie: 'yds_cc_auth=secret%2Fvalue',
-      },
-    }, {
-      status() {
-        throw new Error('Did not expect a status response');
-      },
-      send() {
-        throw new Error('Did not expect a login page response');
-      },
-    }, () => {
-      nextCalled = true;
-    });
-
-    assert.equal(nextCalled, true);
+    assert.equal(nextCalled, false);
+    assert.equal(statusCalled, true);
   });
 });

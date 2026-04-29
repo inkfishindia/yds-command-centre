@@ -3,6 +3,27 @@
  * Uses Alpine.js for reactivity, marked.js for markdown rendering.
  */
 
+function safeLocalSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    if (e.name === 'QuotaExceededError' || e.code === 22) {
+      console.warn('localStorage quota exceeded, clearing old items');
+      for (const k of Object.keys(localStorage).slice(0, 10)) {
+        if (!k.startsWith('notification')) break;
+        localStorage.removeItem(k);
+      }
+      try {
+        localStorage.setItem(key, value);
+      } catch {
+        console.error('localStorage still full after cleanup');
+      }
+    } else {
+      console.error('localStorage error:', e);
+    }
+  }
+}
+
 import { configureMarkdown } from './modules/markdown.js';
 import { createDashboardModule } from './modules/dashboard.js';
 import { createCommandShellModule } from './modules/command-shell.js';
@@ -34,6 +55,7 @@ const LAZY_MODULE_FACTORIES = {
   'claude-usage': () => import('./modules/claude-usage.js').then(({ createClaudeUsageModule }) => createClaudeUsageModule()),
   'system-map': () => import('./modules/system-map.js').then(({ createSystemMapModule }) => createSystemMapModule()),
   'dan-colin': () => import('./modules/dan-colin.js').then(({ createDanColinModule }) => createDanColinModule()),
+  'daily-sales': () => import('./modules/daily-sales.js').then(({ createDailySalesModule }) => createDailySalesModule()),
 };
 
 function app() {
@@ -92,6 +114,7 @@ function app() {
         'claude-usage': 'claude-usage',
         'system-map': 'system-map',
         'dan-colin': 'dan-colin',
+        'daily-sales': 'daily-sales',
       };
       return fileMap[name] || null;
     },
@@ -190,6 +213,7 @@ function app() {
         'claude-usage': 'usage-view',
         'system-map': 'system-map-view',
         'dan-colin': 'dan-colin-view',
+        'daily-sales': 'daily-sales-view',
       };
       return classMap[name] || name + '-view';
     },
@@ -296,6 +320,10 @@ function app() {
     dcFocusAreaLegendOpen: false,
     _dcFocusColorCache: {},
     _dcSlowNetworkTimer: null,
+    // daily-sales
+    dailySales: null, dailySalesLoading: false, dailySalesError: null,
+    _dsTrendPaths: null,
+    _dsTrendTooltip: { visible: false, x: 0, y: 0, date: '', revenue: '', orders: '' },
 
     // Eager modules — always initialized
     ...createDashboardModule(),
@@ -439,16 +467,19 @@ function app() {
         }
       });
 
-      // Auto-refresh active view every 5 minutes
+      // Auto-refresh active view every 5 minutes (only when visible)
       this.refreshIntervalId = setInterval(() => {
+        if (document.hidden) return;
         if (this.view === 'overview') this.loadOverview();
-        else if (this.view === 'dashboard') this.loadDashboard();
+        else if (this.view === 'dashboard') this.loadDashboard(true); // silent
       }, 300000);
 
       // Independent action queue refresh every 3 minutes — runs regardless of active view.
       // Uses silent mode (no loading spinner) so it doesn't disrupt other views.
+      // Only runs when tab is visible.
       this._aqIntervalId = setInterval(() => {
-        if (document.visibilityState === 'visible' && !this._requestControllers?.actionQueue) {
+        if (document.visibilityState !== 'visible') return;
+        if (!this._requestControllers?.actionQueue) {
           this.loadActionQueue({ silent: true });
         }
       }, 180000);
@@ -865,7 +896,7 @@ function app() {
     },
 
     saveNotificationSettings() {
-      localStorage.setItem('notificationSettings', JSON.stringify(this.notificationSettings));
+      safeLocalSet('notificationSettings', JSON.stringify(this.notificationSettings));
     },
 
     openNotificationSettingsPanel() {
@@ -916,7 +947,7 @@ function app() {
 
     resetNotificationBaseline() {
       this._notificationSnapshot = this.getNotificationSnapshot();
-      localStorage.setItem('notificationSnapshot', JSON.stringify(this._notificationSnapshot));
+      safeLocalSet('notificationSnapshot', JSON.stringify(this._notificationSnapshot));
     },
 
     getNotificationSnapshot() {
@@ -1004,7 +1035,7 @@ function app() {
     },
 
     saveNotificationCenter() {
-      localStorage.setItem('notificationCenter', JSON.stringify(this.notificationCenter));
+      safeLocalSet('notificationCenter', JSON.stringify(this.notificationCenter));
     },
 
     getUnreadNotificationCount() {
@@ -1093,7 +1124,7 @@ function app() {
     },
 
     markNotificationCooldown(key) {
-      localStorage.setItem(`notificationCooldown:${key}`, new Date().toISOString());
+      safeLocalSet(`notificationCooldown:${key}`, new Date().toISOString());
     },
 
     sendBrowserNotification(title, options = {}) {
@@ -1147,7 +1178,7 @@ function app() {
         type: 'digest',
         rule: 'digest',
       })) {
-        localStorage.setItem('notificationDailyDigestSent', today);
+        safeLocalSet('notificationDailyDigestSent', today);
       }
     },
 
@@ -1257,7 +1288,7 @@ function app() {
       });
 
       this._notificationSnapshot = current;
-      localStorage.setItem('notificationSnapshot', JSON.stringify(current));
+      safeLocalSet('notificationSnapshot', JSON.stringify(current));
       this.maybeSendDailyDigest();
     },
 

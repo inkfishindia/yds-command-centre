@@ -37,6 +37,7 @@
   --green-glow: var(--green-a08);
   --amber-glow: var(--amber-a08);
   --red-glow: var(--red-a08);
+  --purple-a20: rgba(168, 85, 247, 0.20);
   --purple-glow: rgba(168, 85, 247, 0.08);
   --indigo: #6366f1;
   --text-inverse: #fff;
@@ -10077,6 +10078,24 @@ textarea:focus-visible {
 
 .activity-feed-status-pill {
   font-size: 10px;
+}
+
+.ai-provider-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.badge-anthropic {
+  background: var(--purple-dim);
+  color: var(--purple);
+}
+
+.badge-deepseek {
+  background: var(--green-dim);
+  color: var(--green);
 }
 
 @media (max-width: 768px) {

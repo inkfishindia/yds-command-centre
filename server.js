@@ -104,7 +104,17 @@ const chatLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Rate limit login to prevent brute force
+const loginLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: { error: 'Too many login attempts. Please wait before trying again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // API routes
+app.use('/login', loginLimiter);
 app.use('/api/chat', chatLimiter, require('./server/routes/chat'));
 app.use('/api/skills', require('./server/routes/skills'));
 app.use('/api/notion', require('./server/routes/notion'));
@@ -129,6 +139,7 @@ app.use('/api/health', require('./server/routes/health'));
 app.use('/api/system-map', require('./server/routes/system-map'));
 app.use('/api/dan-colin', require('./server/routes/dan-colin'));
 app.use('/api/activity-feed', require('./server/routes/activity-feed'));
+app.use('/api/daily-sales', require('./server/routes/daily-sales'));
 
 // Static file serving — Alpine.js frontend from public/
 // Cache JS/CSS for 1 hour (assets are rebuilt on deploy); HTML always revalidates.

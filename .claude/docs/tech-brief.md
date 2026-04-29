@@ -2,7 +2,7 @@
 
 **For:** Nirmal + Tech Team
 **From:** Dan
-**Date:** 2 March 2026
+**Date:** 25 April 2026
 
 ---
 
@@ -28,11 +28,12 @@ Browser (Alpine.js)  ←— SSE Stream —→  Express Server  ←— SDK —→
 - **Backend:** Node.js + Express (single `server.js` entry point)
 - **AI:** Anthropic Claude Opus via `@anthropic-ai/sdk`
 - **Notion:** `@notionhq/client` for all database operations
-- **Frontend:** Alpine.js (reactivity) + marked.js (markdown rendering) — no build step
+- **Frontend:** Alpine.js (reactivity) + marked.js (markdown rendering) — lightweight asset build step
+- **Build:** `npm run build` compiles `src/js/*` to `public/js/*` via `scripts/build-assets.mjs`
 - **Streaming:** Server-Sent Events (SSE) for real-time chat responses
 - **State:** In-memory (single user, single session)
 
-No React, no Next.js, no build tooling. Edit HTML, refresh browser.
+No React, no Next.js. Frontend source lives in `src/js/`; built assets in `public/js/`. Run `npm run dev` for development with auto-rebuild.
 
 ---
 
@@ -48,28 +49,60 @@ command-centre/
 ├── server/
 │   ├── config.js                  # Env vars, model selection, workspace paths
 │   ├── routes/
+│   │   ├── activity-feed.js       # Activity log aggregation (days filter)
+│   │   ├── ai-team.js             # AI team roster with resolved relations
+│   │   ├── bmc.js                 # Business Model Canvas (all 11 sections + singles)
+│   │   ├── ceo-dashboard.js       # CEO dashboard + forging, reviews, briefs
 │   │   ├── chat.js                # POST /api/chat (SSE streaming), /approve, /clear, /pending
-│   │   ├── notion.js              # Dashboard, database browser, page viewer endpoints
-│   │   ├── documents.js           # Briefings, decisions, weekly reviews file browser
-│   │   ├── skills.js              # GET /api/skills — lists available skill buttons
-│   │   ├── sheets.js              # CRUD routes for 25 registered Google Sheets (GET/POST/PATCH/DELETE)
-│   │   ├── bmc.js                 # Business Model Canvas: GET / (all 11 sections), GET /:section
-│   │   ├── crm.js                 # CRM integrator: 8 endpoints (people, projects, tasks, campaigns, business-units)
-│   │   ├── marketing-ops.js       # Marketing dashboards (campaigns, content, sequences, sessions)
-│   │   ├── registry.js            # Project registry
-│   │   ├── tech-team.js           # Tech team module (sprint, bugs, specs, decisions, velocity, agents, strategy, github)
-│   │   ├── commitments.js         # POST /api/commitments (Notion write via approval gate)
+│   │   ├── commitments.js         # Create + PATCH commit properties (status, priority, due-date, assignee, notes)
+│   │   ├── competitor-intel.js    # Competitor intel overview, profiles, watchlist, SWOT, steal/adapt
+│   │   ├── crm.js                 # CRM overview, leads, flows, team, config
+│   │   ├── dan-colin.js           # GET queue, POST /:id/answer, POST /drop (SSE + approval-gated)
 │   │   ├── decisions.js           # POST /api/decisions (Notion write via approval gate)
-│   │   └── notebooks.js           # Knowledge base (parsed notebook registry)
+│   │   ├── documents.js           # File browser (briefings, decisions, weekly-reviews) + POST /review
+│   │   ├── factory.js             # Factory config CRUD (GET/PUT), machines, zones, operating
+│   │   ├── health.js              # Health status + details, sync endpoints
+│   │   ├── marketing-ops.js       # Marketing dashboards (campaigns, content, sequences, sessions, tasks)
+│   │   ├── notebooks.js           # Knowledge base (parsed notebook registry)
+│   │   ├── notion.js              # Dashboard, focus areas, commitments, decisions, people, action-queue, etc.
+│   │   ├── ops.js                 # Operations overview (stock, sales, products, POs)
+│   │   ├── overview.js            # Overview aggregation
+│   │   ├── read-models.js         # Read-model GET / and GET /:name endpoints
+│   │   ├── registry.js            # Project registry (GET all, GET :slug, PATCH :slug)
+│   │   ├── sheets.js              # CRUD routes for 25+ registered Google Sheets (GET/POST/PATCH/DELETE)
+│   │   ├── skills.js              # GET /api/skills — lists available skill buttons
+│   │   ├── system-map.js          # Aggregated app structure (60s cache, force bust)
+│   │   └── tech-team.js           # Sprint board, bugs, specs, decisions, velocity, agents, strategy, github, backlog
 │   ├── services/
-│   │   ├── agent.js               # Claude API wrapper, agentic tool loop, conversation state
-│   │   ├── notion.js              # Notion SDK wrapper, 11 databases, 5-min cache
-│   │   ├── sheets.js              # Google Sheets SDK wrapper, SHEET_REGISTRY (25 tabs), CRUD methods, 5-min cache
-│   │   ├── hydration.js           # Data hydration service: FK resolution across sheets (24 relationships)
-│   │   ├── github.js              # GitHub API wrapper (repo activity, PRs, issues, 5-min cache)
-│   │   ├── notebooks.js           # Notebook registry parser (markdown → structured JSON)
-│   │   ├── prompts.js             # Loads CLAUDE.md + colin.md + notion-hub.md as system prompt
-│   │   └── approval.js            # Pending approval queue (promise-based blocking)
+│   │   ├── activity-feed-service.js      # Activity aggregation
+│   │   ├── agent.js                      # Claude API wrapper, agentic tool loop, conversation state
+│   │   ├── approval.js                   # Pending approval queue (promise-based blocking)
+│   │   ├── ceo-dashboard-service.js      # CEO dashboard composition
+│   │   ├── competitor-intel-service.js   # Competitor data aggregation
+│   │   ├── crm-service.js                # CRM aggregation/filtering
+│   │   ├── dan-colin-service.js          # Dan↔Colin queue orchestration (Notion DB 00969f07)
+│   │   ├── dashboard-service.js          # Dashboard summary + action queue composition
+│   │   ├── db.js                         # Optional database adapter (Postgres via DATABASE_URL)
+│   │   ├── db-migrations.js              # Database schema management
+│   │   ├── factory-service.js            # Factory config orchestration
+│   │   ├── github.js                     # GitHub API wrapper (repo activity, 5-min cache)
+│   │   ├── google-calendar.js            # Google Calendar integration
+│   │   ├── hydration.js                  # Data hydration: FK resolution across sheets (24 relationships)
+│   │   ├── marketing-ops-service.js      # Marketing Ops aggregation/filtering
+│   │   ├── notebooks.js                  # Notebook registry parser (markdown → JSON)
+│   │   ├── notion.js                     # Notion SDK wrapper, 15+ databases, 5-min cache
+│   │   ├── notion-detail-service.js      # Focus area + person detail composition
+│   │   ├── ops-service.js                # Operations aggregation
+│   │   ├── overview-service.js           # Overview orchestration
+│   │   ├── projection-job-store.js       # Projection job persistence
+│   │   ├── projects-service.js           # Project enrichment + commitment stats
+│   │   ├── prompts.js                    # Loads CLAUDE.md + colin.md + notion-hub.md as system prompt
+│   │   ├── read-model-scheduler.js       # Read-model refresh scheduler
+│   │   ├── read-model-store.js           # Read-model persistence (DB or filesystem)
+│   │   ├── read-model-sync.js            # Read-model sync orchestration
+│   │   ├── sheets.js                     # Google Sheets SDK wrapper (SHEET_REGISTRY 25+ tabs), 5-min cache
+│   │   ├── system-map-service.js         # System map builder (routes, modules, DBs, sheets, agents)
+│   │   └── tech-team-service.js          # Tech Team aggregation/catalog composition
 │   └── tools/
 │       ├── notion-tools.js        # 4 tool definitions: query_database, get_page, create_page, update_page
 │       ├── file-tools.js          # 3 tool definitions: read_file, write_file, list_files
@@ -84,6 +117,29 @@ command-centre/
 ```
 
 ~40 files total.
+
+---
+
+## Persistence & Read-Models (Phase 1)
+
+The app supports optional **persistent read-models** for cross-domain composition and long-lived caching:
+
+- **Database:** Optional PostgreSQL via `DATABASE_URL` env var. If set, reads/writes flow through `server/services/db.js`. If not set, gracefully degrades to in-memory + filesystem cache.
+- **Read-models:** Domain views (dashboard, CRM, ops, marketing-ops, tech-team, action-queue) are cached separately via `read-model-store.js` — either to the database or to `server/data/` (gitignored). Keyed by domain + version.
+- **Scheduler:** `read-model-scheduler.js` runs periodic refresh jobs to keep cached views fresh without fetching raw data on every request.
+- **Projections:** Stateful job tracking via `projection-job-store.js` to prevent duplicate work and track last-run state.
+
+Graceful degradation: If the database is unavailable or filesystem is read-only (e.g., Vercel Lambda), the app continues to serve from in-memory cache.
+
+---
+
+## Architecture & Roadmap
+
+For deployment patterns, database schema, phased refactoring, and long-term architecture decisions, see:
+- `docs/architecture/target-architecture.md` — Phase 2+ vision (streaming APIs, event sourcing)
+- `docs/architecture/phased-refactor-roadmap.md` — Timeline for optional Postgres adoption
+- `docs/architecture/database-schema-plan.md` — Proposed schema for read-models
+- `docs/architecture/postgres-test-pass.md` — Local Postgres test results
 
 ---
 

@@ -74,6 +74,13 @@ router.post('/sync', async (req, res) => {
   }
 });
 
+router.get('/config', (req, res) => {
+  res.json({
+    provider: config.PROVIDER,
+    model: config.PROVIDER === 'deepseek' ? config.DEEPSEEK_MODEL : config.MODEL,
+  });
+});
+
 router.post('/sync/:name', async (req, res) => {
   try {
     const result = await readModelSync.syncReadModel(req.params.name);

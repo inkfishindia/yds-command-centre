@@ -2,7 +2,7 @@
 
 **Purpose:** Single source of truth for what exists in the app. Read this before building anything. Update this when you change the app.
 
-**Last updated:** 2026-04-23 (Dan ↔ Colin Queue backend added: `/api/dan-colin` routes + `server/services/dan-colin-service.js`. Source: Notion DB `00969f07`. GET groups queue by section; POST /:id/answer and POST /drop both SSE + approval-gated. Auto-close logic: non-empty answer on ⚡ Waiting row atomically sets ✅ Closed + Resolved.)
+**Last updated:** 2026-04-25 (Chat offline UX: When `chatAvailable=false`, offline banner displays with "Drop a note for Colin" CTA that opens a bottom-sheet composer. Submits POST `/api/dan-colin/drop` → row lands as Section=📥 Drop, Owner=Colin, Status=Open in Notion DB `00969f07`. Frontend: state fields `chatOfflineComposerOpen`, `chatOfflineBody`, `chatOfflineSubmitting`, `chatOfflineError` + methods `openChatOfflineComposer()`, `closeChatOfflineComposer()`, `submitChatOfflineDrop()` in `src/js/modules/chat.js`; banner + sheet markup in `public/partials/chat.html`; styles in `src/css/core.css`. Also: converted 16 remaining partial views from `<template x-if>` to `<div x-show>` to prevent view leak across navigations.)
 
 ---
 
@@ -129,6 +129,12 @@ Source: Notion DB `00969f07-8b4d-4c88-8a45-ec1e95b3bacb`. 5-min in-process cache
 | GET | `/api/dan-colin` | Grouped queue: `{ now, waiting, drop, watch, closed, meta }` — excludes Archived, closed = Resolved OR ✅ Closed within 7d |
 | POST | `/api/dan-colin/:id/answer` | Body: `{ answer: string }` — SSE + approval gate. Auto-closes ⚡ Waiting rows to ✅ Closed + Resolved when answer is non-empty |
 | POST | `/api/dan-colin/drop` | Body: `{ body: string }` — SSE + approval gate. Creates new row with Section=📥 Drop, Owner=Colin, Status=Open |
+
+### Daily Sales (`server/routes/daily-sales.js`)
+Source: Google Sheets workbook "YDC - sales report" (`DAILY_SALES_SPREADSHEET_ID`). Two tabs: `2026` (YTD) + dynamic current-month tab (`April 2026` etc). 5-min in-process cache.
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/daily-sales` | CEO dashboard payload: `{ source, freshness, today, mtd, ytd, trend30d, mix, topStates, todaysOrders, concerns }` — see service for full shape. Gracefully degrades if month tab missing (`monthTabAvailable: false`). |
 
 ### Marketing Ops (`server/routes/marketing-ops.js`)
 | Method | Path | Description |

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "nvidia": {
+      "options": {
+        "apiKey": "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"
+      }
+    }
+  },
+  "model": "deepseek-ai/deepseek-v4-pro"
+}

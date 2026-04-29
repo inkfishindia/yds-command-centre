@@ -247,7 +247,7 @@ describe('Sheets Service — SHEET_REGISTRY', () => {
     assert.equal(sheetsService.SHEET_REGISTRY.BMC_SEGMENTS.spreadsheetKey, 'BMC');
   });
 
-  it('has all 25 expected keys', () => {
+  it('has all 27 expected keys', () => {
     sheetsService = require('../server/services/sheets');
     const expectedKeys = [
       'PROJECTS', 'TASKS', 'PEOPLE', 'CAMPAIGNS', 'EXECUTIVE_DASHBOARD', 'TIME_TRACKING',
@@ -256,6 +256,7 @@ describe('Sheets Service — SHEET_REGISTRY', () => {
       'BMC_SEGMENTS', 'BMC_BUSINESS_UNITS', 'BMC_FLYWHEELS', 'BMC_REVENUE_STREAMS',
       'BMC_COST_STRUCTURE', 'BMC_CHANNELS', 'BMC_PLATFORMS', 'BMC_TEAM',
       'BMC_HUBS', 'BMC_PARTNERS', 'BMC_METRICS',
+      'SALES_YTD', 'SALES_CURRENT_MONTH',
     ];
     for (const key of expectedKeys) {
       assert.ok(sheetsService.SHEET_REGISTRY[key], `Missing SHEET_REGISTRY key: ${key}`);

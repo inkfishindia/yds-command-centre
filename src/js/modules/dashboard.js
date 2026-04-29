@@ -51,12 +51,18 @@ export function createDashboardModule() {
     _cachedSavedViewItems: null,
     _cachedPriorityCards: null,
     _cachedActivityFeedItems: null,
+    _dashboardHiddenAt: null,
 
     startDashboardAutoRefresh() {
       this.stopDashboardAutoRefresh();
+      this._dashboardHiddenAt = null;
       this._dashboardRefreshInterval = setInterval(() => {
-        if (this.view === 'dashboard' && !this.dashboardLoading) {
-          this.loadDashboard(true); // silent — no loading skeleton
+        if (document.hidden) {
+          this._dashboardHiddenAt = Date.now();
+          return;
+        }
+        if (this.view === 'dashboard' && !this.dashboardLoading && this.isDashboardStale()) {
+          this.loadDashboard(true);
         }
       }, 5 * 60 * 1000);
     },
@@ -66,6 +72,13 @@ export function createDashboardModule() {
         clearInterval(this._dashboardRefreshInterval);
         this._dashboardRefreshInterval = null;
       }
+      this._dashboardHiddenAt = null;
+    },
+
+    isDashboardStale() {
+      if (!this.dashboardMeta?.lastSyncedAt) return true;
+      const syncedAt = new Date(this.dashboardMeta.lastSyncedAt).getTime();
+      return Date.now() - syncedAt > 5 * 60 * 1000;
     },
 
     async loadDashboard(silent = false) {

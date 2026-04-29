@@ -31,54 +31,96 @@ Express Server (server.js)
 ```
 server.js                          # Express entry, middleware, static serving
 server/config.js                   # Env vars, model config, workspace paths
-server/routes/
+server/routes/                     # Controller-thin HTTP layer
   chat.js                          # POST /api/chat (SSE stream), approval resolve
   notion.js                        # Notion-backed read routes
   commitments.js                   # Commitment write routes
   decisions.js                     # Decision write routes
+  dan-colin.js                     # Dan ↔ Colin Queue: GET queue, POST answer, POST drop
   crm.js                           # CRM endpoints
   marketing-ops.js                 # Marketing operations endpoints
   tech-team.js                     # Tech team endpoints
   factory.js                       # Factory config + simulation endpoints
   bmc.js                           # Business Model Canvas endpoints
+  ceo-dashboard.js                 # CEO dashboard composition
+  ops.js                           # Operations dashboard
+  overview.js                      # Cross-domain overview (read-model backed)
+  activity-feed.js                 # Recent decisions + commitments + queue resolutions
+  competitor-intel.js              # Competitor intelligence
+  system-map.js                    # System map / view registry
+  ai-team.js                       # AI team metadata
+  read-models.js                   # Read-model status, refresh triggers
+  health.js                        # Liveness + env-key visibility
   registry.js                      # Internal project registry endpoints
   sheets.js                        # Registered Google Sheets access
   documents.js                     # Briefings, decisions, weekly reviews
+  notebooks.js                     # Knowledge base notebook registry
   skills.js                        # List available skill buttons
-server/services/
+server/services/                   # Infrastructure + domain orchestration
   agent.js                         # Claude API agentic loop (tool use cycle)
   notion.js                        # Notion SDK wrapper, 5-min cache, raw query primitives
+  sheets.js                        # Google Sheets access + cache
+  hydration.js                     # FK hydration between sheet datasets
+  github.js                        # GitHub repo activity wrapper
+  google-calendar.js               # Google Calendar wrapper
+  db.js + db-migrations.js         # Postgres client + migration runner (optional persistence)
+  prompts.js                       # Load system prompt from Colin's workspace
+  approval.js                      # Promise-based write approval queue
   dashboard-service.js             # Dashboard summary + action queue composition
+  ceo-dashboard-service.js         # CEO-level KPI roll-up
   projects-service.js              # Project enrichment + commitment stats
   notion-detail-service.js         # Focus area + person detail composition
   crm-service.js                   # CRM aggregation/filtering
   marketing-ops-service.js         # Marketing Ops aggregation/filtering
   tech-team-service.js             # Tech Team aggregation/catalog composition
   factory-service.js               # Factory config read/write orchestration
-  sheets.js                        # Google Sheets access + cache
-  hydration.js                     # FK hydration between sheet datasets
-  github.js                        # GitHub repo activity wrapper
-  prompts.js                       # Load system prompt from Colin's workspace
-  approval.js                      # Promise-based write approval queue
+  ops-service.js                   # Operations aggregation
+  overview-service.js              # Cross-domain overview composition (read-model)
+  activity-feed-service.js         # Decision + commitment + queue activity feed
+  competitor-intel-service.js      # Competitor intel aggregation
+  system-map-service.js            # View/route catalog
+  dan-colin-service.js             # Dan ↔ Colin Queue: getQueue/submitAnswer/createDrop
+  notebooks.js                     # Notebook registry parser
+  read-model-store.js              # Read-model JSON persistence (DB + filesystem fallback)
+  read-model-sync.js               # Source-of-truth sync into read-models
+  read-model-scheduler.js          # Background refresh scheduler
+  projection-job-store.js          # Projection job queue state
 server/tools/
   notion-tools.js                  # Tool schemas: query, get, create, update
   file-tools.js                    # Tool schemas: read, write, list
+  marketing-tools.js               # Tool schemas: customer psych, competitor, content, campaign
+  store-tools.js                   # Tool schemas: store_expert query/update
   tool-handler.js                  # Central dispatch + Notion property converter
 public/
   index.html                       # SPA shell (Alpine.js templates)
+  partials/                        # Per-view HTML partials lazy-loaded by command-shell
   js/app.js                        # Built frontend bundle copied from src/js
   css/styles.css                   # Dark theme, responsive layout
 src/js/
   app.js                           # Root shell + shared utilities + module composition
-  modules/                         # Domain frontend modules (chat, dashboard, commitments, factory, command-shell, CRM, etc.)
+  modules/                         # Domain frontend modules (chat, dashboard, dan-colin, factory,
+                                   # command-shell, CRM, marketing-ops, tech-team, ops, overview,
+                                   # competitor-intel, system-map, registry, projects, team,
+                                   # notion-browser, documents, bmc, commitments, claude-usage,
+                                   # read-models, system-status, detail-drawer, inline-actions,
+                                   # markdown, toasts)
 .claude/
   agents/                          # Agent configs (frontend-builder, backend-builder, code-reviewer, devops-infra, ux-auditor, pixel, design-planner, tester, scribe)
   rules/                           # Coding patterns (frontend, server, token efficiency, api-schemas, workflow)
   skills/ui-ux-pro-max/            # Design intelligence: 50+ styles, 97 palettes, 57 font pairings, UX guidelines
   docs/app-reference.md            # FULL APP INVENTORY — routes, views, state, methods, CSS, tools. Read before building.
   docs/notion-hub.md               # Notion database IDs, people IDs, property schemas, write templates
-  docs/tech-brief.md               # Technical architecture brief
+  docs/tech-brief.md               # Technical architecture brief (older; cross-check against app-reference.md if conflict)
+docs/architecture/                 # Forward-looking architecture pack — READ for roadmap context
+  README.md                        # How to use the pack
+  target-architecture.md           # Where the platform is heading
+  database-schema-plan.md          # Postgres schema target + migration shape
+  phased-refactor-roadmap.md       # Phase 0/1/2 plan — what to refactor and in what order
+  postgres-test-pass.md            # DB test strategy
+db/migrations/                     # Postgres migration files (run via server/services/db-migrations.js)
 data/schemas/                      # Captured API response samples (Notion/Sheets/GitHub). Gitignored; regenerate via scripts/capture-schemas.js.
+data/sessions/                     # Per-session log: handoff.md, activity-log.md, decisions.md, open-loops.md
+design-system/                     # Design specs (TOKENS, CSS-PATTERNS, INDEX, page briefs)
 scripts/capture-schemas.js         # One-shot: calls live services, saves real response shapes to data/schemas/.
 ```
 
@@ -90,6 +132,17 @@ scripts/capture-schemas.js         # One-shot: calls live services, saves real r
 4. **Notion + Sheets Infrastructure** — raw SDK/data access stays in infrastructure services; domain services compose product-facing payloads.
 5. **Frontend Modules** — keep domain state in `src/js/modules/*`; `src/js/app.js` should remain a shell/composition layer, not a dumping ground.
 6. **Build Step Exists** — edit `src/js/*`, then build to `public/js/*`.
+
+## Roadmap & Architecture Direction
+
+The forward-looking architecture pack lives in **[`docs/architecture/`](docs/architecture/)**. Read it when planning non-trivial work:
+
+- `target-architecture.md` — where the platform is heading (durable state ownership, clearer read/write boundaries, less direct dependence on Notion/Sheets at request time)
+- `phased-refactor-roadmap.md` — Phase 0 (stabilize) → Phase 1 (read-model layer) → Phase 2+ (durable state) — staged so feature work doesn't freeze
+- `database-schema-plan.md` — Postgres schema target
+- `postgres-test-pass.md` — DB test strategy
+
+The read-model layer (`server/services/read-model-*.js`, `server/routes/read-models.js`, `server/routes/overview.js`) is Phase 1 in flight. New cross-domain views should prefer the read-model path over direct Notion calls.
 
 ## Agent Routing
 

@@ -71,7 +71,7 @@ export function createCommandShellModule() {
 
     async openNavigationTarget(action) {
       // Load HTML partial for views that have been extracted to separate files
-      const partialViews = ['chat', 'overview', 'dashboard', 'actionQueue', 'focusArea', 'team', 'personView', 'docs', 'notion', 'knowledge', 'decisions', 'projects', 'registry', 'commitments', 'factory', 'marketingOps', 'techTeam', 'bmc', 'crm', 'ops', 'status', 'claude-usage', 'system-map', 'dan-colin'];
+      const partialViews = ['chat', 'overview', 'dashboard', 'actionQueue', 'focusArea', 'team', 'personView', 'docs', 'notion', 'knowledge', 'decisions', 'projects', 'registry', 'commitments', 'factory', 'marketingOps', 'techTeam', 'bmc', 'crm', 'ops', 'status', 'claude-usage', 'system-map', 'dan-colin', 'daily-sales'];
       this.view = action;
       this.tableSelectedRow = -1;
       if (partialViews.includes(action)) {
@@ -112,10 +112,14 @@ export function createCommandShellModule() {
       else if (action === 'actionQueue') this.loadActionQueue();
       else if (action === 'factory' && !this.factoryConfig) this.loadFactoryConfig();
       else if (action === 'ops') this.loadOps();
-      else if (action === 'status') this.loadSystemStatus();
+      else if (action === 'status') {
+        this.loadSystemStatus();
+        this.loadAiConfig();
+      }
       else if (action === 'claude-usage') this.loadClaudeUsage();
       else if (action === 'system-map') this.loadSystemMap();
       else if (action === 'dan-colin') this.loadDanColin();
+      else if (action === 'daily-sales') this.loadDailySales();
     },
 
     openCmdPalette() {
@@ -194,6 +198,12 @@ export function createCommandShellModule() {
         { label: 'System Status', icon: '▸', type: 'view', view: 'status', keywords: ['health', 'status', 'sync', 'read models'], action: () => this.openNavigationTarget('status') },
         { label: 'System Map', icon: '▸', type: 'view', view: 'system-map', keywords: ['map', 'architecture', 'routes', 'modules', 'databases', 'repo', 'docs'], action: () => this.openNavigationTarget('system-map') },
         { label: 'Action Queue', icon: '▸', type: 'view', view: 'actionQueue', keywords: ['queue', 'actions', 'pending'], action: () => this.openNavigationTarget('actionQueue') },
+        { label: 'Daily Sales', icon: '▸', type: 'view', view: 'daily-sales', keywords: ['sales', 'revenue', 'orders', 'daily', 'mtd', 'ytd', 'trend'], action: () => this.openNavigationTarget('daily-sales') },
+        { label: 'Daily Sales — B2B only', icon: '▸', type: 'view', view: 'daily-sales', keywords: ['sales b2b', 'b2b orders', 'b2b filter'], action: () => { this.openNavigationTarget('daily-sales'); this.$nextTick(() => this.setDailyFilter('orderType', 'B2B')); } },
+        { label: 'Daily Sales — Cancelled', icon: '▸', type: 'view', view: 'daily-sales', keywords: ['cancelled orders', 'cancellation', 'filter cancelled'], action: () => { this.openNavigationTarget('daily-sales'); this.$nextTick(() => this.setDailyFilter('status', 'Cancelled')); } },
+        { label: 'Daily Sales — All statuses', icon: '▸', type: 'view', view: 'daily-sales', keywords: ['all orders', 'filter all', 'unfiltered'], action: () => { this.openNavigationTarget('daily-sales'); this.$nextTick(() => this.setDailyFilter('status', 'all')); } },
+        { label: 'Daily Sales — Last 7 days', icon: '▸', type: 'view', view: 'daily-sales', keywords: ['7 days', 'last week', 'sales week'], action: () => { this.openNavigationTarget('daily-sales'); this.$nextTick(() => this.applyDateRangePreset('7d')); } },
+        { label: 'Daily Sales — This month', icon: '▸', type: 'view', view: 'daily-sales', keywords: ['mtd', 'month to date', 'this month sales'], action: () => { this.openNavigationTarget('daily-sales'); this.$nextTick(() => this.applyDateRangePreset('mtd')); } },
       ];
     },
 

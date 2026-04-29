@@ -1,6 +1,7 @@
 export function createSystemStatusModule() {
   return {
     systemStatus: null,
+    aiConfig: null,
     systemStatusLoading: false,
     systemSyncing: false,
     systemSyncMessage: '',
@@ -18,6 +19,25 @@ export function createSystemStatusModule() {
       } finally {
         this.systemStatusLoading = false;
       }
+    },
+
+    async loadAiConfig() {
+      try {
+        const res = await fetch('/api/health/config');
+        if (res.ok) {
+          this.aiConfig = await res.json();
+        }
+      } catch (err) {
+        console.error('AI config load error:', err);
+      }
+    },
+
+    getAiProvider() {
+      return this.aiConfig?.provider || 'anthropic';
+    },
+
+    getAiModel() {
+      return this.aiConfig?.model || 'claude-opus-4';
     },
 
     async syncReadModels(name = null) {

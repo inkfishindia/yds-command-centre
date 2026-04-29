@@ -1,10 +1,13 @@
 /**
  * Simple password gate for public deployment.
  * Set ACCESS_PASSWORD env var to enable. If not set, gate is disabled (local dev).
- * Uses a cookie so the user only logs in once per browser session.
+ * Uses a session token stored in a signed cookie.
  */
-const COOKIE_NAME = 'yds_cc_auth';
+const crypto = require('crypto');
+
+const COOKIE_NAME = 'yds_cc_session';
 const LOGIN_PATH = '/login';
+const TOKEN_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const PUBLIC_GET_PATHS = new Set([
   '/api/health',
   '/api/health/details',
@@ -19,18 +22,48 @@ const PUBLIC_ASSET_PATHS = [
   '/favicon.png',
 ];
 
+const activeTokens = new Map();
+
+function escapeHTML(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function generateToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function signToken(token) {
+  const hmac = crypto.createHmac('sha256', TOKEN_SECRET);
+  hmac.update(token);
+  const signature = hmac.digest('hex');
+  return `${token}.${signature}`;
+}
+
+function verifyToken(signed) {
+  if (!signed) return null;
+  const parts = signed.split('.');
+  if (parts.length !== 2) return null;
+  const [token, signature] = parts;
+  const hmac = crypto.createHmac('sha256', TOKEN_SECRET);
+  hmac.update(token);
+  const expected = hmac.digest('hex');
+  if (signature !== expected) return null;
+  return token;
+}
+
 function authGate(req, res, next) {
   const password = process.env.ACCESS_PASSWORD;
 
-  // No password configured or a Vercel preview deploy → gate disabled.
   if (!password) return next();
   if (process.env.VERCEL_ENV === 'preview') return next();
 
-  // Allow the login page and its POST
   if (req.path === LOGIN_PATH) return next();
 
-  // Allow read-only health checks plus static shell assets to load without auth.
-  // Data APIs remain protected unless explicitly listed above.
   if ((req.method === 'GET' || req.method === 'HEAD') && (
     PUBLIC_GET_PATHS.has(req.path)
     || PUBLIC_ASSET_PATHS.includes(req.path)
@@ -39,14 +72,11 @@ function authGate(req, res, next) {
     return next();
   }
 
-  // Check API key header (for service-to-service calls from ERP/other apps)
   const apiKey = process.env.CC_API_KEY;
   if (apiKey && req.headers['x-api-key'] === apiKey) return next();
 
-  // Check cookie
-  if (hasValidAuthCookie(req.headers.cookie || '', password)) return next();
+  if (hasValidSession(req.headers.cookie)) return next();
 
-  // Not authenticated → show login form
   res.status(401).send(loginPage());
 }
 
@@ -55,31 +85,32 @@ function loginRoute(req, res) {
   const submitted = req.body && req.body.password;
 
   if (submitted === password) {
-    const encodedPassword = encodeURIComponent(password);
-    // Set cookie — httpOnly, secure in production, 30 day expiry
+    const token = generateToken();
+    activeTokens.set(token, Date.now());
+
+    const signed = signToken(token);
     const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-    res.setHeader('Set-Cookie', `${COOKIE_NAME}=${encodedPassword}; Path=/; HttpOnly${secure}; SameSite=Strict; Max-Age=${30 * 24 * 60 * 60}`);
+    res.setHeader('Set-Cookie', `${COOKIE_NAME}=${signed}; Path=/; HttpOnly${secure}; SameSite=Strict; Max-Age=${30 * 24 * 60 * 60}`);
     return res.redirect(303, '/');
   }
 
   res.status(401).send(loginPage('Wrong password'));
 }
 
-function hasValidAuthCookie(cookieHeader, password) {
-  if (!cookieHeader || !password) return false;
+function hasValidSession(cookieHeader) {
+  if (!cookieHeader) return false;
 
   for (const pair of cookieHeader.split(';')) {
     const [key, ...rest] = pair.split('=');
     if (!key) continue;
-    const rawValue = rest.join('=').trim();
+    const value = rest.join('=').trim();
     if (key.trim() !== COOKIE_NAME) continue;
 
-    if (rawValue === password) return true;
+    const token = verifyToken(value);
+    if (!token) return false;
 
-    try {
-      if (decodeURIComponent(rawValue) === password) return true;
-    } catch {
-      // Ignore malformed escape sequences and fall back to the raw value check above.
+    if (activeTokens.has(token)) {
+      return true;
     }
   }
 
@@ -108,7 +139,7 @@ function loginPage(error) {
 <body>
   <form class="login-box" method="POST" action="/login">
     <h1>YDS Command Centre</h1>
-    ${error ? `<div class="error">${error}</div>` : ''}
+    ${error ? `<div class="error">${escapeHTML(error)}</div>` : ''}
     <input type="password" name="password" placeholder="Password" autofocus required>
     <button type="submit">Enter</button>
   </form>
@@ -116,4 +147,16 @@ function loginPage(error) {
 </html>`;
 }
 
-module.exports = { authGate, loginRoute, hasValidAuthCookie };
+function clearExpiredTokens() {
+  const now = Date.now();
+  const expiry = 30 * 24 * 60 * 60 * 1000;
+  for (const [token, created] of activeTokens) {
+    if (now - created > expiry) {
+      activeTokens.delete(token);
+    }
+  }
+}
+
+setInterval(clearExpiredTokens, 60 * 60 * 1000);
+
+module.exports = { authGate, loginRoute, hasValidAuthCookie: hasValidSession };

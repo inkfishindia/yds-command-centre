@@ -24,7 +24,8 @@
       "Bash(git commit *)",
       "Bash(python3 .claude/skills/*/scripts/*)",
       "Write(data/sessions/**)",
-      "Edit(data/sessions/**)"
+      "Edit(data/sessions/**)",
+      "mcp__claude_ai_Vercel__get_project"
     ],
     "deny": [
       "Bash(rm -rf *)",
@@ -110,12 +111,18 @@
   "mcpServers": {
     "stitch": {
       "command": "npx",
-      "args": ["@davideast/stitch-mcp", "proxy"],
+      "args": [
+        "@davideast/stitch-mcp",
+        "proxy"
+      ],
       "env": {}
     },
     "nanobanana-mcp": {
       "command": "npx",
-      "args": ["-y", "@ycse/nanobanana-mcp"],
+      "args": [
+        "-y",
+        "@ycse/nanobanana-mcp"
+      ],
       "env": {
         "GOOGLE_AI_API_KEY": "${GOOGLE_AI_API_KEY}"
       }
