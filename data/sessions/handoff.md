@@ -1,5 +1,10 @@
 # Session Handoff — Command Centre
 
+## 2026-04-29 16:00
+**Accomplished:** Scoped "Open in Sheets" link button feature across all sheet-backed views (Daily Sales, D2C, CRM, BMC, Competitor Intel, Ops, Tech Team, Dashboard). Recon mapped sheets-consuming services and routes; proposed 3-step plan (sheets.getSheetUrl helper with cached gid lookup → routes return `meta.sheetUrl` + `meta.sheetName` → view headers get reusable "↗ Open in Sheets" button class).
+**Decisions:** Dan confirmed scope = "all" sheet-backed pages and deep-link to specific tab (not spreadsheet root). Logged as decision #38.
+**Next:** Dispatch backend-builder (helper + route meta), then frontend-builder (button class + per-view placement), then code-reviewer. Pause for Dan to test before ux-auditor/tester per standing skip-UI-gates preference.
+
 ## 2026-04-29 18:35
 
 **Accomplished:**

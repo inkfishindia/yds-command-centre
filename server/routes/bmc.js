@@ -60,7 +60,21 @@ router.get('/', async (req, res) => {
       totalMetrics: canvas.metrics.length,
     };
 
-    res.json({ available: true, canvas, stats, timestamp: new Date().toISOString() });
+    let meta = {};
+    try {
+      const sheetLink = await sheetsService.getSheetLink('BMC_SEGMENTS');
+      if (sheetLink) {
+        const spreadsheetId = sheetsService.getSpreadsheetId('BMC');
+        meta.sheet = {
+          url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+          sheetName: 'Business Model Canvas',
+          label: 'Business Model Canvas',
+          spreadsheetTitle: sheetLink.spreadsheetTitle,
+        };
+      }
+    } catch (_) { /* non-fatal */ }
+
+    res.json({ available: true, canvas, stats, timestamp: new Date().toISOString(), meta });
   } catch (err) {
     console.error('BMC error:', err);
     res.status(500).json({ error: 'Failed to load Business Model Canvas' });

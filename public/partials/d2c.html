@@ -1,0 +1,82 @@
+<!-- D2C Product Catalog View -->
+<div class="d2c-view" x-data="{}">
+  
+  <!-- Header -->
+  <div class="view-header-bar">
+    <div class="view-header-left">
+      <span class="view-header-emoji">👕</span>
+      <div class="view-header-text">
+        <h2 class="view-header-title">Product Catalog</h2>
+        <span class="view-header-subtitle" x-text="(d2cProducts?.length || 0) + ' products'"></span>
+      </div>
+    </div>
+    <div class="view-header-actions">
+      <a
+        x-show="d2cMeta?.sheet?.url"
+        :href="d2cMeta?.sheet?.url"
+        target="_blank"
+        rel="noopener"
+        class="btn-open-sheet"
+        :title="`Open ${d2cMeta?.sheet?.spreadsheetTitle || 'Sheet'} → ${d2cMeta?.sheet?.sheetName || ''} in Google Sheets`"
+      >
+        <span class="btn-open-sheet__icon">↗</span>
+        <span x-text="d2cMeta?.sheet?.label || 'Open in Sheets'"></span>
+      </a>
+      <button class="btn btn-small" @click="loadD2cProducts()">
+        <span x-show="!d2cLoading">Refresh</span>
+        <span x-show="d2cLoading">Loading...</span>
+      </button>
+    </div>
+  </div>
+  
+  <!-- Tabs -->
+  <div class="view-tabs">
+    <button class="tab" :class="d2cActiveTab === 'products' && 'tab-active'" @click="d2cActiveTab = 'products'">Products</button>
+    <button class="tab" :class="d2cActiveTab === 'categories' && 'tab-active'" @click="d2cActiveTab = 'categories'">Categories</button>
+    <button class="tab" :class="d2cActiveTab === 'methods' && 'tab-active'" @click="d2cActiveTab = 'methods'">Methods</button>
+  </div>
+  
+  <!-- Filters -->
+  <div class="view-filters" x-show="d2cActiveTab === 'products'">
+    <input type="text" class="input" placeholder="Search products..." x-model="d2cFilterSearch" @input.debounce.300ms="loadD2cProducts()">
+    <select class="input" x-model="d2cFilterCategory" @change="loadD2cProducts()">
+      <option value="">All Categories</option>
+      <template x-for="cat in d2cCategories" :key="cat.id">
+        <option :value="cat.name" x-text="cat.name + ' (' + cat.product_count + ')'"></option>
+      </template>
+    </select>
+  </div>
+  
+  <!-- Products Grid -->
+  <div class="data-card-grid" x-show="d2cActiveTab === 'products'">
+    <template x-for="product in d2cProducts" :key="product.id">
+      <div class="data-card" @click="loadD2cProduct(product.slug)">
+        <h3 class="data-card-label" x-text="product.name"></h3>
+        <p class="text-muted" style="font-size:0.875rem;" x-text="product.category"></p>
+        <p class="data-card-value" x-text="formatPrice(product.price_inr)"></p>
+      </div>
+    </template>
+  </div>
+  
+  <!-- Categories -->
+  <div class="data-card-grid" x-show="d2cActiveTab === 'categories'">
+    <template x-for="cat in d2cCategories" :key="cat.id">
+      <div class="data-card">
+        <h3 class="data-card-label" x-text="cat.name"></h3>
+        <p class="text-muted" style="font-size:0.875rem;" x-text="cat.product_count + ' products'"></p>
+      </div>
+    </template>
+  </div>
+  
+  <!-- Methods -->
+  <div class="data-card-grid" x-show="d2cActiveTab === 'methods'">
+    <template x-for="method in d2cMethods" :key="method.id">
+      <div class="data-card">
+        <h3 class="data-card-label" x-text="method.name"></h3>
+        <p class="text-muted" style="font-size:0.875rem;" x-text="method.description"></p>
+        <div class="data-card-trend" x-text="method.print_type"></div>
+      </div>
+    </template>
+  </div>
+  
+</div>

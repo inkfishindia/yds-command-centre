@@ -70,8 +70,8 @@ export function createCommandShellModule() {
     },
 
     async openNavigationTarget(action) {
-      // Load HTML partial for views that have been extracted to separate files
-      const partialViews = ['chat', 'overview', 'dashboard', 'actionQueue', 'focusArea', 'team', 'personView', 'docs', 'notion', 'knowledge', 'decisions', 'projects', 'registry', 'commitments', 'factory', 'marketingOps', 'techTeam', 'bmc', 'crm', 'ops', 'status', 'claude-usage', 'system-map', 'dan-colin', 'daily-sales'];
+      this._clearAllIntervals();
+      const partialViews = ['chat', 'overview', 'dashboard', 'actionQueue', 'focusArea', 'team', 'personView', 'docs', 'notion', 'knowledge', 'decisions', 'projects', 'registry', 'commitments', 'factory', 'marketingOps', 'techTeam', 'bmc', 'crm', 'ops', 'status', 'claude-usage', 'system-map', 'dan-colin', 'daily-sales', 'd2c'];
       this.view = action;
       this.tableSelectedRow = -1;
       if (partialViews.includes(action)) {
@@ -120,6 +120,12 @@ export function createCommandShellModule() {
       else if (action === 'system-map') this.loadSystemMap();
       else if (action === 'dan-colin') this.loadDanColin();
       else if (action === 'daily-sales') this.loadDailySales();
+      else if (action === 'd2c') {
+        console.log('[d2c] Loading products...');
+        this.loadD2cCategories();
+        this.loadD2cMethods();
+        this.loadD2cProducts();
+      }
     },
 
     openCmdPalette() {

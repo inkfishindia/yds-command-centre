@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const opsService = require('../services/ops-service');
 const opsReadModel = require('../read-model/ops');
+const sheetsService = require('../services/sheets');
 
 /**
  * GET /api/ops
@@ -11,7 +12,37 @@ const opsReadModel = require('../read-model/ops');
  */
 router.get('/', async (req, res) => {
   try {
-    res.json(await opsReadModel.build());
+    const OPS_SHEET_KEYS = [
+      { spreadsheetKey: 'OPS_INVENTORY', sampleSheetKey: 'OPS_PRODUCT_TYPES', label: 'Inventory' },
+      { spreadsheetKey: 'OPS_SALES',     sampleSheetKey: 'OPS_SALES_ORDERS',  label: 'Sales' },
+      { spreadsheetKey: 'OPS_PRODUCTS',  sampleSheetKey: 'OPS_PRODUCT_VARIANTS', label: 'Products' },
+      { spreadsheetKey: 'OPS_WAREHOUSE', sampleSheetKey: 'OPS_WAREHOUSE_ZONES',  label: 'Warehouse' },
+    ];
+
+    const [data, ...linkResults] = await Promise.all([
+      opsReadModel.build(),
+      ...OPS_SHEET_KEYS.map(k => sheetsService.getSheetLink(k.sampleSheetKey).catch(() => null)),
+    ]);
+
+    const sheetLinks = [];
+    OPS_SHEET_KEYS.forEach(({ spreadsheetKey, label }, i) => {
+      const link = linkResults[i];
+      const spreadsheetId = sheetsService.getSpreadsheetId(spreadsheetKey);
+      if (link && spreadsheetId) {
+        sheetLinks.push({
+          key: spreadsheetKey,
+          label,
+          url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+          sheetName: label,
+          spreadsheetTitle: link.spreadsheetTitle,
+        });
+      }
+    });
+
+    if (sheetLinks.length > 0) {
+      data.meta = Object.assign({}, data.meta || {}, { sheetLinks });
+    }
+    res.json(data);
   } catch (err) {
     console.error('[ops] overview error:', err.message);
     res.status(500).json({ error: 'Failed to load ops overview' });

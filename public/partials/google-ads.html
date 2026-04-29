@@ -1,0 +1,159 @@
+<!-- Loaded lazily via _loadPartial('google-ads') -->
+<div x-init="if (!googleAds && !googleAdsLoading) loadGoogleAds()">
+  <!-- Loading state -->
+  <template x-if="googleAdsLoading && !googleAds">
+    <div class="view-loading">
+      <div class="loading-skeleton skeleton-card"></div>
+      <div class="loading-skeleton skeleton-card"></div>
+    </div>
+  </template>
+
+  <!-- Error state -->
+  <template x-if="googleAdsError && !googleAdsLoading">
+    <div class="ga-error">
+      <p x-text="googleAdsError"></p>
+      <button class="btn btn-small" @click="loadGoogleAds()">Retry</button>
+    </div>
+  </template>
+
+  <!-- Unavailable state -->
+  <template x-if="googleAds && googleAds.available === false">
+    <div class="ga-unavailable">
+      <h3>Google Ads</h3>
+      <p class="text-muted">Not configured. Set <code>GOOGLE_ADS_SPREADSHEET_ID</code> to enable.</p>
+    </div>
+  </template>
+
+  <!-- Dashboard -->
+  <template x-if="googleAds && googleAds.available === true">
+    <div class="ga-dashboard">
+      <!-- Header -->
+      <div class="ga-header">
+        <h2>Google Ads</h2>
+        <span class="text-muted text-small" x-text="'Last sync: ' + new Date(googleAds.timestamp).toLocaleTimeString('en-IN')"></span>
+        <button class="btn btn-small" @click="loadGoogleAds()" :disabled="googleAdsLoading" x-text="googleAdsLoading ? 'Loading...' : 'Refresh'"></button>
+      </div>
+
+      <!-- Metric Cards -->
+      <div class="ga-metrics-grid">
+        <div class="ga-metric-card">
+          <span class="ga-metric-label">Total Spend</span>
+          <span class="ga-metric-value" x-text="gaFormatINR(googleAds.totals.cost)"></span>
+          <span class="ga-metric-sub" x-text="'CPC: ' + gaFormatCPC(googleAds.totals.cpc)"></span>
+        </div>
+        <div class="ga-metric-card">
+          <span class="ga-metric-label">Clicks</span>
+          <span class="ga-metric-value" x-text="gaFormatNum(googleAds.totals.clicks)"></span>
+          <span class="ga-metric-sub" x-text="'CTR: ' + (googleAds.totals.impressions > 0 ? ((googleAds.totals.clicks / googleAds.totals.impressions) * 100).toFixed(2) + '%' : '—')"></span>
+        </div>
+        <div class="ga-metric-card">
+          <span class="ga-metric-label">Conversions</span>
+          <span class="ga-metric-value" x-text="gaFormatNum(googleAds.totals.conversions)"></span>
+          <span class="ga-metric-sub" x-text="'CPA: ' + gaFormatCPC(googleAds.totals.cpa)"></span>
+        </div>
+        <div class="ga-metric-card">
+          <span class="ga-metric-label">Revenue</span>
+          <span class="ga-metric-value" x-text="gaFormatINR(googleAds.totals.revenue)"></span>
+          <span class="ga-metric-sub" x-text="'ROAS: ' + gaFormatPct(googleAds.totals.roas)"></span>
+        </div>
+      </div>
+
+      <!-- Daily Trend -->
+      <div class="ga-section">
+        <h3 class="ga-section-title">Daily Trend (Last 14 Days)</h3>
+        <div class="ga-trend-chart">
+          <table class="ga-trend-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Cost</th>
+                <th>Clicks</th>
+                <th>Conv</th>
+                <th>Revenue</th>
+                <th>ROAS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="day in gaDailyTrend()" :key="day.date">
+                <tr>
+                  <td x-text="day.date"></td>
+                  <td x-text="gaFormatINR(day.cost)"></td>
+                  <td x-text="day.clicks"></td>
+                  <td x-text="gaFormatNum(day.conversions)"></td>
+                  <td x-text="gaFormatINR(day.revenue)"></td>
+                  <td x-text="day.cost > 0 ? (day.revenue / day.cost).toFixed(2) + 'x' : '—'"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Campaign Performance -->
+      <div class="ga-section">
+        <h3 class="ga-section-title">Campaign Performance</h3>
+        <div class="ga-table-wrap">
+          <table class="ga-table">
+            <thead>
+              <tr>
+                <th>Campaign</th>
+                <th>Impressions</th>
+                <th>Clicks</th>
+                <th>Cost</th>
+                <th>CPC</th>
+                <th>Conv</th>
+                <th>CPA</th>
+                <th>Revenue</th>
+                <th>ROAS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="camp in gaFilteredCampaigns()" :key="camp.name">
+                <tr>
+                  <td class="ga-cell-name" x-text="camp.name"></td>
+                  <td x-text="gaFormatNum(camp.impressions)"></td>
+                  <td x-text="camp.clicks"></td>
+                  <td x-text="gaFormatINR(camp.cost)"></td>
+                  <td x-text="gaFormatCPC(camp.cpc)"></td>
+                  <td x-text="gaFormatNum(camp.conversions)"></td>
+                  <td x-text="gaFormatCPC(camp.cpa)"></td>
+                  <td x-text="gaFormatINR(camp.revenue)"></td>
+                  <td :class="camp.roas >= 1 ? 'ga-positive' : 'ga-negative'" x-text="gaFormatPct(camp.roas)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Search Terms -->
+      <div class="ga-section">
+        <h3 class="ga-section-title">Top Search Terms</h3>
+        <div class="ga-table-wrap">
+          <table class="ga-table">
+            <thead>
+              <tr>
+                <th>Search Term</th>
+                <th>Campaign</th>
+                <th>Clicks</th>
+                <th>Cost</th>
+                <th>Conv</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="term in gaVisibleSearchTerms()" :key="term.term">
+                <tr>
+                  <td class="ga-cell-term" x-text="term.term"></td>
+                  <td x-text="term.campaign"></td>
+                  <td x-text="term.clicks"></td>
+                  <td x-text="gaFormatINR(term.cost)"></td>
+                  <td x-text="term.conversions"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </template>
+</div>

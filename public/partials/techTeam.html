@@ -615,6 +615,19 @@
         <div x-show="!techStrategy?.available" class="empty-state">
           <p>Strategy Cascade not configured. Set STRATEGY_SHEETS_ID to enable.</p>
         </div>
+        <div x-show="techStrategy?.available" style="display:flex;justify-content:flex-end;margin-bottom:0.75rem;">
+          <a
+            x-show="techStrategy?.meta?.sheet?.url"
+            :href="techStrategy?.meta?.sheet?.url"
+            target="_blank"
+            rel="noopener"
+            class="btn-open-sheet"
+            :title="`Open ${techStrategy?.meta?.sheet?.spreadsheetTitle || 'Sheet'} → ${techStrategy?.meta?.sheet?.sheetName || ''} in Google Sheets`"
+          >
+            <span class="btn-open-sheet__icon">↗</span>
+            <span x-text="techStrategy?.meta?.sheet?.label || 'Open in Sheets'"></span>
+          </a>
+        </div>
         <div x-show="techStrategy?.available" class="tech-strategy-tree">
           <template x-for="level in (techStrategy?.levels || [])" :key="level.name">
             <div class="tech-strategy-level">

@@ -17,6 +17,7 @@ const express = require('express');
 const router = express.Router();
 const dailySalesService = require('../services/daily-sales-service');
 const { parseFilterSpec, validateFilterSpec } = require('../services/daily-sales/filters');
+const sheetsService = require('../services/sheets');
 
 // GET /api/daily-sales
 router.get('/', async (req, res) => {
@@ -28,7 +29,17 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: errors.join('; ') });
     }
 
-    const payload = await dailySalesService.getDashboard({ filterSpec });
+    const [payload, sheetLink] = await Promise.all([
+      dailySalesService.getDashboard({ filterSpec }),
+      sheetsService.getSheetLink('SALES_CURRENT_MONTH').catch(() => null),
+    ]);
+
+    if (sheetLink) {
+      payload.meta = Object.assign({}, payload.meta || {}, {
+        sheet: { url: sheetLink.url, sheetName: sheetLink.sheetName, label: sheetLink.label, spreadsheetTitle: sheetLink.spreadsheetTitle },
+      });
+    }
+
     res.json(payload);
   } catch (err) {
     console.error('[daily-sales] getDashboard error:', err);

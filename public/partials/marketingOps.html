@@ -1113,11 +1113,24 @@
 
             <!-- Sub-nav: landscape / capabilities / swot / steal-adapt -->
             <template x-if="ciData || ciLoading">
-              <div class="ci-subnav" x-show="!ciLoading || ciData">
-                <button class="ci-subnav-btn" :class="ciSection === 'landscape' && 'ci-subnav-btn-active'" @click="ciSection = 'landscape'">Landscape</button>
-                <button class="ci-subnav-btn" :class="(ciSection === 'capabilities') && 'ci-subnav-btn-active'" @click="ciSwitchSection('capabilities')">Capabilities</button>
-                <button class="ci-subnav-btn" :class="(ciSection === 'swot') && 'ci-subnav-btn-active'" @click="ciSwitchSection('swot')">SWOT</button>
-                <button class="ci-subnav-btn" :class="(ciSection === 'steal-adapt') && 'ci-subnav-btn-active'" @click="ciSwitchSection('steal-adapt')">Steal / Adapt</button>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                <div class="ci-subnav" x-show="!ciLoading || ciData" style="margin-bottom:0;">
+                  <button class="ci-subnav-btn" :class="ciSection === 'landscape' && 'ci-subnav-btn-active'" @click="ciSection = 'landscape'">Landscape</button>
+                  <button class="ci-subnav-btn" :class="(ciSection === 'capabilities') && 'ci-subnav-btn-active'" @click="ciSwitchSection('capabilities')">Capabilities</button>
+                  <button class="ci-subnav-btn" :class="(ciSection === 'swot') && 'ci-subnav-btn-active'" @click="ciSwitchSection('swot')">SWOT</button>
+                  <button class="ci-subnav-btn" :class="(ciSection === 'steal-adapt') && 'ci-subnav-btn-active'" @click="ciSwitchSection('steal-adapt')">Steal / Adapt</button>
+                </div>
+                <a
+                  x-show="ciData?.meta?.sheet?.url"
+                  :href="ciData?.meta?.sheet?.url"
+                  target="_blank"
+                  rel="noopener"
+                  class="btn-open-sheet"
+                  :title="`Open ${ciData?.meta?.sheet?.spreadsheetTitle || 'Sheet'} → ${ciData?.meta?.sheet?.sheetName || ''} in Google Sheets`"
+                >
+                  <span class="btn-open-sheet__icon">↗</span>
+                  <span x-text="ciData?.meta?.sheet?.label || 'Open in Sheets'"></span>
+                </a>
               </div>
             </template>
 

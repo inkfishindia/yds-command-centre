@@ -167,6 +167,10 @@
             <span class="nav-icon-emoji" aria-hidden="true">🤝</span>
             <span class="nav-label" x-show="sidebarExpanded">CRM</span>
           </button>
+          <button class="nav-btn" :class="view === 'google-ads' && 'nav-active'" @click="openNavigationTarget('google-ads')" aria-label="Google Ads" :aria-current="view === 'google-ads' ? 'page' : false">
+            <span class="nav-icon-emoji" aria-hidden="true">📢</span>
+            <span class="nav-label" x-show="sidebarExpanded">Google Ads</span>
+          </button>
           <button class="nav-btn" :class="view === 'ops' && 'nav-active'" @click="openNavigationTarget('ops')" aria-label="Inventory &amp; Sales" :aria-current="view === 'ops' ? 'page' : false">
             <span class="nav-icon-emoji" aria-hidden="true">📦</span>
             <span class="nav-label" x-show="sidebarExpanded">Inventory</span>
@@ -228,6 +232,10 @@
           <button class="nav-btn" :class="view === 'factory' && 'nav-active'" @click="openNavigationTarget('factory')" aria-label="Factory" :aria-current="view === 'factory' ? 'page' : false">
             <span class="nav-icon-emoji" aria-hidden="true">🏭</span>
             <span class="nav-label" x-show="sidebarExpanded">Factory</span>
+          </button>
+          <button class="nav-btn" :class="view === 'd2c' && 'nav-active'" @click="openNavigationTarget('d2c')" aria-label="Product Catalog" :aria-current="view === 'd2c' ? 'page' : false">
+            <span class="nav-icon-emoji" aria-hidden="true">👕</span>
+            <span class="nav-label" x-show="sidebarExpanded">Catalog</span>
           </button>
           <button class="nav-btn" :class="view === 'notion' && 'nav-active'" @click="openNavigationTarget('notion')" aria-label="Notion browser" :aria-current="view === 'notion' ? 'page' : false" :title="getShortcutTooltip('Notion', 'notion')">
             <span class="nav-icon-emoji" aria-hidden="true">📋</span>
@@ -404,7 +412,7 @@
       </div>
 
       <!-- Dan ↔ Colin Queue view -->
-      <div x-show="view === 'dan-colin'" class="dan-colin-view view-panel">
+      <div x-show="view === 'dan-colin'" class="dan-colin-view view-panel view-scroll-container">
         <div x-show="!_partialLoaded['dan-colin']" class="view-loading">
           <div class="loading-skeleton skeleton-card"></div>
           <div class="loading-skeleton skeleton-card"></div>
@@ -412,7 +420,7 @@
       </div>
 
       <!-- Daily Sales view -->
-      <div x-show="view === 'daily-sales'" class="daily-sales-view view-panel">
+      <div x-show="view === 'daily-sales'" class="daily-sales-view view-panel view-scroll-container">
         <div x-show="!_partialLoaded['daily-sales']" class="view-loading">
           <div class="loading-skeleton skeleton-card"></div>
           <div class="loading-skeleton skeleton-card"></div>
@@ -520,6 +528,29 @@
     </div>
     <!-- ─── /CRM / Execution Data ─────────────────────────── -->
 
+    <!-- ─── D2C Product Catalog ─────────────────────────────────── -->
+    <div x-show="view === 'd2c'" class="d2c-view view-panel view-scroll-container">
+      <div x-show="!_partialLoaded.d2c" class="view-loading">
+        <div class="loading-skeleton skeleton-card"></div>
+        <div class="loading-skeleton skeleton-card"></div>
+      </div>
+      <div x-show="_partialLoaded.d2c" x-cloak>
+        <div x-data="{}" x-ref="d2cContent">
+          <!-- Content loads via loadPartial -->
+        </div>
+      </div>
+    </div>
+    <!-- ─── /D2C Product Catalog ───────────────────────────── -->
+
+    <!-- ─── Google Ads ─────────────────────────────────────── -->
+    <div x-show="view === 'google-ads'" class="google-ads-view view-panel">
+      <div x-show="!_partialLoaded['google-ads']" class="view-loading">
+        <div class="loading-skeleton skeleton-card"></div>
+        <div class="loading-skeleton skeleton-card"></div>
+      </div>
+    </div>
+    <!-- ─── /Google Ads ───────────────────────────────────── -->
+    
     <!-- ─── Inventory & Sales (Ops) ──────────────────────────────────── -->
     <div x-show="view === 'ops'" class="ops-view view-panel">
       <div x-show="!_partialLoaded.ops" class="view-loading">

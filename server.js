@@ -42,6 +42,7 @@ app.use('/api', (req, res, next) => {
     '/ops',
     '/marketing-ops',
     '/tech-team',
+    '/google-ads',
   ];
   const mediumCachePaths = [
     '/skills',
@@ -130,6 +131,7 @@ app.use('/api/tech-team', require('./server/routes/tech-team'));
 app.use('/api/ai-team', require('./server/routes/ai-team'));
 app.use('/api/bmc', require('./server/routes/bmc'));
 app.use('/api/crm', require('./server/routes/crm'));
+app.use('/api/d2c', require('./server/routes/d2c'));
 app.use('/api/overview', require('./server/routes/overview'));
 app.use('/api/ops', require('./server/routes/ops'));
 app.use('/api/read-models', require('./server/routes/read-models'));
@@ -140,6 +142,7 @@ app.use('/api/system-map', require('./server/routes/system-map'));
 app.use('/api/dan-colin', require('./server/routes/dan-colin'));
 app.use('/api/activity-feed', require('./server/routes/activity-feed'));
 app.use('/api/daily-sales', require('./server/routes/daily-sales'));
+app.use('/api/google-ads', require('./server/routes/google-ads'));
 
 // Static file serving — Alpine.js frontend from public/
 // Cache JS/CSS for 1 hour (assets are rebuilt on deploy); HTML always revalidates.

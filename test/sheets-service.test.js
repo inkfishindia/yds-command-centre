@@ -636,3 +636,200 @@ describe('Sheets Service — error discrimination: reason field contract', () =>
     assert.equal(shape.reason, undefined);
   });
 });
+
+// ── getSheetLink — unit tests ─────────────────────────────────────────────────
+
+describe('Sheets Service — getSheetLink (unconfigured)', () => {
+  let savedEnv;
+
+  beforeEach(() => { savedEnv = saveAndClearSheetsEnv(); });
+  afterEach(() => restoreSheetsEnv(savedEnv));
+
+  it('exports getSheetLink as a function', () => {
+    const sheets = require('../server/services/sheets');
+    assert.equal(typeof sheets.getSheetLink, 'function');
+  });
+
+  it('returns null when spreadsheet is not configured', async () => {
+    const { getSheetLink } = require('../server/services/sheets');
+    const result = await getSheetLink('BMC_SEGMENTS');
+    assert.equal(result, null);
+  });
+
+  it('returns null for SALES_CURRENT_MONTH when not configured', async () => {
+    const { getSheetLink } = require('../server/services/sheets');
+    const result = await getSheetLink('SALES_CURRENT_MONTH');
+    assert.equal(result, null);
+  });
+
+  it('throws on unknown sheet key', async () => {
+    const { getSheetLink } = require('../server/services/sheets');
+    await assert.rejects(() => getSheetLink('NOT_A_REAL_KEY'), /Unknown sheet key/);
+  });
+
+  it('does not throw when not configured', async () => {
+    const { getSheetLink } = require('../server/services/sheets');
+    await assert.doesNotReject(() => getSheetLink('PROJECTS'));
+  });
+});
+
+describe('Sheets Service — getSheetLink (mocked API)', () => {
+  // We test the gid-lookup and cache hit by injecting a configured config and
+  // monkey-patching the googleapis module in require.cache to return fake data.
+
+  const CONFIG_PATH = require.resolve('../server/config');
+  const SHEETS_PATH = require.resolve('../server/services/sheets');
+  const GOOGLEAPIS_PATH = require.resolve('googleapis');
+
+  let savedConfig;
+  let savedSheets;
+  let savedGoogleapis;
+
+  const FAKE_SPREADSHEET_ID = 'fake-spreadsheet-id-abc123';
+  const FAKE_SHEET_KEY = 'BMC_SEGMENTS'; // spreadsheetKey: 'BMC', sheetName: 'segments'
+
+  // Fake spreadsheets.get response: two tabs with known gids
+  const FAKE_GET_RESPONSE = {
+    data: {
+      properties: { title: 'BMC Workbook' },
+      sheets: [
+        { properties: { title: 'segments', sheetId: 42 } },
+        { properties: { title: 'business_units', sheetId: 99 } },
+      ],
+    },
+  };
+
+  let getCallCount = 0;
+
+  function buildFakeGoogleapis() {
+    return {
+      google: {
+        auth: {
+          GoogleAuth: class {
+            // no-op constructor
+          },
+        },
+        sheets() {
+          return {
+            spreadsheets: {
+              get() {
+                getCallCount++;
+                return Promise.resolve(FAKE_GET_RESPONSE);
+              },
+              values: {
+                get() { return Promise.resolve({ data: { values: [] } }); },
+                append() { return Promise.resolve({ data: {} }); },
+                update() { return Promise.resolve({ data: {} }); },
+              },
+              batchUpdate() { return Promise.resolve({}); },
+            },
+          };
+        },
+      },
+    };
+  }
+
+  beforeEach(() => {
+    getCallCount = 0;
+    savedConfig = require.cache[CONFIG_PATH];
+    savedSheets = require.cache[SHEETS_PATH];
+    savedGoogleapis = require.cache[GOOGLEAPIS_PATH];
+
+    // Inject configured config with BMC spreadsheet set
+    require.cache[CONFIG_PATH] = {
+      id: CONFIG_PATH, filename: CONFIG_PATH, loaded: true,
+      exports: {
+        GOOGLE_SERVICE_ACCOUNT_KEY: '{"type":"service_account","project_id":"fake"}',
+        GOOGLE_SHEETS_ID: 'some-crm-id',
+        BMC_SPREADSHEET_ID: FAKE_SPREADSHEET_ID,
+        // all other keys empty
+        STRATEGY_SPREADSHEET_ID: '',
+        EXECUTION_SPREADSHEET_ID: '',
+        APP_LOGGING_SPREADSHEET_ID: '',
+        CRM_CONFIG_SPREADSHEET_ID: '',
+        CRM_FLOWS_SPREADSHEET_ID: '',
+        OPS_INVENTORY_SPREADSHEET_ID: '',
+        OPS_SALES_SPREADSHEET_ID: '',
+        OPS_PRODUCTS_SPREADSHEET_ID: '',
+        OPS_WAREHOUSE_SPREADSHEET_ID: '',
+        COMPETITOR_INTEL_SPREADSHEET_ID: '',
+        DAILY_SALES_SPREADSHEET_ID: '',
+        STRATEGY_SHEETS_ID: '',
+      },
+      parent: null, children: [], paths: [],
+    };
+
+    // Inject fake googleapis
+    require.cache[GOOGLEAPIS_PATH] = {
+      id: GOOGLEAPIS_PATH, filename: GOOGLEAPIS_PATH, loaded: true,
+      exports: buildFakeGoogleapis(),
+      parent: null, children: [], paths: [],
+    };
+
+    // Force sheets.js to reload with injected deps
+    delete require.cache[SHEETS_PATH];
+  });
+
+  afterEach(() => {
+    if (savedConfig) require.cache[CONFIG_PATH] = savedConfig;
+    else delete require.cache[CONFIG_PATH];
+    if (savedSheets) require.cache[SHEETS_PATH] = savedSheets;
+    else delete require.cache[SHEETS_PATH];
+    if (savedGoogleapis) require.cache[GOOGLEAPIS_PATH] = savedGoogleapis;
+    else delete require.cache[GOOGLEAPIS_PATH];
+  });
+
+  it('returns an object with url, sheetName, spreadsheetTitle, label', async () => {
+    const { getSheetLink } = require('../server/services/sheets');
+    const result = await getSheetLink(FAKE_SHEET_KEY);
+    assert.ok(result, 'Expected non-null result');
+    assert.ok(typeof result.url === 'string', 'url should be a string');
+    assert.ok(typeof result.sheetName === 'string', 'sheetName should be a string');
+    assert.ok(typeof result.spreadsheetTitle === 'string', 'spreadsheetTitle should be a string');
+    assert.ok(typeof result.label === 'string', 'label should be a string');
+  });
+
+  it('URL contains correct gid for the named tab', async () => {
+    const { getSheetLink } = require('../server/services/sheets');
+    const result = await getSheetLink(FAKE_SHEET_KEY);
+    // BMC_SEGMENTS sheetName is 'segments' → gid 42 in our fake response
+    assert.ok(result.url.includes('gid=42'), `Expected gid=42 in URL, got: ${result.url}`);
+  });
+
+  it('URL includes the spreadsheet ID', async () => {
+    const { getSheetLink } = require('../server/services/sheets');
+    const result = await getSheetLink(FAKE_SHEET_KEY);
+    assert.ok(
+      result.url.includes(FAKE_SPREADSHEET_ID),
+      `Expected spreadsheetId in URL, got: ${result.url}`
+    );
+  });
+
+  it('spreadsheetTitle is populated from API response', async () => {
+    const { getSheetLink } = require('../server/services/sheets');
+    const result = await getSheetLink(FAKE_SHEET_KEY);
+    assert.equal(result.spreadsheetTitle, 'BMC Workbook');
+  });
+
+  it('hits the Sheets API only once; second call uses cache', async () => {
+    const { getSheetLink } = require('../server/services/sheets');
+    await getSheetLink(FAKE_SHEET_KEY);
+    await getSheetLink(FAKE_SHEET_KEY); // second call — should be cached
+    assert.equal(getCallCount, 1, 'Expected exactly 1 API call (second should hit cache)');
+  });
+
+  it('different sheet keys in same spreadsheet also use the cached tab list', async () => {
+    const { getSheetLink } = require('../server/services/sheets');
+    await getSheetLink('BMC_SEGMENTS');       // tab: segments  → gid 42
+    const r2 = await getSheetLink('BMC_BUSINESS_UNITS'); // tab: business_units → gid 99
+    assert.equal(getCallCount, 1, 'Should reuse cached tab list');
+    assert.ok(r2.url.includes('gid=99'), `Expected gid=99 in URL, got: ${r2.url}`);
+  });
+
+  it('falls back to gid=0 when named tab is not in the tab list', async () => {
+    const { getSheetLink } = require('../server/services/sheets');
+    // BMC_FLYWHEELS has sheetName: 'flywheels' — not in FAKE_GET_RESPONSE
+    const result = await getSheetLink('BMC_FLYWHEELS');
+    assert.ok(result.url.includes('gid=0'), `Expected fallback gid=0, got: ${result.url}`);
+  });
+});

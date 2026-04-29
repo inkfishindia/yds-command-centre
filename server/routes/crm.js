@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 const crmService = require('../services/crm-service');
 const crmReadModel = require('../read-model/crm');
+const sheetsService = require('../services/sheets');
 
 /**
  * GET /api/crm
@@ -11,7 +12,34 @@ const crmReadModel = require('../read-model/crm');
  */
 router.get('/', async (req, res) => {
   try {
-    res.json(await crmReadModel.build());
+    const [data, coreLink, configLink, flowsLink] = await Promise.all([
+      crmReadModel.build(),
+      sheetsService.getSheetLink('CRM_LEADS').catch(() => null),
+      sheetsService.getSheetLink('CRM_SLA_RULES').catch(() => null),
+      sheetsService.getSheetLink('CRM_LEAD_TO_ACCOUNT').catch(() => null),
+    ]);
+
+    const sheetLinks = [];
+    const addLink = (key, label, link) => {
+      const spreadsheetId = sheetsService.getSpreadsheetId(key);
+      if (link && spreadsheetId) {
+        sheetLinks.push({
+          key,
+          label,
+          url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+          sheetName: label,
+          spreadsheetTitle: link.spreadsheetTitle,
+        });
+      }
+    };
+    addLink('CRM_CORE', 'CRM Core', coreLink);
+    addLink('CRM_CONFIG', 'CRM Config', configLink);
+    addLink('CRM_FLOWS', 'CRM Flows', flowsLink);
+
+    if (sheetLinks.length > 0) {
+      data.meta = Object.assign({}, data.meta || {}, { sheetLinks });
+    }
+    res.json(data);
   } catch (err) {
     console.error('CRM overview error:', err);
     res.status(500).json({ error: 'Failed to load CRM data' });

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const techTeamService = require('../services/tech-team-service');
 const techTeamReadModel = require('../read-model/tech-team');
+const sheetsService = require('../services/sheets');
 
 // GET /api/tech-team — Tech team summary (command center data)
 router.get('/', async (req, res) => {
@@ -81,7 +82,22 @@ router.get('/agents', async (req, res) => {
 // GET /api/tech-team/strategy — Strategy cascade from Google Sheets
 router.get('/strategy', async (req, res) => {
   try {
-    res.json(await techTeamService.getStrategy());
+    const [data, sheetLink] = await Promise.all([
+      techTeamService.getStrategy(),
+      sheetsService.getSheetLink('BUSINESS_UNITS').catch(() => null),
+    ]);
+    if (sheetLink) {
+      const spreadsheetId = sheetsService.getSpreadsheetId('STRATEGY');
+      data.meta = Object.assign({}, data.meta || {}, {
+        sheet: {
+          url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+          sheetName: 'Strategy Cascade',
+          label: 'Strategy Cascade',
+          spreadsheetTitle: sheetLink.spreadsheetTitle,
+        },
+      });
+    }
+    res.json(data);
   } catch (err) {
     console.error('Strategy error:', err);
     res.status(500).json({ error: 'Failed to load strategy data' });

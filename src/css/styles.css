@@ -2392,13 +2392,14 @@ tr:hover .table-link { color: var(--accent); }
 }
 
 .filter-pill {
-  padding: 4px 12px;
-  border-radius: 16px;
+  padding: 6px 14px;
+  border-radius: 20px;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-secondary);
   font-family: var(--font-ui);
   font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
 }
@@ -2406,6 +2407,7 @@ tr:hover .table-link { color: var(--accent); }
 .filter-pill:hover {
   border-color: var(--border-light);
   color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .filter-pill:focus-visible {
@@ -2423,6 +2425,8 @@ tr:hover .table-link { color: var(--accent); }
   background: var(--accent);
   border-color: var(--accent);
   color: var(--text-inverse);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .filter-pill-mission.filter-pill-active  { background: var(--accent); border-color: var(--accent); }
@@ -7073,6 +7077,14 @@ tr:hover .table-link { color: var(--accent); }
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 1rem;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.mktops-area-metric-card:hover,
+.mktops-priority-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-light);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .mktops-area-metric-label {

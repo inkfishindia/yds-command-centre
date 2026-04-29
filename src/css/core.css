@@ -1534,6 +1534,72 @@ tr:hover .table-link { color: var(--accent); }
   border-bottom: 1px solid var(--border);
 }
 
+/* Tabs */
+.view-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+
+.tab {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--radius);
+  transition: all 0.2s;
+}
+
+.tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.tab-active, .tab.tab-active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+/* Form inputs */
+.input {
+  padding: 0.5rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.view-filters {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.filter-search {
+  padding: 0.5rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  min-width: 150px;
+}
+
+.filter-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .tab-btn {
   padding: 0.5rem 1rem;
   border: none;
@@ -10115,4 +10181,72 @@ textarea:focus-visible {
     align-items: center;
     gap: 6px;
   }
+}
+
+/* ── Open-in-Sheets button ─────────────────────────────────────────────── */
+.btn-open-sheet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  cursor: pointer;
+  line-height: 1;
+}
+.btn-open-sheet:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  border-color: var(--border-light);
+}
+.btn-open-sheet__icon {
+  font-size: 11px;
+  opacity: 0.7;
+  font-style: normal;
+}
+
+/* Multi-sheet dropdown wrapper */
+.btn-open-sheet-group {
+  position: relative;
+  display: inline-block;
+}
+.btn-open-sheet-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 50;
+  min-width: 220px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.btn-open-sheet-menu__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s, color 0.1s;
+}
+.btn-open-sheet-menu__item:last-child {
+  border-bottom: none;
+}
+.btn-open-sheet-menu__item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.btn-open-sheet-menu__sheet {
+  font-size: 11px;
+  opacity: 0.55;
 }

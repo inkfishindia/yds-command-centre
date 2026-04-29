@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const ciService = require('../services/competitor-intel-service');
+const sheetsService = require('../services/sheets');
 
 /**
  * GET /api/competitor-intel
@@ -10,7 +11,22 @@ const ciService = require('../services/competitor-intel-service');
  */
 router.get('/', async (req, res) => {
   try {
-    res.json(await ciService.getOverview());
+    const [overview, sheetLink] = await Promise.all([
+      ciService.getOverview(),
+      sheetsService.getSheetLink('CI_COMPETITORS').catch(() => null),
+    ]);
+    if (sheetLink) {
+      const spreadsheetId = sheetsService.getSpreadsheetId('COMPETITOR_INTEL');
+      overview.meta = Object.assign({}, overview.meta || {}, {
+        sheet: {
+          url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+          sheetName: 'Competitor Intel',
+          label: 'Competitor Intel',
+          spreadsheetTitle: sheetLink.spreadsheetTitle,
+        },
+      });
+    }
+    res.json(overview);
   } catch (err) {
     console.error('[competitor-intel] overview error:', err.message);
     res.status(500).json({ error: 'Failed to load competitor intel overview' });

@@ -29,18 +29,15 @@
   <h2 class="ds-page-title">Daily Sales</h2>
   <div class="ds-page-actions">
     <a
-      x-show="dailySales?.source?.sourceUrl"
-      :href="dailySales?.source?.sourceUrl"
+      x-show="dailySales?.meta?.sheet?.url || dailySales?.source?.sourceUrl"
+      :href="dailySales?.meta?.sheet?.url || dailySales?.source?.sourceUrl"
       target="_blank"
       rel="noopener noreferrer"
-      class="ds-refresh-btn"
-      aria-label="Open source spreadsheet in new tab"
+      class="btn-open-sheet"
+      :title="`Open ${dailySales?.meta?.sheet?.spreadsheetTitle || 'Sheet'} → ${dailySales?.meta?.sheet?.sheetName || 'Daily Sales'} in Google Sheets`"
     >
-      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <path d="M11 1H3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5l-4-4zm2 12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h6v3a1 1 0 0 0 1 1h2v7z" fill="currentColor" opacity=".4"/>
-        <path d="M9.5 6.5h3M9.5 9h3M9.5 11.5h3M3.5 6.5h4M3.5 9h4M3.5 11.5h4" stroke="currentColor" stroke-width="1" stroke-linecap="round" opacity=".7"/>
-      </svg>
-      <span>Open Sheet</span>
+      <span class="btn-open-sheet__icon">↗</span>
+      <span x-text="dailySales?.meta?.sheet?.label || 'Open in Sheets'"></span>
     </a>
     <button
       class="ds-refresh-btn"

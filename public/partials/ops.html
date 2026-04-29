@@ -9,6 +9,21 @@
         </div>
         <div class="view-header-actions">
           <span class="view-refresh-label" x-show="opsLastRefresh" x-text="getOpsRefreshLabel()"></span>
+          <div class="btn-open-sheet-group" x-data="{ open: false }" x-show="opsMeta?.sheetLinks?.length">
+            <button type="button" class="btn-open-sheet" @click="open = !open" aria-label="Open Ops sheets">
+              <span class="btn-open-sheet__icon">↗</span>
+              Sheets
+              <span x-text="`(${opsMeta?.sheetLinks?.length || 0})`"></span>
+            </button>
+            <div class="btn-open-sheet-menu" x-show="open" @click.outside="open = false">
+              <template x-for="link in (opsMeta?.sheetLinks || [])" :key="link.key">
+                <a :href="link.url" target="_blank" rel="noopener" class="btn-open-sheet-menu__item">
+                  <span x-text="link.label"></span>
+                  <span class="btn-open-sheet-menu__sheet" x-text="link.sheetName"></span>
+                </a>
+              </template>
+            </div>
+          </div>
           <button class="btn btn-small btn-icon" @click="loadOps()" :disabled="opsLoading" aria-label="Refresh Ops">
             <span class="refresh-icon">&#x21bb;</span>
             <span x-text="opsLoading ? 'Loading...' : 'Refresh'"></span>

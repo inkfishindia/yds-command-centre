@@ -56,6 +56,8 @@ const LAZY_MODULE_FACTORIES = {
   'system-map': () => import('./modules/system-map.js').then(({ createSystemMapModule }) => createSystemMapModule()),
   'dan-colin': () => import('./modules/dan-colin.js').then(({ createDanColinModule }) => createDanColinModule()),
   'daily-sales': () => import('./modules/daily-sales.js').then(({ createDailySalesModule }) => createDailySalesModule()),
+  'd2c': () => import('./modules/d2c.js').then(({ createD2cModule }) => createD2cModule()),
+  'google-ads': () => import('./modules/google-ads.js').then(({ createGoogleAdsModule }) => createGoogleAdsModule()),
 };
 
 function app() {
@@ -87,6 +89,7 @@ function app() {
     },
     _notificationIntervalId: null,
     _notificationSnapshot: null,
+    _notificationCheckInProgress: false,
     notificationCenter: [],
     systemAlertSnapshot: null,
 
@@ -100,7 +103,8 @@ function app() {
     _loadedViewStyles: {},
     _viewStylePromises: {},
 
-    _viewStyleFile(name) {
+_viewStyleFile(name) {
+      // Only views with dedicated CSS files go here
       const fileMap = {
         factory: 'factory',
         registry: 'registry',
@@ -110,11 +114,12 @@ function app() {
         bmc: 'bmc',
         crm: 'crm',
         ops: 'ops',
-        status: 'system-status',
-        'claude-usage': 'claude-usage',
-        'system-map': 'system-map',
-        'dan-colin': 'dan-colin',
-        'daily-sales': 'daily-sales',
+        d2c: 'd2c',
+        danColin: 'dan-colin',
+        dailySales: 'daily-sales',
+        systemStatus: 'system-status',
+        systemMap: 'system-map',
+        claudeUsage: 'claude-usage',
       };
       return fileMap[name] || null;
     },
@@ -214,6 +219,8 @@ function app() {
         'system-map': 'system-map-view',
         'dan-colin': 'dan-colin-view',
         'daily-sales': 'daily-sales-view',
+        'd2c': 'd2c-view',
+        'google-ads': 'google-ads-view',
       };
       return classMap[name] || name + '-view';
     },
@@ -289,6 +296,12 @@ function app() {
     showSnoozeFor: null, showReassignFor: null, selectedOverdue: [],
     // factory
     factoryConfig: null, factoryConfigLoading: false,
+    // d2c
+    d2cProducts: [], d2cCategories: [], d2cMethods: [],
+    d2cLoading: false, d2cError: null,
+    d2cFilterCategory: '', d2cFilterMethod: '', d2cFilterSearch: '', d2cShowLiveOnly: true,
+    d2cSelectedProduct: null, d2cProductLoading: false,
+    d2cDetailOpen: false, d2cActiveTab: 'products',
     // ops
     opsSection: 'overview',
     ops: null, opsLoading: false,
@@ -324,6 +337,8 @@ function app() {
     dailySales: null, dailySalesLoading: false, dailySalesError: null,
     _dsTrendPaths: null,
     _dsTrendTooltip: { visible: false, x: 0, y: 0, date: '', revenue: '', orders: '' },
+    // google-ads
+    googleAds: null, googleAdsLoading: false, googleAdsError: null, googleAdsFilterPeriod: 'all',
 
     // Eager modules — always initialized
     ...createDashboardModule(),
@@ -376,6 +391,10 @@ function app() {
         .then((mod) => {
           Object.assign(this, mod);
           this._initializedModules[name] = true;
+        })
+        .catch((err) => {
+          console.error(`Failed to load module "${name}":`, err);
+          this.showError(`Failed to load ${name} module`);
         })
         .finally(() => {
           delete this._moduleLoadPromises[name];
@@ -519,6 +538,23 @@ function app() {
 
     closeMobileDrawer() {
       this.mobileDrawerOpen = false;
+    },
+
+    _clearAllIntervals() {
+      if (this.refreshIntervalId) {
+        clearInterval(this.refreshIntervalId);
+        this.refreshIntervalId = null;
+      }
+      if (this._aqIntervalId) {
+        clearInterval(this._aqIntervalId);
+        this._aqIntervalId = null;
+      }
+      if (this._notificationIntervalId) {
+        clearInterval(this._notificationIntervalId);
+        this._notificationIntervalId = null;
+      }
+      this.stopDashboardAutoRefresh?.();
+      this.stopChatPolling?.();
     },
 
     beginRequest(key) {
@@ -1183,6 +1219,16 @@ function app() {
     },
 
     async runNotificationChecks(source = 'manual') {
+      if (this._notificationCheckInProgress) return;
+      this._notificationCheckInProgress = true;
+      try {
+        await this._runNotificationChecks(source);
+      } finally {
+        this._notificationCheckInProgress = false;
+      }
+    },
+
+    async _runNotificationChecks(source = 'manual') {
       this.syncNotificationPermission();
       if (!this.notificationSettings.enabled || this.notificationPermission !== 'granted') return;
       await this.refreshSystemAlertSnapshot();
