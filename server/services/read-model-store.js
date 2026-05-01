@@ -28,7 +28,18 @@ function modelPath(name) {
 }
 
 async function ensureDir() {
-  await fs.mkdir(READ_MODELS_DIR, { recursive: true });
+  try {
+    await fs.mkdir(READ_MODELS_DIR, { recursive: true });
+  } catch (err) {
+    if (BENIGN_FS_CODES.has(err && err.code)) {
+      if (!_warnedPaths.has(READ_MODELS_DIR)) {
+        _warnedPaths.add(READ_MODELS_DIR);
+        console.warn(`[read-model-store] fs not writable (${err.code}), skipping mkdir: ${READ_MODELS_DIR}`);
+      }
+      return;
+    }
+    throw err;
+  }
 }
 
 async function readJson(filePath) {
