@@ -18,7 +18,9 @@ function parseRegistry() {
 
   const filePath = getRegistryPath();
   if (!fs.existsSync(filePath)) {
-    return { available: false, error: 'Registry file not found' };
+    cache = { available: false, error: 'Registry file not found' };
+    cacheTime = now;
+    return cache;
   }
 
   const raw = fs.readFileSync(filePath, 'utf8');

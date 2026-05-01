@@ -157,6 +157,6 @@ function clearExpiredTokens() {
   }
 }
 
-setInterval(clearExpiredTokens, 60 * 60 * 1000);
+setInterval(clearExpiredTokens, 60 * 60 * 1000).unref();
 
 module.exports = { authGate, loginRoute, hasValidAuthCookie: hasValidSession };

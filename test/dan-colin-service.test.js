@@ -7,7 +7,7 @@
  * Pattern mirrors test/system-map.test.js (node:test built-in runner).
  */
 
-const { describe, it, beforeEach, afterEach } = require('node:test');
+const { describe, it, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
@@ -428,7 +428,7 @@ describe('dan-colin route: handler wiring', () => {
     let jsonPayload = null;
     await handler({ query: {} }, {
       json(p) { jsonPayload = p; },
-      status(c) { return { json(p) { jsonPayload = p; } }; },
+      status(_c) { return { json(p) { jsonPayload = p; } }; },
     });
 
     assert.deepEqual(jsonPayload, fakeQueue, 'returns queue payload');
