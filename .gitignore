@@ -16,3 +16,9 @@ server/data/projection-jobs.json
 # Captured API samples — shape docs contain live workspace data
 data/schemas/*.json
 
+# Live workspace data — sheets/notion IDs, service-account references, internal registries
+.opencode/context/sheets-registry.md
+
+# OpenAgentsControl (OAC) framework — pruned 2026-04-30 (decision in AGENTS.md)
+.opencode.archived/
+

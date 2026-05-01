@@ -3,7 +3,7 @@
   "provider": {
     "nvidia": {
       "options": {
-        "apiKey": "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"
+        "apiKey": "{env:NVIDIA_API_KEY}"
       }
     }
   },

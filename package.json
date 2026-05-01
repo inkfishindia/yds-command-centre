@@ -11,7 +11,8 @@
     "start": "npm run build && node server.js",
     "dev": "npm run build && node --watch server.js",
     "test": "node --test 'test/*.test.js'",
-    "lint": "eslint server.js server/ test/ src/js/"
+    "lint": "eslint server.js server/ test/ src/js/",
+    "lint:css": "node scripts/check-css-leakage.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
