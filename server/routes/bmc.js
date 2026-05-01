@@ -72,7 +72,7 @@ router.get('/', async (req, res) => {
           spreadsheetTitle: sheetLink.spreadsheetTitle,
         };
       }
-    } catch (_) { /* non-fatal */ }
+    } catch { /* non-fatal: sheet not found */ }
 
     res.json({ available: true, canvas, stats, timestamp: new Date().toISOString(), meta });
   } catch (err) {

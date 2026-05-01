@@ -11,7 +11,7 @@ module.exports = {
   PORT: process.env.PORT || 3000,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   NOTION_TOKEN: process.env.NOTION_TOKEN,
-  MODEL: process.env.MODEL || 'claude-opus-4-20250514',
+  MODEL: process.env.MODEL || 'claude-sonnet-4-6',
   PROVIDER: process.env.PROVIDER || 'anthropic', // 'anthropic' or 'deepseek'
   DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
   DEEPSEEK_BASE_URL: process.env.DEEPSEEK_BASE_URL || 'https://integrate.api.nvidia.com/v1',
