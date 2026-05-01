@@ -1,159 +1,291 @@
 <!-- Loaded lazily via _loadPartial('google-ads') -->
-<div x-init="if (!googleAds && !googleAdsLoading) loadGoogleAds()">
+<div
+  x-data=""
+  x-init="
+    $watch('view', v => {
+      if (v === 'google-ads' && !googleAds && !googleAdsLoading) {
+        loadGoogleAds();
+      }
+    });
+    if (view === 'google-ads' && !googleAds && !googleAdsLoading) {
+      loadGoogleAds();
+    }
+  "
+  style="display:contents">
+
   <!-- Loading state -->
-  <template x-if="googleAdsLoading && !googleAds">
-    <div class="view-loading">
-      <div class="loading-skeleton skeleton-card"></div>
-      <div class="loading-skeleton skeleton-card"></div>
-    </div>
-  </template>
+  <div x-show="googleAdsLoading && !googleAds" class="view-loading" style="display: none;">
+    <div class="loading-skeleton skeleton-card"></div>
+    <div class="loading-skeleton skeleton-card"></div>
+  </div>
 
   <!-- Error state -->
-  <template x-if="googleAdsError && !googleAdsLoading">
-    <div class="ga-error">
-      <p x-text="googleAdsError"></p>
-      <button class="btn btn-small" @click="loadGoogleAds()">Retry</button>
-    </div>
-  </template>
+  <div x-show="googleAdsError && !googleAdsLoading" class="ga-error" style="display: none;">
+    <p x-text="googleAdsError"></p>
+    <button class="btn btn-small" @click="loadGoogleAds()">Retry</button>
+  </div>
 
   <!-- Unavailable state -->
-  <template x-if="googleAds && googleAds.available === false">
-    <div class="ga-unavailable">
-      <h3>Google Ads</h3>
-      <p class="text-muted">Not configured. Set <code>GOOGLE_ADS_SPREADSHEET_ID</code> to enable.</p>
-    </div>
-  </template>
+  <div x-show="googleAds && googleAds.available === false" class="ga-unavailable" style="display: none;">
+    <h3>Google Ads</h3>
+    <p class="text-muted">Not configured. Set <code>GOOGLE_ADS_SPREADSHEET_ID</code> to enable.</p>
+  </div>
 
-  <!-- Dashboard -->
-  <template x-if="googleAds && googleAds.available === true">
-    <div class="ga-dashboard">
-      <!-- Header -->
-      <div class="ga-header">
-        <h2>Google Ads</h2>
-        <span class="text-muted text-small" x-text="'Last sync: ' + new Date(googleAds.timestamp).toLocaleTimeString('en-IN')"></span>
-        <button class="btn btn-small" @click="loadGoogleAds()" :disabled="googleAdsLoading" x-text="googleAdsLoading ? 'Loading...' : 'Refresh'"></button>
-      </div>
+  <!-- Main Dashboard -->
+  <div x-show="googleAds && googleAds.available === true" class="ga-dashboard" style="display:none">
+    <div class="ga-layout">
+      <!-- Main Content -->
+      <div class="ga-main">
+        <!-- Header -->
+        <div class="ga-header">
+          <h2>YDS Google Ads Dashboard</h2>
+          <div class="ga-header-right">
+            <span class="text-muted text-small" x-text="googleAds?.timestamp ? 'Last sync: ' + new Date(googleAds.timestamp).toLocaleTimeString('en-IN') : ''"></span>
+            <button class="btn btn-small" @click="loadGoogleAds(googleAdsPeriod)" :disabled="googleAdsLoading" x-text="googleAdsLoading ? 'Loading...' : 'Refresh'"></button>
+          </div>
+        </div>
 
-      <!-- Metric Cards -->
-      <div class="ga-metrics-grid">
-        <div class="ga-metric-card">
-          <span class="ga-metric-label">Total Spend</span>
-          <span class="ga-metric-value" x-text="gaFormatINR(googleAds.totals.cost)"></span>
-          <span class="ga-metric-sub" x-text="'CPC: ' + gaFormatCPC(googleAds.totals.cpc)"></span>
+        <!-- Status Pills -->
+        <div class="ga-status-pills">
+          <span class="ga-status-pill ga-status-pill--red" x-show="googleAds?.totals?.revenue === 0">
+            ₹0 ROAS — Tracking Broken
+          </span>
         </div>
-        <div class="ga-metric-card">
-          <span class="ga-metric-label">Clicks</span>
-          <span class="ga-metric-value" x-text="gaFormatNum(googleAds.totals.clicks)"></span>
-          <span class="ga-metric-sub" x-text="'CTR: ' + (googleAds.totals.impressions > 0 ? ((googleAds.totals.clicks / googleAds.totals.impressions) * 100).toFixed(2) + '%' : '—')"></span>
-        </div>
-        <div class="ga-metric-card">
-          <span class="ga-metric-label">Conversions</span>
-          <span class="ga-metric-value" x-text="gaFormatNum(googleAds.totals.conversions)"></span>
-          <span class="ga-metric-sub" x-text="'CPA: ' + gaFormatCPC(googleAds.totals.cpa)"></span>
-        </div>
-        <div class="ga-metric-card">
-          <span class="ga-metric-label">Revenue</span>
-          <span class="ga-metric-value" x-text="gaFormatINR(googleAds.totals.revenue)"></span>
-          <span class="ga-metric-sub" x-text="'ROAS: ' + gaFormatPct(googleAds.totals.roas)"></span>
-        </div>
-      </div>
 
-      <!-- Daily Trend -->
-      <div class="ga-section">
-        <h3 class="ga-section-title">Daily Trend (Last 14 Days)</h3>
-        <div class="ga-trend-chart">
-          <table class="ga-trend-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Cost</th>
-                <th>Clicks</th>
-                <th>Conv</th>
-                <th>Revenue</th>
-                <th>ROAS</th>
-              </tr>
-            </thead>
-            <tbody>
+        <!-- Tab Bar -->
+        <div class="ga-tabs">
+          <button class="ga-tab" :class="googleAdsActiveTab === 'overview' && 'ga-tab--active'" @click="setGaTab('overview')">Overview</button>
+          <button class="ga-tab" :class="googleAdsActiveTab === 'campaigns' && 'ga-tab--active'" @click="setGaTab('campaigns')">Campaigns</button>
+          <button class="ga-tab" :class="googleAdsActiveTab === 'search' && 'ga-tab--active'" @click="setGaTab('search')">Search Terms</button>
+          <button class="ga-tab" :class="googleAdsActiveTab === 'funnel' && 'ga-tab--active'" @click="setGaTab('funnel')">Funnel</button>
+        </div>
+
+        <!-- ========== OVERVIEW TAB ========== -->
+        <div x-show="googleAdsActiveTab === 'overview'" class="ga-tab-content" style="display:none">
+          <!-- KPI Row -->
+          <div class="ga-kpi-grid">
+            <div class="ga-kpi-card">
+              <span class="ga-kpi-label">Total Spend</span>
+              <span class="ga-kpi-value" x-text="gaFormatINR(googleAds?.totals?.spend)"></span>
+              <span class="ga-kpi-sub" x-text="'₹' + (googleAds?.totals?.dailyAvg || 0).toFixed(0) + '/day avg'"></span>
+            </div>
+            <div class="ga-kpi-card">
+              <span class="ga-kpi-label">Clicks</span>
+              <span class="ga-kpi-value" x-text="gaFormatNum(googleAds?.totals?.clicks)"></span>
+              <span class="ga-kpi-sub" x-text="'CPC ' + gaFormatCPC(googleAds?.totals?.cpc)"></span>
+            </div>
+            <div class="ga-kpi-card">
+              <span class="ga-kpi-label">Conversions</span>
+              <span class="ga-kpi-value" x-text="gaFormatNum(googleAds?.totals?.conversions)"></span>
+              <span class="ga-kpi-sub">Note: includes fake conv</span>
+            </div>
+            <div class="ga-kpi-card" :class="googleAds?.totals?.revenue === 0 && 'ga-kpi-card--alert'">
+              <span class="ga-kpi-label">Revenue</span>
+              <span class="ga-kpi-value" x-text="gaFormatINR(googleAds?.totals?.revenue)"></span>
+              <span class="ga-kpi-sub" x-show="googleAds?.totals?.revenue === 0" style="color: var(--red);">Tracking failure</span>
+            </div>
+          </div>
+
+          <!-- Revenue Warning Banner -->
+          <div class="ga-banner ga-banner--warning" x-show="googleAds?.totals?.revenue === 0">
+            Revenue tracking is broken. Nirmal's P0 task (dataLayer push) must ship before ROAS is meaningful.
+          </div>
+
+          <!-- Status Table -->
+          <div class="ga-section">
+            <h3 class="ga-section-title">Status Signals</h3>
+            <table class="ga-table ga-status-table">
+              <thead>
+                <tr><th>Signal</th><th>Status</th><th>What it means</th></tr>
+              </thead>
+              <tbody>
+                <template x-for="row in gaStatusTable()" :key="row.signal">
+                  <tr>
+                    <td x-text="row.signal"></td>
+                    <td><span class="ga-status-badge" :class="'ga-status-badge--' + gaGetStatusColor(row.status)" x-text="row.status"></span></td>
+                    <td x-text="row.meaning"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Daily Spend Chart -->
+          <div class="ga-section">
+            <h3 class="ga-section-title">Daily Spend</h3>
+            <div class="ga-bar-chart">
               <template x-for="day in gaDailyTrend()" :key="day.date">
-                <tr>
-                  <td x-text="day.date"></td>
-                  <td x-text="gaFormatINR(day.cost)"></td>
-                  <td x-text="day.clicks"></td>
-                  <td x-text="gaFormatNum(day.conversions)"></td>
-                  <td x-text="gaFormatINR(day.revenue)"></td>
-                  <td x-text="day.cost > 0 ? (day.revenue / day.cost).toFixed(2) + 'x' : '—'"></td>
-                </tr>
+                <div class="ga-bar-row">
+                  <span class="ga-bar-label" x-text="day.date"></span>
+                  <div class="ga-bar-track">
+                    <div class="ga-bar-fill" :style="'width: ' + Math.min(100, (day.cost / (googleAds?.totals?.spend || 1)) * 100) + '%'"></div>
+                  </div>
+                  <span class="ga-bar-value" x-text="gaFormatINR(day.cost)"></span>
+                </div>
               </template>
-            </tbody>
-          </table>
+            </div>
+          </div>
+
+          <!-- Conversion Breakdown -->
+          <div class="ga-section">
+            <h3 class="ga-section-title">Conversion Breakdown</h3>
+            <div class="ga-donut-chart">
+              <template x-for="item in gaConversionBreakdown()" :key="item.label">
+                <div class="ga-donut-segment" :class="'ga-donut-segment--' + item.color">
+                  <span class="ga-donut-label" x-text="item.label"></span>
+                  <span class="ga-donut-value" x-text="item.value"></span>
+                </div>
+              </template>
+            </div>
+            <p class="ga-note">Fake conversion data cleaned up Feb 21. Real purchase tracking rebuilding.</p>
+          </div>
+        </div>
+
+        <!-- ========== CAMPAIGNS TAB ========== -->
+        <div x-show="googleAdsActiveTab === 'campaigns'" class="ga-tab-content" style="display:none">
+          <div class="ga-section">
+            <h3 class="ga-section-title">Campaign Performance</h3>
+            <table class="ga-table ga-campaign-table">
+              <thead>
+                <tr><th>Grade</th><th>Campaign</th><th>Clicks</th><th>Spend</th><th>Conv</th><th>CPA</th><th>ROAS</th><th>Verdict</th></tr>
+              </thead>
+              <tbody>
+                <template x-for="camp in gaCampaigns()" :key="camp.name">
+                  <tr>
+                    <td><span class="ga-grade-badge" :class="'ga-grade-badge--' + gaGetGradeColor(camp.grade)" x-text="camp.grade"></span></td>
+                    <td class="ga-cell-name" x-text="camp.name"></td>
+                    <td x-text="gaFormatNum(camp.clicks)"></td>
+                    <td x-text="gaFormatINR(camp.cost)"></td>
+                    <td x-text="gaFormatNum(camp.conversions)"></td>
+                    <td x-text="gaFormatCPC(camp.cpa)"></td>
+                    <td x-text="camp.roas > 0 ? gaFormatPct(camp.roas) : 'N/A'"></td>
+                    <td :class="camp.verdict === 'SCALE NOW' ? 'ga-positive' : ''" x-text="camp.verdict"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- CPA Comparison Chart -->
+          <div class="ga-section">
+            <h3 class="ga-section-title">CPA Comparison</h3>
+            <div class="ga-horizontal-bars">
+              <template x-for="camp in gaCampaigns()" :key="camp.name">
+                <div class="ga-h-bar-row">
+                  <span class="ga-h-bar-label" x-text="camp.name.substring(0, 30)"></span>
+                  <div class="ga-h-bar-track">
+                    <div class="ga-h-bar-fill" :class="'ga-h-bar-fill--' + gaGetGradeColor(camp.grade)" :style="'width: ' + Math.min(100, (camp.cpa / 60) * 100) + '%'"></div>
+                  </div>
+                  <span class="ga-h-bar-value" x-text="gaFormatCPC(camp.cpa)"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== SEARCH TERMS TAB ========== -->
+        <div x-show="googleAdsActiveTab === 'search'" class="ga-tab-content" style="display:none">
+          <div class="ga-section">
+            <h3 class="ga-section-title">Top Search Terms</h3>
+            <table class="ga-table ga-search-table">
+              <thead>
+                <tr><th>Search Term</th><th>Type</th><th>Clicks</th><th>Spend</th><th>Conv</th><th>CPC</th><th>Signal</th></tr>
+              </thead>
+              <tbody>
+                <template x-for="term in gaSearchTerms()" :key="term.term">
+                  <tr>
+                    <td class="ga-cell-term" x-text="term.term"></td>
+                    <td><span class="ga-type-badge" :class="'ga-type-badge--' + gaGetTermTypeColor(term.type)" x-text="term.type"></span></td>
+                    <td x-text="gaFormatNum(term.clicks)"></td>
+                    <td x-text="gaFormatINR(term.cost)"></td>
+                    <td x-text="gaFormatNum(term.conversions)"></td>
+                    <td x-text="gaFormatCPC(term.cpc)"></td>
+                    <td x-text="term.signal || '—'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="ga-insight-panel">
+            <p>Competitor terms (Printrove, Printify, Printful) are generating conversions at low CPAs from users actively comparing POD providers. Recommended: build dedicated landing pages for competitor switchers highlighting YDS's 48-hour turnaround, no minimums, and India-based production.</p>
+          </div>
+        </div>
+
+        <!-- ========== FUNNEL TAB ========== -->
+        <div x-show="googleAdsActiveTab === 'funnel'" class="ga-tab-content" style="display:none">
+          <div class="ga-section">
+            <h3 class="ga-section-title">Conversion Funnel</h3>
+            <div class="ga-funnel">
+              <template x-for="stage in gaFunnel()" :key="stage.stage">
+                <div class="ga-funnel-row" :class="stage.loginWall && 'ga-funnel-row--alert'">
+                  <span class="ga-funnel-stage" x-text="stage.stage"></span>
+                  <div class="ga-funnel-bar-track">
+                    <div class="ga-funnel-bar" :style="'width: ' + (stage.users / 1180 * 100) + '%'"></div>
+                  </div>
+                  <span class="ga-funnel-users" x-text="stage.users"></span>
+                  <span class="ga-funnel-drop" x-show="stage.dropOff" x-text="stage.dropOff + '%'"></span>
+                  <span class="ga-funnel-login-wall" x-show="stage.loginWall">LOGIN WALL</span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="ga-section">
+            <h3 class="ga-section-title">Revenue Recovery Model</h3>
+            <div class="ga-recovery-grid">
+              <div class="ga-recovery-card">
+                <h4>Current</h4>
+                <p class="ga-recovery-value">5</p>
+                <p class="ga-recovery-label">Orders per 3 days</p>
+              </div>
+              <div class="ga-recovery-card ga-recovery-card--highlight">
+                <h4>Estimated (guest checkout)</h4>
+                <p class="ga-recovery-value">15-20</p>
+                <p class="ga-recovery-label">Orders per 3 days</p>
+              </div>
+            </div>
+            <p class="ga-note">Removing the login wall is the single highest-leverage change in the D2C funnel. No additional ad spend required.</p>
+          </div>
+
+          <div class="ga-callout ga-callout--success">
+            <strong>Nirmal → guest checkout first.</strong> This one change, at current ad spend, should 3x D2C revenue. Every other optimization is noise until this is live.
+          </div>
         </div>
       </div>
 
-      <!-- Campaign Performance -->
-      <div class="ga-section">
-        <h3 class="ga-section-title">Campaign Performance</h3>
-        <div class="ga-table-wrap">
-          <table class="ga-table">
-            <thead>
-              <tr>
-                <th>Campaign</th>
-                <th>Impressions</th>
-                <th>Clicks</th>
-                <th>Cost</th>
-                <th>CPC</th>
-                <th>Conv</th>
-                <th>CPA</th>
-                <th>Revenue</th>
-                <th>ROAS</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template x-for="camp in gaFilteredCampaigns()" :key="camp.name">
-                <tr>
-                  <td class="ga-cell-name" x-text="camp.name"></td>
-                  <td x-text="gaFormatNum(camp.impressions)"></td>
-                  <td x-text="camp.clicks"></td>
-                  <td x-text="gaFormatINR(camp.cost)"></td>
-                  <td x-text="gaFormatCPC(camp.cpc)"></td>
-                  <td x-text="gaFormatNum(camp.conversions)"></td>
-                  <td x-text="gaFormatCPC(camp.cpa)"></td>
-                  <td x-text="gaFormatINR(camp.revenue)"></td>
-                  <td :class="camp.roas >= 1 ? 'ga-positive' : 'ga-negative'" x-text="gaFormatPct(camp.roas)"></td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <!-- Advisory Sidebar -->
+      <div class="ga-sidebar">
+        <h3 class="ga-sidebar-title">Advisory</h3>
+        
+        <!-- Advisory Cards -->
+        <template x-for="card in gaAdvisoryCards()" :key="card.expert">
+          <div class="ga-advisory-card" :class="'ga-advisory-card--' + card.color">
+            <span class="ga-advisory-expert" x-text="card.expert"></span>
+            <p class="ga-advisory-insight" x-text="card.insight"></p>
+          </div>
+        </template>
 
-      <!-- Search Terms -->
-      <div class="ga-section">
-        <h3 class="ga-section-title">Top Search Terms</h3>
-        <div class="ga-table-wrap">
-          <table class="ga-table">
-            <thead>
-              <tr>
-                <th>Search Term</th>
-                <th>Campaign</th>
-                <th>Clicks</th>
-                <th>Cost</th>
-                <th>Conv</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template x-for="term in gaVisibleSearchTerms()" :key="term.term">
-                <tr>
-                  <td class="ga-cell-term" x-text="term.term"></td>
-                  <td x-text="term.campaign"></td>
-                  <td x-text="term.clicks"></td>
-                  <td x-text="gaFormatINR(term.cost)"></td>
-                  <td x-text="term.conversions"></td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
+        <!-- Action Queue -->
+        <h3 class="ga-sidebar-subtitle">Action Queue</h3>
+        <div class="ga-action-queue">
+          <template x-for="action in gaActionQueue()" :key="action.action">
+            <div class="ga-action-item">
+              <span class="ga-priority-badge" :class="'ga-priority-badge--' + action.priority.charAt(1)" x-text="action.priority"></span>
+              <span class="ga-action-text" x-text="action.action"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Date Range Selector -->
+        <h3 class="ga-sidebar-subtitle">Date Range</h3>
+        <div class="ga-period-selector">
+          <button class="ga-period-btn" :class="googleAdsPeriod === '7d' && 'ga-period-btn--active'" @click="setGaPeriod('7d')">7 Days</button>
+          <button class="ga-period-btn" :class="googleAdsPeriod === '14d' && 'ga-period-btn--active'" @click="setGaPeriod('14d')">14 Days</button>
+          <button class="ga-period-btn" :class="googleAdsPeriod === '30d' && 'ga-period-btn--active'" @click="setGaPeriod('30d')">30 Days</button>
+          <button class="ga-period-btn" :class="googleAdsPeriod === 'all' && 'ga-period-btn--active'" @click="setGaPeriod('all')">All</button>
         </div>
       </div>
     </div>
-  </template>
+  </div>
 </div>
