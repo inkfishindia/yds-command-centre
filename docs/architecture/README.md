@@ -23,3 +23,13 @@ Current architectural diagnosis:
 - Operational visibility exists in pieces, but not yet as a first-class platform concern.
 
 The goal of this pack is to give the team a practical target state and a staged path to get there without freezing feature work.
+
+## Background workloads — why not Managed Agents
+
+The read-model scheduler runs as an in-process Node.js interval inside `server.js` (calling `server/services/read-model-scheduler.js`). Managed Agents was evaluated and rejected:
+
+- **Co-location:** The scheduler lives inside the app server — no separate cloud infrastructure is warranted.
+- **Short-lived work:** Each sync tick completes in seconds. Managed Agents targets multi-hour autonomous loops.
+- **Cost:** Managed Agents bills $0.08/session-hour of active runtime. An in-process `setInterval` has near-zero marginal cost.
+
+Revisit if the scheduler grows beyond simple interval syncs, or if it needs to run independently of the web server (e.g., separate worker process on Railway).
