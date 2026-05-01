@@ -54,7 +54,7 @@
   justify-content: space-between;
   height: 44px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--border-light, #2a2a2a);
+  border-bottom: 1px solid var(--border);
   background: var(--bg-secondary, #111111);
   flex-shrink: 0;
 }
@@ -124,12 +124,41 @@
   font-size: 12px;
   font-weight: 600;
   line-height: 1;
-  color: #fff;
+  color: white;
 }
-.dc-count-badge--waiting { background: var(--amber, #f59e0b); color: #000; }
+/* amber badge: dark text for contrast — #f59e0b on dark bg is ~8:1 with #000; OK */
+.dc-count-badge--waiting { background: var(--amber, #f59e0b); color: var(--bg-primary); }
 .dc-count-badge--now     { background: var(--red, #ef4444); }
 .dc-count-badge--watch   { background: var(--amber-muted); }
 .dc-count-badge--drop    { background: var(--accent, #3b82f6); }
+
+
+/* Extra-small Lucide icon — replaces inline style="width:12px;height:12px" */
+.dc-icon-xs {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* Saved state indicator wrapper */
+.dc-saved-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Green tint on the saved check icon */
+.dc-icon-saved {
+  color: var(--green);
+}
+
+/* Sticky header right-side actions wrapper — replaces inline style */
+.dc-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
 /* Chevron */
 .dc-chevron {
@@ -314,7 +343,7 @@
 }
 .dc-focus-pill:hover {
   background: var(--accent, #3b82f6);
-  color: #fff;
+  color: white;
   border-color: var(--accent);
   transform: scale(1.02);
 }
@@ -332,7 +361,7 @@
   font-size: 13px;
   color: var(--text-secondary, #888888);
   line-height: 1.4;
-  border-left: 2px solid var(--text-secondary, #888888);
+  border-left: 2px solid var(--border);
 }
 
 /* ── Answer textarea ── */
@@ -603,7 +632,7 @@
 /* ── §8: Slow-network toast neutral ── */
 .dc-toast--neutral {
   background: var(--dc-toast-neutral, #888888);
-  color: #fff;
+  color: white;
 }
 
 /* ── §9: Debounce dot + inline save indicator ── */
@@ -638,7 +667,7 @@
   height: 56px;
   border-radius: 10px;
   background: var(--accent, #3b82f6);
-  color: #fff;
+  color: white;
   border: none;
   cursor: pointer;
   display: flex;
@@ -670,7 +699,8 @@
   outline: 2px solid var(--accent, #3b82f6);
   outline-offset: 3px;
 }
-.dc-fab svg {
+.dc-fab svg,
+.dc-fab-icon {
   width: 24px;
   height: 24px;
 }
@@ -817,11 +847,11 @@
 }
 .dc-sheet-btn--drop {
   background: var(--accent, #3b82f6);
-  color: #fff;
+  color: white;
 }
 .dc-sheet-btn--success {
-  background: #22c55e;
-  color: #fff;
+  background: var(--green);
+  color: white;
 }
 
 /* Small spinner inside button */
@@ -829,8 +859,8 @@
   display: inline-block;
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: #fff;
+  border: 2px solid rgba(255,255,255,0.3); /* white at opacity on colored bg — semantic */
+  border-top-color: white;
   border-radius: 50%;
   animation: dcSpin 0.7s linear infinite;
   flex-shrink: 0;
@@ -848,8 +878,8 @@
   z-index: 60;
   padding: 10px 20px;
   border-radius: var(--radius, 6px);
-  background: #22c55e;
-  color: #fff;
+  background: var(--green);
+  color: white;
   font-size: 14px;
   font-weight: 500;
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
@@ -998,4 +1028,54 @@
       animation: none;
     }
   }
+}
+
+/* ── Utility classes (promoted from inline styles) ── */
+
+/* Medium Lucide icon (16px) — replaces inline style="width:16px;height:16px" */
+.dc-icon-md {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+/* "Tap to open" hint on Now rows */
+.dc-tap-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: block;
+}
+
+/* Empty state headline */
+.dc-empty-headline {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Empty state subheadline */
+.dc-empty-subheadline {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* Load error container */
+.dc-load-error {
+  padding: 20px;
+  text-align: center;
+}
+
+/* Load error message */
+.dc-load-error-msg {
+  color: var(--red);
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+
+/* Load error retry spacing */
+.dc-load-error-retry {
+  margin-top: 0; /* margin already on msg above */
 }

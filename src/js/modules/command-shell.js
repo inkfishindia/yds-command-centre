@@ -71,7 +71,7 @@ export function createCommandShellModule() {
 
     async openNavigationTarget(action) {
       this._clearAllIntervals();
-      const partialViews = ['chat', 'overview', 'dashboard', 'actionQueue', 'focusArea', 'team', 'personView', 'docs', 'notion', 'knowledge', 'decisions', 'projects', 'registry', 'commitments', 'factory', 'marketingOps', 'techTeam', 'bmc', 'crm', 'ops', 'status', 'claude-usage', 'system-map', 'dan-colin', 'daily-sales', 'd2c'];
+      const partialViews = ['chat', 'overview', 'dashboard', 'actionQueue', 'focusArea', 'team', 'personView', 'docs', 'notion', 'knowledge', 'decisions', 'projects', 'registry', 'commitments', 'factory', 'marketingOps', 'techTeam', 'bmc', 'crm', 'ops', 'status', 'claude-usage', 'system-map', 'dan-colin', 'daily-sales', 'd2c', 'google-ads'];
       this.view = action;
       this.tableSelectedRow = -1;
       if (partialViews.includes(action)) {
@@ -126,6 +126,7 @@ export function createCommandShellModule() {
         this.loadD2cMethods();
         this.loadD2cProducts();
       }
+      else if (action === 'google-ads') this.loadGoogleAds();
     },
 
     openCmdPalette() {
@@ -210,6 +211,9 @@ export function createCommandShellModule() {
         { label: 'Daily Sales — All statuses', icon: '▸', type: 'view', view: 'daily-sales', keywords: ['all orders', 'filter all', 'unfiltered'], action: () => { this.openNavigationTarget('daily-sales'); this.$nextTick(() => this.setDailyFilter('status', 'all')); } },
         { label: 'Daily Sales — Last 7 days', icon: '▸', type: 'view', view: 'daily-sales', keywords: ['7 days', 'last week', 'sales week'], action: () => { this.openNavigationTarget('daily-sales'); this.$nextTick(() => this.applyDateRangePreset('7d')); } },
         { label: 'Daily Sales — This month', icon: '▸', type: 'view', view: 'daily-sales', keywords: ['mtd', 'month to date', 'this month sales'], action: () => { this.openNavigationTarget('daily-sales'); this.$nextTick(() => this.applyDateRangePreset('mtd')); } },
+        { label: 'Google Ads', icon: '▸', type: 'view', view: 'google-ads', keywords: ['ads', 'google', 'ppc', 'adwords', 'campaigns', 'search terms'], action: () => this.openNavigationTarget('google-ads') },
+        { label: 'Google Ads — Last 7 days', icon: '▸', type: 'view', view: 'google-ads', keywords: ['ads 7 days', 'ads week'], action: () => { this.openNavigationTarget('google-ads'); this.$nextTick(() => this.setGaFilterPeriod('7d')); } },
+        { label: 'Google Ads — This month', icon: '▸', type: 'view', view: 'google-ads', keywords: ['ads mtd', 'ads month'], action: () => { this.openNavigationTarget('google-ads'); this.$nextTick(() => this.setGaFilterPeriod('30d')); } },
       ];
     },
 

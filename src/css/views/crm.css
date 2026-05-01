@@ -48,22 +48,6 @@
 .crm-status-new      { color: var(--text-secondary); }
 .crm-status-unknown  { color: var(--text-muted); }
 
-/* Tab count badge */
-.crm-tab-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  margin-left: 4px;
-  background: var(--bg-hover);
-  border-radius: 9px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  vertical-align: middle;
-}
 
 /* Section heading */
 .crm-section-heading {

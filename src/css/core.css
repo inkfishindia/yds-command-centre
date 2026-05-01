@@ -1036,7 +1036,7 @@ body {
 }
 
 .btn:hover { background: var(--bg-hover); }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 .btn-small { padding: 0.3rem 0.6rem; font-size: 12px; }
 
 .btn-ghost {
@@ -1256,6 +1256,18 @@ body {
 
 /* === Dashboard === */
 
+/* ===== Dashboard morning brief banner — wrapper markers ===== */
+/* These are semantic wrappers on .brief-banner-section. Styling comes from
+   the section base + the suffixed children (.brief-banner-overdue-content,
+   .brief-banner-top3-list, etc.) defined in views/dashboard.css. The bare
+   wrapper classes exist for JS targeting + AT semantics only. */
+.brief-banner-overdue,
+.brief-banner-top3,
+.brief-banner-flags,
+.brief-banner-waiting {
+  /* marker class — see comment above */
+}
+
 .dashboard-view, .team-view, .docs-view {
   padding: 1.5rem;
   overflow-y: auto;
@@ -1276,6 +1288,9 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+}
+.context-menu-trigger {
+  /* JS hook marker — styled via .btn-icon */
 }
 .refresh-icon {
   display: inline-block;
@@ -1491,6 +1506,23 @@ tr:hover .table-link { color: var(--accent); }
   pointer-events: none;
 }
 
+/* ===== Bulk-action button variants ===== */
+.btn-done {
+  color: var(--green);
+}
+.btn-done:hover {
+  background: var(--green-dim);
+  border-color: var(--green);
+}
+
+.btn-snooze {
+  color: var(--amber);
+}
+.btn-snooze:hover {
+  background: var(--amber-dim);
+  border-color: var(--amber);
+}
+
 /* === Team Health Classes === */
 
 .team-card.health-green {
@@ -1649,6 +1681,23 @@ tr:hover .table-link { color: var(--accent); }
 .docs-filter-input {
   min-width: 220px;
 }
+.filter-input {
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  transition: border-color var(--transition-fast);
+}
+.filter-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.filter-input::placeholder {
+  color: var(--text-muted);
+}
 
 .doc-item {
   display: flex;
@@ -1669,6 +1718,13 @@ tr:hover .table-link { color: var(--accent); }
 
 .doc-item:hover { background: var(--bg-hover); }
 .doc-date { font-size: 11px; color: var(--text-muted); }
+
+/* ===== Generic document name utility ===== */
+.doc-name {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
 
 .doc-card {
   display: flex;
@@ -2285,6 +2341,11 @@ tr:hover .table-link { color: var(--accent); }
 .skeleton-text.medium { width: 65%; }
 .skeleton-text.long { width: 90%; }
 .skeleton-card { height: 80px; border-radius: var(--radius-lg); }
+.skeleton-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
 @keyframes skeleton-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
@@ -2745,6 +2806,9 @@ tr:hover .table-link { color: var(--accent); }
 }
 
 .filter-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
   padding: 4px 12px;
   border-radius: 16px;
   border: 1px solid var(--border);
@@ -6557,6 +6621,15 @@ tr:hover .table-link { color: var(--accent); }
     padding-right: 0.8rem;
   }
 
+  /* Area metric cards: single column on small mobile */
+  .mktops-area-metrics { grid-template-columns: 1fr; }
+
+  /* Tighten pill padding on small screens */
+  .mktops-area-metric-card--critical .mktops-area-metric-note,
+  .mktops-area-metric-card--warning .mktops-area-metric-note {
+    padding: 0.3rem 0.5rem;
+  }
+
   .kpi-row,
   .team-metrics {
     grid-template-columns: 1fr;
@@ -6699,6 +6772,10 @@ tr:hover .table-link { color: var(--accent); }
 
 .attention-overdue .attention-number {
   color: var(--red);
+}
+
+.attention-upcoming {
+  /* sibling modifier of .attention-dan/.attention-blocked/.attention-overdue — non-urgent counter, keeps default styling */
 }
 
 .attention-label {
@@ -7834,6 +7911,29 @@ tr:hover .table-link { color: var(--accent); }
 .text-muted { color: var(--text-muted); }
 .text-secondary { color: var(--text-secondary); }
 .text-xs { font-size: var(--font-size-xs); }
+.text-small { font-size: 0.75rem; }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.org-last-refresh {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.decision-owner {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
 .font-mono { font-family: var(--font-mono); }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -10249,4 +10349,835 @@ textarea:focus-visible {
 .btn-open-sheet-menu__sheet {
   font-size: 11px;
   opacity: 0.55;
+}
+
+/* ===== Shared: mktops overview shell + hero + priority grid =====
+   Used by: bmc, crm, dashboard, factory, marketingOps, ops, techTeam.
+   Base rules live here so all views get them without loading marketingOps.css.
+   Class names kept as-is (mktops-*) — rename is a separate decision.
+   ================================================================= */
+
+.mktops-overview-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.mktops-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.35rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 35%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
+    var(--bg-card);
+}
+
+.mktops-hero--critical {
+  border-color: var(--red-a50);
+  background:
+    radial-gradient(circle at top right, rgba(239, 68, 68, 0.18), transparent 35%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
+    var(--bg-card);
+}
+
+.mktops-hero--warning {
+  border-color: rgba(245, 158, 11, 0.45);
+  background:
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.16), transparent 35%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
+    var(--bg-card);
+}
+
+.mktops-hero--healthy {
+  border-color: var(--green-a35);
+}
+
+.mktops-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-width: 700px;
+}
+
+.mktops-hero-kicker {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.mktops-hero-title {
+  font-size: 24px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.mktops-hero-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.mktops-hero-status {
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.mktops-hero-status-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.mktops-hero-status-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.mktops-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.mktops-priority-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.mktops-priority-card--critical {
+  border-color: var(--red-a40);
+}
+
+.mktops-priority-card--warning {
+  border-color: var(--amber-a40);
+}
+
+.mktops-priority-card--healthy {
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.mktops-priority-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.mktops-priority-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mktops-priority-copy {
+  margin: 0.3rem 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.mktops-priority-value {
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.mktops-priority-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.mktops-priority-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--border);
+}
+
+.mktops-priority-item:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.mktops-priority-item-name {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.mktops-priority-item-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+/* ─── Area Metric Cards — base + tone modifiers (shared, dashboard + ops views) ─── */
+
+.mktops-area-metric-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  cursor: pointer;
+  position: relative;
+  transition: all var(--transition-normal);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.mktops-area-metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.mktops-area-metric-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mktops-area-metric-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.mktops-area-metric-value {
+  margin-top: 0.45rem;
+  font-size: 46px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.mktops-area-metric-note {
+  display: block;
+  margin-top: 0.55rem;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Icon slot — top-left, 16px, inherits tone color via cascade */
+.mktops-area-metric-icon {
+  width: 16px;
+  height: 16px;
+  margin-bottom: 0.3rem;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+/* Chevron — top-right, hidden by default, revealed on hover */
+.mktops-area-metric-chevron {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 14px;
+  height: 14px;
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  pointer-events: none;
+}
+
+.mktops-area-metric-card:hover .mktops-area-metric-chevron {
+  opacity: 1;
+  color: currentColor;
+}
+
+/* Tone: critical */
+.mktops-area-metric-card--critical {
+  border-color: var(--red-a50);
+  background:
+    radial-gradient(circle at top right, rgba(239, 68, 68, 0.12), transparent 40%),
+    var(--bg-card);
+}
+
+.mktops-area-metric-card--critical .mktops-area-metric-label {
+  color: var(--red);
+}
+
+.mktops-area-metric-card--critical .mktops-area-metric-value {
+  color: var(--red);
+}
+
+.mktops-area-metric-card--critical .mktops-area-metric-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--red-a12);
+  border: 1px solid var(--red-a50);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--red);
+  font-weight: 500;
+}
+
+/* Tone: warning */
+.mktops-area-metric-card--warning {
+  border-color: var(--amber-a40);
+  background:
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.1), transparent 40%),
+    var(--bg-card);
+}
+
+.mktops-area-metric-card--warning .mktops-area-metric-label {
+  color: var(--amber);
+}
+
+.mktops-area-metric-card--warning .mktops-area-metric-value {
+  color: var(--amber);
+}
+
+.mktops-area-metric-card--warning .mktops-area-metric-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--amber-a15);
+  border: 1px solid var(--amber-a40);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--amber);
+  font-weight: 500;
+}
+
+/* Tone: healthy */
+.mktops-area-metric-card--healthy {
+  border-color: var(--green-a35);
+}
+
+.mktops-area-metric-card--healthy .mktops-area-metric-label {
+  color: var(--green);
+}
+
+.mktops-area-metric-card--healthy .mktops-area-metric-value {
+  color: var(--green);
+}
+
+.mktops-area-metric-card--healthy .mktops-area-metric-note {
+  color: var(--text-muted);
+}
+
+/* Tone: neutral (default — no modifier needed; base styles apply) */
+.mktops-area-metric-card--neutral {
+  /* inherits base styles */
+}
+
+/* === Shared Pill / Filter / Table-Action Utilities === */
+/* Used across: crm, dashboard, factory, marketingOps, ops, techTeam, bmc */
+
+/* Saved-view pills row */
+.saved-view-pills {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
+/* Tab count badge (CRM tabs, ops tabs) */
+.crm-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  margin-left: 4px;
+  background: var(--bg-hover);
+  border-radius: 9px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  vertical-align: middle;
+}
+
+/* Inline action button row inside table cells */
+.table-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.mini-action-btn {
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1;
+  padding: 0.32rem 0.5rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.mini-action-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.mini-action-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Filter select — shared across ops, techTeam, docs */
+.filter-select {
+  padding: 6px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+.filter-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.filter-select:hover {
+  border-color: var(--border-hover, var(--accent));
+}
+
+.filter-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Detail Panel — multi-partial (bmc + crm) ────────────────────── */
+
+.detail-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 400px;
+  max-width: 90vw;
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border);
+  z-index: 50;
+  overflow-y: auto;
+  box-shadow: var(--shadow-overlay);
+}
+
+.detail-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background:
+    linear-gradient(180deg, rgba(97, 146, 255, 0.12), rgba(17, 17, 17, 0.96)),
+    var(--bg-primary);
+  z-index: 1;
+}
+
+.detail-panel-header h3 {
+  font-size: 1.1rem;
+  font-weight: 650;
+  color: var(--text-primary);
+  margin: 0.35rem 0 0;
+}
+
+.detail-panel-body {
+  padding: 1rem 1.5rem;
+}
+
+.detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.detail-value {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+@media (max-width: 600px) {
+  .detail-panel {
+    top: auto;
+    bottom: 56px;
+    left: 0;
+    width: 100vw;
+    max-width: 100vw;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+}
+
+/* ── BMC Canvas + Block — multi-partial (bmc + marketingOps) ─────── */
+
+.bmc-canvas {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.bmc-block {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+    var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  overflow: hidden;
+  transition: border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  min-height: 210px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+
+.bmc-block:hover {
+  border-color: rgba(97, 146, 255, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+}
+
+.bmc-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.95rem 1rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
+  flex-shrink: 0;
+}
+
+.bmc-block-title {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 900px) {
+  .bmc-block {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .bmc-canvas {
+    grid-template-columns: 1fr;
+  }
+  .bmc-block-header {
+    padding: 0.85rem 0.9rem 0.75rem;
+  }
+}
+
+/* ===== BMC static block variant ===== */
+/* Variant of .bmc-block (defined above) — used for placeholder/non-interactive cells. */
+.bmc-block--static {
+  /* marker — inherits from .bmc-block */
+}
+
+/* ===== Daily Sales drill-sheet visibility ===== */
+.ds-drill-sheet--visible {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ===== Daily Sales geo row marker ===== */
+/* Base class for x-class binding — drillable variant adds interactivity (defined in views/daily-sales.css). */
+.ds-geo-row {
+  /* marker — modifier .ds-geo-row--drillable adds styling */
+}
+
+/* ── Registry / Knowledge — multi-partial (registry + knowledge/system-map) */
+
+.reg-stat {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1.25rem;
+  text-align: center;
+  min-width: 80px;
+}
+
+.reg-stat-number {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.reg-stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+.registry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.reg-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.reg-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-light);
+  box-shadow: var(--shadow-elevated);
+  transform: translateY(-1px);
+}
+
+.reg-link {
+  font-size: 12px;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.reg-link:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+@media (max-width: 768px) {
+  .registry-grid { grid-template-columns: 1fr; }
+  .reg-stat { padding: 0.5rem 0.75rem; min-width: 60px; }
+  .reg-stat-number { font-size: 18px; }
+}
+
+/* ===== Multi-partial shared classes (Phase 3 CSS Step 2 Batch C) ===== */
+/* Migrated from styles.css + views/marketingOps.css — used by 2+ partials */
+
+/* Tabs navigation used by crm, marketingOps, ops */
+.mktops-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* Alert banners used by marketingOps, techTeam */
+.mktops-alert {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  font-size: 13px;
+}
+.mktops-alert-danger {
+  background: var(--red-glow);
+  border: 1px solid var(--red);
+  color: var(--red);
+}
+
+/* View refresh label used by bmc, crm, dashboard, factory, marketingOps, ops, techTeam */
+.view-refresh-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Card buttons used by crm, dashboard, factory, marketingOps, ops, techTeam */
+.area-card-button,
+.data-card-button {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.area-card-button {
+  border: 1px solid var(--border);
+}
+
+.data-card-button {
+  background: var(--bg-card);
+}
+
+.area-card-button:hover,
+.data-card-button:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.area-card-button:focus-visible,
+.data-card-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Compact empty state used by crm, dashboard, factory, marketingOps, ops, techTeam */
+.compact-empty-state {
+  margin: 0;
+  padding: 0.75rem 1rem;
+}
+
+/* Kanban empty state used by commitments, marketingOps */
+.kanban-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+/* Danger action button used by marketingOps, techTeam */
+.kanban-card-actions .action-btn-danger {
+  color: var(--red);
+  border-color: var(--red);
+}
+.kanban-card-actions .action-btn-danger:hover {
+  background: var(--red);
+  color: var(--text-inverse);
+}
+
+/* Small Lucide icon size — used by dan-colin, daily-sales, dashboard */
+.dc-icon-sm {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* ===== Phase 3 Leg 3 Batch 5 — final leakage cleanup ===== */
+/* 12 cross-view classes whose destination view-CSS files are over hard cap.
+   Per orchestrator: route through core.css to bypass per-view splits.
+   Mix of wrapper markers (compound class — base does the work) and minimal
+   real styling (error banners, tab-body wrappers, count badges).
+   Once view-CSS splits land (queued open-loop), these can migrate. */
+
+/* Wrapper markers — base/sibling class does the actual styling */
+.ga-status-table,
+.ga-campaign-table,
+.ga-search-table {
+  /* compound `class="ga-table ga-status-table"` etc — .ga-table base does the work */
+}
+
+.ds-weekly-chart {
+  /* compound `class="ds-trend-chart ds-weekly-chart"` — .ds-trend-chart base does the work */
+}
+
+.tech-crm-breaches {
+  /* wrapper with x-show condition — child rows handle styling */
+}
+
+.tech-strategy-level {
+  /* wrapper — child .tech-strategy-level-header (in views/techTeam.css) handles heading; rows handle level body */
+}
+
+/* Real minimal styling */
+.ga-error,
+.ga-unavailable {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.ga-error {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.ga-tab-content {
+  padding: 1rem 0;
+}
+
+.pipeline-placeholder {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.kanban-card-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.filter-pill-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-radius: 999px;
+  font-family: var(--font-mono);
 }

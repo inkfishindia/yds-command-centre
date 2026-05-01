@@ -33,7 +33,10 @@ async function bundleCss() {
   const viewEntries = (await readdir(viewDir))
     .filter((name) => name.endsWith('.css'))
     .map((name) => path.join(viewDir, name));
-  const entryPoints = [path.join(cssDir, 'core.css'), ...viewEntries];
+  const entryPoints = [
+    path.join(cssDir, 'core.css'),
+    ...viewEntries,
+  ];
 
   await mkdir(cssOutDir, { recursive: true });
   await esbuild.build({

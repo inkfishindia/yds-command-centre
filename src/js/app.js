@@ -106,6 +106,7 @@ function app() {
 _viewStyleFile(name) {
       // Only views with dedicated CSS files go here
       const fileMap = {
+        dashboard: 'dashboard',
         factory: 'factory',
         registry: 'registry',
         knowledge: 'knowledge',
@@ -115,11 +116,12 @@ _viewStyleFile(name) {
         crm: 'crm',
         ops: 'ops',
         d2c: 'd2c',
-        danColin: 'dan-colin',
-        dailySales: 'daily-sales',
-        systemStatus: 'system-status',
-        systemMap: 'system-map',
-        claudeUsage: 'claude-usage',
+        'dan-colin': 'dan-colin',
+        'daily-sales': 'daily-sales',
+        'google-ads': 'google-ads',
+        status: 'system-status',
+        'system-map': 'system-map',
+        'claude-usage': 'claude-usage',
       };
       return fileMap[name] || null;
     },

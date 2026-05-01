@@ -1,0 +1,615 @@
+Checking CSS leakage...
+
+❌ CSS LEAKAGE DETECTED
+
+| Partial | Class | Defined In |
+|---|---|---|
+| actionQueue | `.actionQueueLoading` | undefined |
+| actionQueue | `.context-menu-trigger` | undefined |
+| bmc | `.view-refresh-label` | styles.css, views/marketingOps.css |
+| bmc | `.skeleton-stack` | undefined |
+| commitments | `.commitmentsLoading` | undefined |
+| commitments | `.kanban-empty` | styles.css, views/marketingOps.css |
+| crm | `.view-refresh-label` | styles.css, views/marketingOps.css |
+| crm | `.mktops-tabs` | styles.css, views/marketingOps.css |
+| crm | `.skeleton-stack` | undefined |
+| crm | `.area-card-button` | styles.css, views/marketingOps.css |
+| crm | `.compact-empty-state` | styles.css, views/marketingOps.css |
+| crm | `.data-card-button` | styles.css, views/marketingOps.css |
+| crm | `.detail-panel` | styles.css, views/bmc.css |
+| crm | `.detail-panel-header` | styles.css, views/bmc.css |
+| crm | `.detail-panel-body` | styles.css, views/bmc.css |
+| crm | `.detail-row` | styles.css, views/bmc.css |
+| crm | `.detail-label` | styles.css, views/bmc.css |
+| crm | `.detail-value` | styles.css, views/bmc.css |
+| daily-sales | `.dc-icon-sm` | views/dan-colin.css |
+| daily-sales | `.ds-weekly-chart` | undefined |
+| daily-sales | `.ds-geo-row` | undefined |
+| daily-sales | `.realized` | undefined |
+| daily-sales | `.status` | undefined |
+| daily-sales | `.all` | undefined |
+| daily-sales | `.acceptance` | undefined |
+| daily-sales | `.Accepted` | undefined |
+| daily-sales | `.Awaiting` | undefined |
+| daily-sales | `.Rejected` | undefined |
+| daily-sales | `.date` | undefined |
+| daily-sales | `.state` | undefined |
+| daily-sales | `.ds-drill-sheet--visible` | undefined |
+| dan-colin | `.dropSubmitSuccess` | undefined |
+| dan-colin | `.dcAnswerFocused` | undefined |
+| dan-colin | `.watchExpanded` | undefined |
+| dan-colin | `.closedExpanded` | undefined |
+| dashboard | `.view-refresh-label` | styles.css, views/marketingOps.css |
+| dashboard | `.dashboardLoading` | undefined |
+| dashboard | `.dc-icon-sm` | views/dan-colin.css |
+| dashboard | `.health-strip` | styles.css, views/factory.css |
+| dashboard | `.dashboard-container-3zone` | styles.css, views/factory.css |
+| dashboard | `.area-card-button` | styles.css, views/marketingOps.css |
+| dashboard | `.compact-empty-state` | styles.css, views/marketingOps.css |
+| dashboard | `.dashboard-morning-brief-banner` | styles.css, views/factory.css |
+| dashboard | `.brief-banner-section` | styles.css, views/factory.css |
+| dashboard | `.brief-banner-overdue` | undefined |
+| dashboard | `.brief-banner-section-label` | styles.css, views/factory.css |
+| dashboard | `.brief-banner-overdue-content` | styles.css, views/factory.css |
+| dashboard | `.brief-banner-overdue-count` | styles.css, views/factory.css |
+| dashboard | `.brief-banner-overdue-items` | styles.css, views/factory.css |
+| dashboard | `.brief-banner-overdue-item` | styles.css, views/factory.css |
+| dashboard | `.brief-banner-overdue-name` | styles.css, views/factory.css |
+| dashboard | `.brief-banner-top3` | undefined |
+| dashboard | `.brief-banner-top3-list` | styles.css, views/factory.css |
+| dashboard | `.brief-banner-top3-item` | styles.css, views/factory.css |
+| dashboard | `.brief-banner-flags` | undefined |
+| dashboard | `.brief-banner-flags-list` | styles.css, views/factory.css |
+| dashboard | `.brief-banner-flag` | styles.css, views/factory.css |
+| dashboard | `.brief-banner-flag-msg` | styles.css, views/factory.css |
+| dashboard | `.brief-banner-waiting` | undefined |
+| dashboard | `.dashboard-health-lanes` | styles.css, views/factory.css |
+| dashboard | `.dashboard-business-health` | styles.css, views/factory.css |
+| dashboard | `.dashboard-zone-header` | styles.css, views/factory.css |
+| dashboard | `.dashboard-business-header-row` | styles.css, views/factory.css |
+| dashboard | `.dashboard-pipeline-summary` | styles.css, views/factory.css |
+| dashboard | `.dashboard-pipeline-total` | styles.css, views/factory.css |
+| dashboard | `.dashboard-pipeline-legend` | styles.css, views/factory.css |
+| dashboard | `.dashboard-legend-row` | styles.css, views/factory.css |
+| dashboard | `.dashboard-zone-subheader` | styles.css, views/factory.css |
+| dashboard | `.dashboard-mini-funnel` | styles.css, views/factory.css |
+| dashboard | `.health-metric-grid` | styles.css, views/factory.css |
+| dashboard | `.health-metric-card` | styles.css, views/factory.css |
+| dashboard | `.health-metric-value` | styles.css, views/factory.css |
+| dashboard | `.health-metric-label` | styles.css, views/factory.css |
+| dashboard | `.pipeline-placeholder` | undefined |
+| dashboard | `.dashboard-execution-health` | styles.css, views/factory.css |
+| dashboard | `.team-workload-strip` | styles.css, views/factory.css |
+| dashboard | `.workload-person` | styles.css, views/factory.css |
+| dashboard | `.workload-person-name` | styles.css, views/factory.css |
+| dashboard | `.workload-bar-track` | styles.css, views/factory.css |
+| dashboard | `.workload-label` | styles.css, views/factory.css |
+| dashboard | `.health-chip-dot` | styles.css, views/factory.css |
+| dashboard | `.health-chip-name` | styles.css, views/factory.css |
+| dashboard | `.health-chip-stats` | styles.css, views/factory.css |
+| dashboard | `.health-chip-overdue` | styles.css, views/factory.css |
+| dashboard | `.dashboard-action-zone` | styles.css, views/factory.css |
+| dashboard | `.dashboard-overdue-triage` | styles.css, views/factory.css |
+| dashboard | `.btn-done` | undefined |
+| dashboard | `.btn-snooze` | undefined |
+| dashboard | `.dashboard-triage-empty` | styles.css, views/factory.css |
+| dashboard | `.dashboard-overdue-groups` | styles.css, views/factory.css |
+| dashboard | `.overdue-group` | styles.css, views/factory.css |
+| dashboard | `.overdue-group-header` | styles.css, views/factory.css |
+| dashboard | `.overdue-group-name` | styles.css, views/factory.css |
+| dashboard | `.overdue-group-chevron` | styles.css, views/factory.css |
+| dashboard | `.overdue-group-body` | styles.css, views/factory.css |
+| dashboard | `.dashboard-activity-feed` | styles.css, views/factory.css |
+| dashboard | `.dashboard-activity-empty` | styles.css, views/factory.css |
+| dashboard | `.activity-item` | styles.css, views/factory.css |
+| dashboard | `.activity-item-icon` | styles.css, views/factory.css |
+| dashboard | `.activity-item-body` | styles.css, views/factory.css |
+| dashboard | `.activity-item-name` | styles.css, views/factory.css |
+| dashboard | `.activity-item-time` | styles.css, views/factory.css |
+| dashboard | `.decision-owner` | undefined |
+| decisions | `.skeleton-stack` | undefined |
+| decisions | `.decision-owner` | undefined |
+| docs | `.skeleton-stack` | undefined |
+| docs | `.doc-name` | undefined |
+| docs | `.pill` | undefined |
+| factory | `.view-refresh-label` | styles.css, views/marketingOps.css |
+| factory | `.factoryShowFormulas` | undefined |
+| factory | `.factorySimOpen` | undefined |
+| factory | `.area-card-button` | styles.css, views/marketingOps.css |
+| factory | `.compact-empty-state` | styles.css, views/marketingOps.css |
+| google-ads | `.view-loading` | undefined |
+| google-ads | `.ga-error` | undefined |
+| google-ads | `.ga-unavailable` | undefined |
+| google-ads | `.text-small` | undefined |
+| google-ads | `.ga-tab-content` | undefined |
+| google-ads | `.ga-status-table` | undefined |
+| google-ads | `.ga-campaign-table` | undefined |
+| google-ads | `.ga-search-table` | undefined |
+| knowledge | `.reg-stat` | styles.css, views/registry.css |
+| knowledge | `.reg-stat-number` | styles.css, views/registry.css |
+| knowledge | `.reg-stat-label` | styles.css, views/registry.css |
+| knowledge | `.skeleton-stack` | undefined |
+| knowledge | `.reg-link` | styles.css, views/registry.css |
+| marketingOps | `.skeleton-stack` | undefined |
+| marketingOps | `.filter-pill-count` | undefined |
+| marketingOps | `.kanban-card-title` | undefined |
+| marketingOps | `.bmc-canvas` | styles.css, views/bmc.css |
+| marketingOps | `.bmc-block` | styles.css, views/bmc.css |
+| marketingOps | `.bmc-block--static` | undefined |
+| marketingOps | `.bmc-block-header` | styles.css, views/bmc.css |
+| marketingOps | `.bmc-block-title` | styles.css, views/bmc.css |
+| marketingOps | `.utm-builder-section` | undefined |
+| marketingOps | `.utm-builder-header` | undefined |
+| marketingOps | `.utm-builder-header-left` | undefined |
+| marketingOps | `.utm-builder-icon` | undefined |
+| marketingOps | `.utm-builder-title` | undefined |
+| marketingOps | `.utm-builder-subtitle` | undefined |
+| marketingOps | `.utm-builder-body` | undefined |
+| marketingOps | `.utm-builder-form` | undefined |
+| marketingOps | `.utm-builder-field` | undefined |
+| marketingOps | `.utm-builder-field--full` | undefined |
+| marketingOps | `.utm-builder-label` | undefined |
+| marketingOps | `.utm-required` | undefined |
+| marketingOps | `.utm-input` | undefined |
+| marketingOps | `.utm-optional` | undefined |
+| marketingOps | `.utm-builder-preview` | undefined |
+| marketingOps | `.utm-preview-label` | undefined |
+| marketingOps | `.utm-preview-row` | undefined |
+| marketingOps | `.utm-preview-input` | undefined |
+| marketingOps | `.utm-builder-presets` | undefined |
+| marketingOps | `.utm-presets-header` | undefined |
+| marketingOps | `.utm-presets-title` | undefined |
+| marketingOps | `.utm-preset-save-row` | undefined |
+| marketingOps | `.utm-preset-name-input` | undefined |
+| marketingOps | `.utm-preset-list` | undefined |
+| marketingOps | `.utm-preset-row` | undefined |
+| marketingOps | `.utm-preset-info` | undefined |
+| marketingOps | `.utm-preset-name` | undefined |
+| marketingOps | `.utm-preset-meta` | undefined |
+| marketingOps | `.utm-preset-actions` | undefined |
+| marketingOps | `.mini-action-btn--danger` | undefined |
+| notion | `.skeleton-stack` | undefined |
+| ops | `.view-refresh-label` | styles.css, views/marketingOps.css |
+| ops | `.mktops-tabs` | styles.css, views/marketingOps.css |
+| ops | `.skeleton-stack` | undefined |
+| ops | `.area-card-button` | styles.css, views/marketingOps.css |
+| ops | `.compact-empty-state` | styles.css, views/marketingOps.css |
+| ops | `.data-card-button` | styles.css, views/marketingOps.css |
+| ops | `.filter-input` | undefined |
+| overview | `.org-last-refresh` | undefined |
+| overview | `.overviewLoading` | undefined |
+| overview | `.attention-upcoming` | undefined |
+| status | `.org-last-refresh` | undefined |
+| status | `.systemSyncing` | undefined |
+| status | `.systemStatusLoading` | undefined |
+| system-map | `.org-last-refresh` | undefined |
+| system-map | `.systemMapLoading` | undefined |
+| system-map | `.registry-grid` | styles.css, views/registry.css |
+| system-map | `.system-map-view-card` | undefined |
+| system-map | `.reg-card` | styles.css, views/registry.css |
+| system-map | `.system-map-view-card-header` | undefined |
+| system-map | `.system-map-view-card-label-group` | undefined |
+| system-map | `.system-map-view-card-label` | undefined |
+| system-map | `.system-map-view-card-id` | undefined |
+| system-map | `.view-status-pill` | undefined |
+| system-map | `.system-map-view-card-files` | undefined |
+| system-map | `.system-map-view-file-ref` | undefined |
+| system-map | `.system-map-view-file-sep` | undefined |
+| system-map | `.system-map-view-missing` | undefined |
+| techTeam | `.skeleton-stack` | undefined |
+| techTeam | `.view-refresh-label` | styles.css, views/marketingOps.css |
+| techTeam | `.area-card-button` | styles.css, views/marketingOps.css |
+| techTeam | `.compact-empty-state` | styles.css, views/marketingOps.css |
+| techTeam | `.data-card-button` | styles.css, views/marketingOps.css |
+| techTeam | `.tech-system-tag-btn` | styles.css, views/marketingOps.css |
+| techTeam | `.action-btn-danger` | styles.css, views/marketingOps.css |
+| techTeam | `.tech-crm-breaches` | undefined |
+| techTeam | `.mktops-alert` | styles.css, views/marketingOps.css |
+| techTeam | `.mktops-alert-danger` | styles.css, views/marketingOps.css |
+| techTeam | `.tech-strategy-level` | undefined |
+
+## styles.css orphans
+
+| Class | Used By | Action |
+|---|---|---|
+| `.factory-layout` | factory | views/factory.css |
+| `.factory-main` | factory | views/factory.css |
+| `.factory-summary-row` | factory | views/factory.css |
+| `.factory-kpi-card` | factory | views/factory.css |
+| `.factory-kpi-label` | factory | views/factory.css |
+| `.factory-kpi-value` | factory | views/factory.css |
+| `.factory-kpi-sub` | factory | views/factory.css |
+| `.factory-kpi-note` | factory | views/factory.css |
+| `.factory-section` | factory | views/factory.css |
+| `.factory-section-title` | factory | views/factory.css |
+| `.factory-section-desc` | factory | views/factory.css |
+| `.factory-zones` | factory | views/factory.css |
+| `.factory-zone-wrapper` | factory | views/factory.css |
+| `.factory-zone-row` | factory | views/factory.css |
+| `.factory-zone-meta` | factory | views/factory.css |
+| `.factory-zone-bar` | factory | views/factory.css |
+| `.factory-zone-bar-fill` | factory | views/factory.css |
+| `.factory-zone-cap` | factory | views/factory.css |
+| `.factory-zone-load` | factory | views/factory.css |
+| `.factory-zone-chevron` | factory | views/factory.css |
+| `.factory-zone-detail` | factory | views/factory.css |
+| `.factory-zone-people-note` | factory | views/factory.css |
+| `.factory-zone-bottleneck-note` | factory | views/factory.css |
+| `.factory-icon-sm` | factory | views/factory.css |
+| `.factory-machine-table-wrap` | factory | views/factory.css |
+| `.text-right` | factory | views/factory.css |
+| `.factory-role-badge` | factory | views/factory.css |
+| `.factory-role-bottleneck` | factory | views/factory.css |
+| `.factory-role-support` | factory | views/factory.css |
+| `.factory-role-production` | factory | views/factory.css |
+| `.factory-bottom-row` | factory | views/factory.css |
+| `.factory-section-half` | factory | views/factory.css |
+| `.factory-cascade` | factory | views/factory.css |
+| `.factory-cascade-item` | factory | views/factory.css |
+| `.factory-cascade-rank` | factory | views/factory.css |
+| `.factory-cascade-body` | factory | views/factory.css |
+| `.factory-cascade-header` | factory | views/factory.css |
+| `.factory-cascade-name` | factory | views/factory.css |
+| `.factory-cascade-stats` | factory | views/factory.css |
+| `.factory-cascade-fix` | factory | views/factory.css |
+| `.factory-shared` | factory | views/factory.css |
+| `.factory-shared-item` | factory | views/factory.css |
+| `.factory-shared-header` | factory | views/factory.css |
+| `.factory-shared-name` | factory | views/factory.css |
+| `.factory-shared-bar` | factory | views/factory.css |
+| `.factory-shared-note` | factory | views/factory.css |
+| `.factory-assumptions` | factory | views/factory.css |
+| `.factory-assumptions-label` | factory | views/factory.css |
+| `.factory-assumptions-sep` | factory | views/factory.css |
+| `.factory-assumptions-read` | factory | views/factory.css |
+| `.factory-assumptions-edit-btn` | factory | views/factory.css |
+| `.factory-view-header` | factory | views/factory.css |
+| `.factory-config-loading` | factory | views/factory.css |
+| `.factory-sim-toggle-btn` | factory | views/factory.css |
+| `.factory-sim-sidebar` | factory | views/factory.css |
+| `.factory-sim-section` | factory | views/factory.css |
+| `.factory-sim-section-title` | factory | views/factory.css |
+| `.factory-sim-presets` | factory | views/factory.css |
+| `.factory-sim-preset-btn` | factory | views/factory.css |
+| `.factory-sim-columns` | factory | views/factory.css |
+| `.factory-sim-col` | factory | views/factory.css |
+| `.factory-sim-field` | factory | views/factory.css |
+| `.factory-sim-label` | factory | views/factory.css |
+| `.factory-sim-val` | factory | views/factory.css |
+| `.factory-sim-derived` | factory | views/factory.css |
+| `.factory-sim-range` | factory | views/factory.css |
+| `.factory-sim-check` | factory | views/factory.css |
+| `.factory-sim-radios` | factory | views/factory.css |
+| `.factory-sim-radio` | factory | views/factory.css |
+| `.health-strip` | dashboard | views/dashboard.css |
+| `.health-chip-dot` | dashboard | views/dashboard.css |
+| `.health-chip-name` | dashboard | views/dashboard.css |
+| `.health-chip-stats` | dashboard | views/dashboard.css |
+| `.health-chip-overdue` | dashboard | views/dashboard.css |
+| `.dashboard-container-3zone` | dashboard | views/dashboard.css |
+| `.dashboard-zone-header` | dashboard | views/dashboard.css |
+| `.dashboard-zone-subheader` | dashboard | views/dashboard.css |
+| `.dashboard-morning-brief-banner` | dashboard | views/dashboard.css |
+| `.brief-banner-section` | dashboard | views/dashboard.css |
+| `.brief-banner-section-label` | dashboard | views/dashboard.css |
+| `.brief-banner-overdue-content` | dashboard | views/dashboard.css |
+| `.brief-banner-overdue-count` | dashboard | views/dashboard.css |
+| `.brief-banner-overdue-items` | dashboard | views/dashboard.css |
+| `.brief-banner-overdue-item` | dashboard | views/dashboard.css |
+| `.brief-banner-overdue-name` | dashboard | views/dashboard.css |
+| `.brief-banner-top3-list` | dashboard | views/dashboard.css |
+| `.brief-banner-top3-item` | dashboard | views/dashboard.css |
+| `.brief-banner-flags-list` | dashboard | views/dashboard.css |
+| `.brief-banner-flag` | dashboard | views/dashboard.css |
+| `.brief-banner-flag-msg` | dashboard | views/dashboard.css |
+| `.dashboard-health-lanes` | dashboard | views/dashboard.css |
+| `.dashboard-business-health` | dashboard | views/dashboard.css |
+| `.dashboard-execution-health` | dashboard | views/dashboard.css |
+| `.dashboard-business-header-row` | dashboard | views/dashboard.css |
+| `.dashboard-pipeline-summary` | dashboard | views/dashboard.css |
+| `.dashboard-pipeline-total` | dashboard | views/dashboard.css |
+| `.dashboard-pipeline-legend` | dashboard | views/dashboard.css |
+| `.dashboard-legend-row` | dashboard | views/dashboard.css |
+| `.dashboard-mini-funnel` | dashboard | views/dashboard.css |
+| `.team-workload-strip` | dashboard | views/dashboard.css |
+| `.workload-person` | dashboard | views/dashboard.css |
+| `.workload-person-name` | dashboard | views/dashboard.css |
+| `.workload-bar-track` | dashboard | views/dashboard.css |
+| `.workload-label` | dashboard | views/dashboard.css |
+| `.health-metric-grid` | dashboard | views/dashboard.css |
+| `.health-metric-card` | dashboard | views/dashboard.css |
+| `.health-metric-value` | dashboard | views/dashboard.css |
+| `.health-metric-label` | dashboard | views/dashboard.css |
+| `.dashboard-action-zone` | dashboard | views/dashboard.css |
+| `.dashboard-overdue-triage` | dashboard | views/dashboard.css |
+| `.dashboard-overdue-groups` | dashboard | views/dashboard.css |
+| `.overdue-group` | dashboard | views/dashboard.css |
+| `.overdue-group-header` | dashboard | views/dashboard.css |
+| `.overdue-group-name` | dashboard | views/dashboard.css |
+| `.overdue-group-chevron` | dashboard | views/dashboard.css |
+| `.overdue-group-body` | dashboard | views/dashboard.css |
+| `.dashboard-triage-empty` | dashboard | views/dashboard.css |
+| `.dashboard-activity-empty` | dashboard | views/dashboard.css |
+| `.dashboard-activity-feed` | dashboard | views/dashboard.css |
+| `.activity-item` | dashboard | views/dashboard.css |
+| `.activity-item-icon` | dashboard | views/dashboard.css |
+| `.activity-item-body` | dashboard | views/dashboard.css |
+| `.activity-item-name` | dashboard | views/dashboard.css |
+| `.activity-item-time` | dashboard | views/dashboard.css |
+| `.factory-sim-mix-total` | factory | views/factory.css |
+| `.factory-sim-machines` | factory | views/factory.css |
+| `.factory-sim-results` | factory | views/factory.css |
+| `.factory-sim-results-title` | factory | views/factory.css |
+| `.factory-sim-compare-item` | factory | views/factory.css |
+| `.factory-sim-compare-label` | factory | views/factory.css |
+| `.factory-sim-compare-vals` | factory | views/factory.css |
+| `.factory-sim-before` | factory | views/factory.css |
+| `.factory-sim-after` | factory | views/factory.css |
+| `.factory-sim-delta` | factory | views/factory.css |
+| `.factory-sim-zone-bars` | factory | views/factory.css |
+| `.factory-sim-zone-bars-title` | factory | views/factory.css |
+| `.factory-sim-zone-bar-label` | factory | views/factory.css |
+| `.factory-sim-mini-bar` | factory | views/factory.css |
+| `.factory-formula-sidebar` | factory | views/factory.css |
+| `.factory-formula-card` | factory | views/factory.css |
+| `.factory-formula-name` | factory | views/factory.css |
+| `.factory-formula-code` | factory | views/factory.css |
+| `.factory-formula-desc` | factory | views/factory.css |
+| `.factory-error-toast` | factory | views/factory.css |
+| `.factory-edit-btn` | factory | views/factory.css |
+| `.factory-edit-inline` | factory | views/factory.css |
+| `.factory-machine-edit-row` | factory | views/factory.css |
+| `.factory-edit-field` | factory | views/factory.css |
+| `.factory-edit-field-wide` | factory | views/factory.css |
+| `.factory-edit-input` | factory | views/factory.css |
+| `.factory-edit-input-sm` | factory | views/factory.css |
+| `.factory-edit-actions` | factory | views/factory.css |
+| `.factory-edit-save-btn` | factory | views/factory.css |
+| `.factory-edit-cancel-btn` | factory | views/factory.css |
+| `.factory-formula-line` | factory | views/factory.css |
+| `.factory-formula-label` | factory | views/factory.css |
+| `.factory-formula-text` | factory | views/factory.css |
+| `.factory-formula-result` | factory | views/factory.css |
+| `.factory-rule-pills` | factory | views/factory.css |
+| `.factory-rule-pill` | factory | views/factory.css |
+| `.factory-machine-meta-row` | factory | views/factory.css |
+| `.factory-rules-edit-section` | factory | views/factory.css |
+| `.factory-rules-edit-label` | factory | views/factory.css |
+| `.factory-rule-edit` | factory | views/factory.css |
+| `.factory-rule-type-select` | factory | views/factory.css |
+| `.factory-rule-target-input` | factory | views/factory.css |
+| `.factory-rule-desc-input` | factory | views/factory.css |
+| `.factory-rule-remove-btn` | factory | views/factory.css |
+| `.factory-rule-add-btn` | factory | views/factory.css |
+| `.factory-zone-detail-header` | factory | views/factory.css |
+| `.factory-zone-detail-meta` | factory | views/factory.css |
+| `.factory-zone-detail-title` | factory | views/factory.css |
+| `.factory-zone-detail-ops` | factory | views/factory.css |
+| `.factory-zone-notes` | factory | views/factory.css |
+| `.factory-operating-edit` | factory | views/factory.css |
+| `.registry-stats` | registry | views/registry.css |
+| `.reg-stat` | knowledge, registry | core.css |
+| `.reg-stat-number` | knowledge, registry | core.css |
+| `.reg-stat-label` | knowledge, registry | core.css |
+| `.registry-grid` | registry, system-map | core.css |
+| `.reg-card` | registry, system-map | core.css |
+| `.reg-card-header` | registry | views/registry.css |
+| `.reg-status-badge` | registry | views/registry.css |
+| `.reg-card-name` | registry | views/registry.css |
+| `.reg-card-desc` | registry | views/registry.css |
+| `.reg-card-metrics` | registry | views/registry.css |
+| `.reg-card-activity` | registry | views/registry.css |
+| `.reg-activity-text` | registry | views/registry.css |
+| `.reg-activity-date` | registry | views/registry.css |
+| `.reg-card-stack` | registry | views/registry.css |
+| `.reg-tech-pill` | registry | views/registry.css |
+| `.reg-card-links` | registry | views/registry.css |
+| `.reg-link` | knowledge, registry | core.css |
+| `.kb-stats` | knowledge | views/knowledge.css |
+| `.kb-filters` | knowledge | views/knowledge.css |
+| `.kb-category` | knowledge | views/knowledge.css |
+| `.kb-category-header` | knowledge | views/knowledge.css |
+| `.kb-category-count` | knowledge | views/knowledge.css |
+| `.kb-grid` | knowledge | views/knowledge.css |
+| `.kb-card` | knowledge | views/knowledge.css |
+| `.kb-card-header` | knowledge | views/knowledge.css |
+| `.kb-card-name` | knowledge | views/knowledge.css |
+| `.kb-source-badge` | knowledge | views/knowledge.css |
+| `.kb-shared-tag` | knowledge | views/knowledge.css |
+| `.kb-card-desc` | knowledge | views/knowledge.css |
+| `.kb-card-details` | knowledge | views/knowledge.css |
+| `.kb-card-id` | knowledge | views/knowledge.css |
+| `.mktops-tabs` | crm, marketingOps, ops | core.css |
+| `.mktops-alert` | marketingOps, techTeam | core.css |
+| `.mktops-alert-danger` | marketingOps, techTeam | core.css |
+| `.mktops-alert-warning` | marketingOps | views/marketingOps.css |
+| `.mktops-alert-items` | marketingOps | views/marketingOps.css |
+| `.mktops-alert-item` | marketingOps | views/marketingOps.css |
+| `.view-refresh-label` | bmc, crm, dashboard, factory, marketingOps, ops, techTeam | core.css |
+| `.area-card-button` | crm, dashboard, factory, marketingOps, ops, techTeam | core.css |
+| `.data-card-button` | crm, marketingOps, ops, techTeam | core.css |
+| `.compact-empty-state` | crm, dashboard, factory, marketingOps, ops, techTeam | core.css |
+| `.tech-system-tag-btn` | techTeam | views/techTeam.css |
+| `.clickable-cell` | marketingOps | views/marketingOps.css |
+| `.kanban-empty` | commitments, marketingOps | core.css |
+| `.seq-health` | marketingOps | views/marketingOps.css |
+| `.view-toggle-group` | marketingOps | views/marketingOps.css |
+| `.view-toggle-btn` | marketingOps | views/marketingOps.css |
+| `.action-btn-danger` | techTeam | views/techTeam.css |
+| `.tech-tabs` | techTeam | views/techTeam.css |
+| `.tech-sprint-board` | techTeam | views/techTeam.css |
+| `.tech-filters` | techTeam | views/techTeam.css |
+| `.tech-type-badge` | techTeam | views/techTeam.css |
+| `.tech-priority-pill` | techTeam | views/techTeam.css |
+| `.tech-system-tag` | techTeam | views/techTeam.css |
+| `.tech-person` | techTeam | views/techTeam.css |
+| `.tech-blocked-text` | techTeam | views/techTeam.css |
+| `.tech-waiting-text` | techTeam | views/techTeam.css |
+| `.tech-bug-metrics` | techTeam | views/techTeam.css |
+| `.tech-bug-breakdown` | techTeam | views/techTeam.css |
+| `.tech-bar-row` | techTeam | views/techTeam.css |
+| `.tech-bar-label` | techTeam | views/techTeam.css |
+| `.tech-bar` | techTeam | views/techTeam.css |
+| `.tech-bar-fill` | techTeam | views/techTeam.css |
+| `.tech-bar-system` | techTeam | views/techTeam.css |
+| `.tech-bar-crm` | techTeam | views/techTeam.css |
+| `.tech-bar-count` | techTeam | views/techTeam.css |
+| `.tech-spec-board` | techTeam | views/techTeam.css |
+| `.tech-decision-timeline` | techTeam | views/techTeam.css |
+| `.tech-decision-card` | techTeam | views/techTeam.css |
+| `.tech-decision-header` | techTeam | views/techTeam.css |
+| `.tech-decision-date` | techTeam | views/techTeam.css |
+| `.tech-decision-title` | techTeam | views/techTeam.css |
+| `.tech-decision-meta` | techTeam | views/techTeam.css |
+| `.tech-decision-details` | techTeam | views/techTeam.css |
+| `.tech-detail-section` | techTeam | views/techTeam.css |
+| `.tech-velocity-chart` | techTeam | views/techTeam.css |
+| `.tech-velocity-row` | techTeam | views/techTeam.css |
+| `.tech-velocity-label` | techTeam | views/techTeam.css |
+| `.tech-velocity-bars` | techTeam | views/techTeam.css |
+| `.tech-velocity-bar` | techTeam | views/techTeam.css |
+| `.tech-velocity-bar-planned` | techTeam | views/techTeam.css |
+| `.tech-velocity-bar-completed` | techTeam | views/techTeam.css |
+| `.tech-velocity-numbers` | techTeam | views/techTeam.css |
+| `.tech-velocity-pct` | techTeam | views/techTeam.css |
+| `.tech-roadmap` | techTeam | views/techTeam.css |
+| `.tech-command-grid` | techTeam | views/techTeam.css |
+| `.tech-widget` | techTeam | views/techTeam.css |
+| `.tech-widget-value` | techTeam | views/techTeam.css |
+| `.tech-widget-list` | techTeam | views/techTeam.css |
+| `.tech-crm-section` | techTeam | views/techTeam.css |
+| `.tech-crm-funnel` | techTeam | views/techTeam.css |
+| `.tech-funnel-row` | techTeam | views/techTeam.css |
+| `.tech-funnel-label` | techTeam | views/techTeam.css |
+| `.tech-strategy-tree` | techTeam | views/techTeam.css |
+| `.tech-strategy-level-header` | techTeam | views/techTeam.css |
+| `.tech-strategy-items` | techTeam | views/techTeam.css |
+| `.tech-strategy-node` | techTeam | views/techTeam.css |
+| `.tech-strategy-node-name` | techTeam | views/techTeam.css |
+| `.tech-strategy-node-meta` | techTeam | views/techTeam.css |
+| `.tech-strategy-node-desc` | techTeam | views/techTeam.css |
+| `.kanban-title` | techTeam | views/techTeam.css |
+| `.kanban-meta` | techTeam | views/techTeam.css |
+| `.kanban-card-top` | techTeam | views/techTeam.css |
+| `.bmc-hero` | bmc | views/bmc.css |
+| `.bmc-hero-copy` | bmc | views/bmc.css |
+| `.bmc-hero-metrics` | bmc | views/bmc.css |
+| `.bmc-eyebrow` | bmc | views/bmc.css |
+| `.detail-kicker` | bmc | views/bmc.css |
+| `.bmc-spotlights` | bmc | views/bmc.css |
+| `.bmc-spotlight` | bmc | views/bmc.css |
+| `.bmc-spotlight-label` | bmc | views/bmc.css |
+| `.bmc-hero-card` | bmc | views/bmc.css |
+| `.bmc-hero-label` | bmc | views/bmc.css |
+| `.bmc-hero-value` | bmc | views/bmc.css |
+| `.bmc-hero-note` | bmc | views/bmc.css |
+| `.bmc-toolbar` | bmc | views/bmc.css |
+| `.bmc-toolbar-group` | bmc | views/bmc.css |
+| `.bmc-search` | bmc | views/bmc.css |
+| `.bmc-focus-label` | bmc | views/bmc.css |
+| `.bmc-canvas` | bmc, marketingOps | core.css |
+| `.bmc-partners` | bmc | views/bmc.css |
+| `.bmc-activities` | bmc | views/bmc.css |
+| `.bmc-resources` | bmc | views/bmc.css |
+| `.bmc-value-props` | bmc | views/bmc.css |
+| `.bmc-segments` | bmc | views/bmc.css |
+| `.bmc-channels` | bmc | views/bmc.css |
+| `.bmc-bus-units` | bmc | views/bmc.css |
+| `.bmc-costs` | bmc | views/bmc.css |
+| `.bmc-revenue` | bmc | views/bmc.css |
+| `.bmc-metrics-block` | bmc | views/bmc.css |
+| `.bmc-platforms-block` | bmc | views/bmc.css |
+| `.bmc-block` | bmc, marketingOps | core.css |
+| `.bmc-block-accent` | bmc | views/bmc.css |
+| `.bmc-block-header` | bmc, marketingOps | core.css |
+| `.bmc-block-title` | bmc, marketingOps | core.css |
+| `.bmc-block-summary` | bmc | views/bmc.css |
+| `.bmc-block-count` | bmc | views/bmc.css |
+| `.bmc-block-items` | bmc | views/bmc.css |
+| `.bmc-block-items-rich` | bmc | views/bmc.css |
+| `.bmc-block-actions` | bmc | views/bmc.css |
+| `.bmc-featured-stack` | bmc | views/bmc.css |
+| `.bmc-item-card` | bmc | views/bmc.css |
+| `.bmc-item-card-featured` | bmc | views/bmc.css |
+| `.bmc-item-card-compact` | bmc | views/bmc.css |
+| `.bmc-item-row` | bmc | views/bmc.css |
+| `.bmc-item-name` | bmc | views/bmc.css |
+| `.bmc-item-preview` | bmc | views/bmc.css |
+| `.bmc-meta-grid` | bmc | views/bmc.css |
+| `.bmc-meta-chip` | bmc | views/bmc.css |
+| `.bmc-more` | bmc | views/bmc.css |
+| `.bmc-empty` | bmc | views/bmc.css |
+| `.detail-panel` | bmc, crm | core.css |
+| `.detail-panel-header` | bmc, crm | core.css |
+| `.detail-panel-body` | bmc, crm | core.css |
+| `.detail-related` | bmc | views/bmc.css |
+| `.detail-related-header` | bmc | views/bmc.css |
+| `.detail-related-title` | bmc | views/bmc.css |
+| `.detail-related-note` | bmc | views/bmc.css |
+| `.detail-related-list` | bmc | views/bmc.css |
+| `.detail-related-item` | bmc | views/bmc.css |
+| `.detail-related-kicker` | bmc | views/bmc.css |
+| `.detail-related-name` | bmc | views/bmc.css |
+| `.detail-related-status` | bmc | views/bmc.css |
+| `.detail-row` | bmc, crm | core.css |
+| `.detail-label` | bmc, crm | core.css |
+| `.detail-value` | bmc, crm | core.css |
+| `.crm-status-active` | crm | views/crm.css |
+| `.crm-status-stalled` | crm | views/crm.css |
+| `.crm-section-heading` | crm | views/crm.css |
+| `.crm-status-bar` | crm | views/crm.css |
+| `.crm-status-pill` | crm | views/crm.css |
+| `.crm-status-pill-count` | crm | views/crm.css |
+| `.crm-owner-grid` | crm | views/crm.css |
+| `.crm-owner-card` | crm | views/crm.css |
+| `.crm-owner-name` | crm | views/crm.css |
+| `.crm-owner-count` | crm | views/crm.css |
+| `.crm-owner-bar-wrap` | crm | views/crm.css |
+| `.crm-owner-bar` | crm | views/crm.css |
+| `.crm-pagination` | crm | views/crm.css |
+| `.crm-team-card` | crm | views/crm.css |
+| `.crm-team-meta` | crm | views/crm.css |
+| `.crm-team-flows` | crm | views/crm.css |
+| `.crm-config-sections` | crm | views/crm.css |
+| `.crm-config-block` | crm | views/crm.css |
+| `.crm-config-summary` | crm | views/crm.css |
+| `.crm-detail-section-title` | crm | views/crm.css |
+| `.crm-detail-flow-row` | crm | views/crm.css |
+| `.ops-two-col` | ops | views/ops.css |
+| `.ops-stacked-bar` | ops | views/ops.css |
+| `.ops-bar-segment` | ops | views/ops.css |
+| `.ops-bar-legend` | ops | views/ops.css |
+| `.ops-bar-legend-item` | ops | views/ops.css |
+| `.ops-bar-legend-dot` | ops | views/ops.css |
+| `.ops-section-label` | ops | views/ops.css |
+| `.ops-row-count` | ops | views/ops.css |
+| `.view-header-svg` | claude-usage | views/claude-usage.css |
+| `.usage-stats-row` | claude-usage | views/claude-usage.css |
+| `.usage-stat-card` | claude-usage | views/claude-usage.css |
+| `.usage-stat-number` | claude-usage | views/claude-usage.css |
+| `.usage-stat-label` | claude-usage | views/claude-usage.css |
+| `.usage-stat-sub` | claude-usage | views/claude-usage.css |
+| `.usage-progress-wrap` | claude-usage | views/claude-usage.css |
+| `.usage-progress-bar` | claude-usage | views/claude-usage.css |
+| `.usage-progress-fill` | claude-usage | views/claude-usage.css |
+| `.usage-progress-labels` | claude-usage | views/claude-usage.css |
+| `.usage-form-card` | claude-usage | views/claude-usage.css |
+| `.usage-log-card` | claude-usage | views/claude-usage.css |
+| `.usage-section-title` | claude-usage | views/claude-usage.css |
+| `.usage-form` | claude-usage | views/claude-usage.css |
+| `.usage-form-field` | claude-usage | views/claude-usage.css |
+| `.usage-form-field--grow` | claude-usage | views/claude-usage.css |
+| `.usage-form-label` | claude-usage | views/claude-usage.css |
+| `.usage-form-optional` | claude-usage | views/claude-usage.css |
+| `.usage-percent-input-row` | claude-usage | views/claude-usage.css |
+| `.usage-slider` | claude-usage | views/claude-usage.css |
+| `.usage-number-input` | claude-usage | views/claude-usage.css |
+| `.usage-text-input` | claude-usage | views/claude-usage.css |
+| `.usage-add-btn` | claude-usage | views/claude-usage.css |
+| `.usage-empty` | claude-usage | views/claude-usage.css |
+| `.usage-session-table` | claude-usage | views/claude-usage.css |
+| `.usage-cell-muted` | claude-usage | views/claude-usage.css |
+| `.usage-cell-note` | claude-usage | views/claude-usage.css |
+| `.usage-pct-badge` | claude-usage | views/claude-usage.css |
+| `.usage-delete-btn` | claude-usage | views/claude-usage.css |
+

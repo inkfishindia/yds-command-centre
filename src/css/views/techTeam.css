@@ -46,16 +46,6 @@
   flex-wrap: wrap;
   align-items: center;
 }
-.tech-filters .filter-select,
-.tech-filters .filter-search {
-  padding: 6px 12px;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-primary);
-  font-size: 13px;
-  outline: none;
-}
 .tech-filters .filter-search {
   width: 180px;
 }
@@ -94,6 +84,12 @@
   border: 1px solid var(--border);
   border-radius: 3px;
   color: var(--text-secondary);
+}
+
+.tech-system-tag-btn {
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
 }
 
 .tech-person {
