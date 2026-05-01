@@ -161,14 +161,30 @@ function buildTrend30dLong(wide) {
 // ── Concerns ───────────────────────────────────────────────────────────────────
 
 const TERMINAL_STATUSES = new Set([
-  'delivered', 'cancelled', 'returned', 'refunded',
+  'delivered', 'fulfilled', 'fullfilled',
+  'partially fulfilled', 'partially fullfilled',
+  'cancelled', 'returned', 'refunded', 'rto', 'lost',
 ]);
 
 /**
- * Build concerns: pending acceptance + stuck orders.
+ * Build concerns per Master Spec §7 / UI Spec §11.
+ *
+ * pendingAcceptance  — status === 'Order Placed' && acceptanceStatus === 'awaiting'
+ * rejectedOrders     — status === 'Order Placed' && acceptanceStatus === 'rejected'
+ * stuckOrders        — (status === 'Order Placed' || status === 'Processing') && daysOpen > 5
+ *
+ * Each concern row: { orderNumber, customer, amount, daysAgo, daysOpen, channel, madeBy }
+ * Revenue sums: pendingRevenue (sum over pendingAcceptance), rejectedRevenue (sum over rejectedOrders)
+ *
  * @param {import('./parse').Order[]} orders
  * @param {number|null} nowMs
- * @returns {{ pendingAcceptance: Object[], stuckOrders: Object[] }}
+ * @returns {{
+ *   pendingAcceptance: Object[],
+ *   rejectedOrders: Object[],
+ *   stuckOrders: Object[],
+ *   pendingRevenue: number,
+ *   rejectedRevenue: number
+ * }}
  */
 function buildConcerns(orders, nowMs) {
   const istNow = getISTNow(nowMs);
@@ -180,37 +196,65 @@ function buildConcerns(orders, nowMs) {
   })();
 
   const pendingAcceptance = [];
+  const rejectedOrders = [];
   const stuckOrders = [];
+  let pendingRevenue = 0;
+  let rejectedRevenue = 0;
 
   for (const o of orders) {
-    let daysAgo = null;
+    let daysOpen = null;
     if (o.istDateKey) {
       const [oy, om, od] = o.istDateKey.split('-').map(Number);
       const [ty, tm, td] = todayKey.split('-').map(Number);
       const orderUTC = Date.UTC(oy, om - 1, od);
       const todayUTC = Date.UTC(ty, tm - 1, td);
-      daysAgo = Math.floor((todayUTC - orderUTC) / 86400000);
+      daysOpen = Math.floor((todayUTC - orderUTC) / 86400000);
     }
 
+    const amt = isNaN(o.amountWithTax) ? 0 : Math.round(o.amountWithTax);
     const concern = {
       orderNumber: o.orderNumber,
       customer:    o.customer,
-      amount:      isNaN(o.amountWithTax) ? 0 : Math.round(o.amountWithTax),
-      daysAgo:     daysAgo != null ? daysAgo : 0,
+      amount:      amt,
+      daysAgo:     daysOpen != null ? daysOpen : 0,  // kept for frontend compat
+      daysOpen:    daysOpen != null ? daysOpen : 0,  // synonym per spec
       channel:     o.salesChannel,
+      madeBy:      o.madeBy,
     };
 
+    const statusLower = (o.status || '').toLowerCase();
     const accStatus = (o.acceptanceStatus || '').toLowerCase();
-    if (accStatus === 'pending' || accStatus === 'awaiting' || accStatus === 'rejected') {
+
+    // pendingAcceptance: Order Placed + awaiting
+    if (statusLower === 'order placed' && accStatus === 'awaiting') {
       pendingAcceptance.push(concern);
+      pendingRevenue += amt;
     }
 
-    if (daysAgo != null && daysAgo > 5 && !TERMINAL_STATUSES.has(o.status.toLowerCase())) {
+    // rejectedOrders: Order Placed + rejected
+    if (statusLower === 'order placed' && accStatus === 'rejected') {
+      rejectedOrders.push({ ...concern });
+      rejectedRevenue += amt;
+    }
+
+    // stuckOrders: Order Placed or Processing, open > 5 days
+    // TERMINAL_STATUSES exclusion is defense-in-depth (Order Placed + Processing are non-terminal)
+    if (
+      (statusLower === 'order placed' || statusLower === 'processing') &&
+      daysOpen != null && daysOpen > 5 &&
+      !TERMINAL_STATUSES.has(statusLower)
+    ) {
       stuckOrders.push({ ...concern, status: o.status });
     }
   }
 
-  return { pendingAcceptance, stuckOrders };
+  return {
+    pendingAcceptance,
+    rejectedOrders,
+    stuckOrders,
+    pendingRevenue,
+    rejectedRevenue,
+  };
 }
 
 // ── Top States ─────────────────────────────────────────────────────────────────
@@ -269,6 +313,7 @@ function parseTime12h(str) {
 
 /**
  * Extract today's orders sorted by time desc.
+ * Extended with channelGroup, shippingState, acceptanceStatus, madeBy per UI Spec Panel 10.
  * @param {import('./parse').Order[]} orders
  * @param {string} todayKey  - "YYYY-MM-DD" IST
  * @returns {Object[]}
@@ -277,16 +322,106 @@ function buildTodaysOrders(orders, todayKey) {
   return orders
     .filter(o => o.istDateKey === todayKey)
     .map(o => ({
-      orderNumber:  o.orderNumber,
-      customer:     o.customer,
-      amount:       Math.round(isNaN(o.amountWithTax) ? 0 : o.amountWithTax),
-      status:       o.status,
-      salesChannel: o.salesChannel,
-      tag:          o.printMethod,
-      time:         o.time,
+      orderNumber:      o.orderNumber,
+      customer:         o.customer,
+      amount:           Math.round(isNaN(o.amountWithTax) ? 0 : o.amountWithTax),
+      status:           o.status,
+      salesChannel:     o.salesChannel,
+      tag:              o.printMethod,
+      time:             o.time,
+      // Extended fields (UI Spec Panel 10)
+      channelGroup:     o.channelGroup,
+      shippingState:    o.shipping.state,
+      acceptanceStatus: o.acceptanceStatus,
+      madeBy:           o.madeBy,
     }))
     .sort((a, b) => parseTime12h(b.time) - parseTime12h(a.time))
     .slice(0, 50);
+}
+
+// ── Weekly Trend ───────────────────────────────────────────────────────────────
+
+const MONTH_ABBREVS = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+
+/**
+ * Format an FY week's date range as e.g. "1 Apr – 7 Apr".
+ * FY week N spans FY days (N-1)*7+1 .. N*7, capped at today.
+ * @param {number} weekNum   - 1-indexed FY week number
+ * @param {number} fyStartYear - calendar year of April 1 (FY start)
+ * @param {number} todayUTC  - today epoch ms (UTC midnight IST day)
+ * @returns {string}
+ */
+function weekDateRange(weekNum, fyStartYear, todayUTC) {
+  const fyStartUTC = Date.UTC(fyStartYear, 3, 1); // April 1 of FY start year
+  const weekStartOrdinal = (weekNum - 1) * 7 + 1; // FY day (1-indexed)
+  const weekEndOrdinal = weekNum * 7;
+
+  const startMs = fyStartUTC + (weekStartOrdinal - 1) * 86400000;
+  const endMs = Math.min(fyStartUTC + (weekEndOrdinal - 1) * 86400000, todayUTC);
+
+  function fmt(ms) {
+    const d = new Date(ms);
+    const dayNum = d.getUTCDate();
+    const month0 = d.getUTCMonth();
+    // FY month index: April=0 → index 0 in MONTH_ABBREVS
+    const fyMonthIdx = month0 >= 3 ? month0 - 3 : month0 + 9;
+    return `${dayNum} ${MONTH_ABBREVS[fyMonthIdx]}`;
+  }
+
+  return `${fmt(startMs)} – ${fmt(endMs)}`;
+}
+
+/**
+ * Build weekly trend array from filter-applied orders.
+ * Returns one entry per FY week from W1 (Apr 1) up to the current week.
+ * Future weeks are excluded (no data yet).
+ *
+ * @param {import('./parse').Order[]} orders   - filter-applied orders
+ * @param {number|null} nowMs
+ * @returns {Array<{ week: number, dateRange: string, orders: number, revenue: number, aov: number }>}
+ */
+function buildWeeklyTrend(orders, nowMs) {
+  const istNow = getISTNow(nowMs);
+  const istYear = istNow.getUTCFullYear();
+  const istMonth0 = istNow.getUTCMonth();
+  const istDay = istNow.getUTCDate();
+
+  // FY start year (same calendar year if April+, else year - 1)
+  const fyStartYear = istMonth0 >= 3 ? istYear : istYear - 1;
+  const fyStartUTC = Date.UTC(fyStartYear, 3, 1); // April 1
+
+  // Today as UTC midnight (for FY ordinal calculation)
+  const todayUTC = Date.UTC(istYear, istMonth0, istDay);
+  const todayFyOrdinal = Math.floor((todayUTC - fyStartUTC) / 86400000) + 1; // 1-indexed
+  const currentWeek = Math.ceil(todayFyOrdinal / 7);
+
+  // Aggregate orders by fyWeek
+  const weekMap = new Map(); // weekNum → { orders: 0, revenue: 0 }
+  for (const o of orders) {
+    if (!o.fyWeek) continue;
+    if (o.fyWeek > currentWeek) continue; // future week
+    if (!weekMap.has(o.fyWeek)) weekMap.set(o.fyWeek, { orders: 0, revenue: 0 });
+    const entry = weekMap.get(o.fyWeek);
+    const v = o.amountWithTax;
+    if (!isNaN(v)) {
+      entry.orders += 1;
+      entry.revenue += v;
+    }
+  }
+
+  const result = [];
+  for (let w = 1; w <= currentWeek; w++) {
+    const data = weekMap.get(w) || { orders: 0, revenue: 0 };
+    const revenue = Math.round(data.revenue);
+    result.push({
+      week:      w,
+      dateRange: weekDateRange(w, fyStartYear, todayUTC),
+      orders:    data.orders,
+      revenue,
+      aov:       data.orders > 0 ? Math.round(revenue / data.orders) : 0,
+    });
+  }
+  return result;
 }
 
 module.exports = {
@@ -299,5 +434,6 @@ module.exports = {
   buildConcerns,
   buildTopStates,
   buildTodaysOrders,
+  buildWeeklyTrend,
   parseTime12h,
 };

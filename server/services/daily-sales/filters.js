@@ -6,29 +6,37 @@
  * All functions are pure (no I/O).
  *
  * @typedef {Object} FilterSpec
- * @property {string|null} from       - "YYYY-MM-DD" inclusive (IST); null = no lower bound
- * @property {string|null} to         - "YYYY-MM-DD" inclusive (IST); null = no upper bound
- * @property {string[]} channels      - empty = all
- * @property {string} orderType       - "all" | any value present in the sheet's Order Type column (e.g. "B2C", "DS", "Manual", "Stores")
- * @property {string} paymentMode     - "all" | specific value
- * @property {string} status          - "realized" | "all" | specific Status value
- * @property {string} state           - empty = all
- * @property {string} printMethod     - empty = all
+ * @property {string|null} from           - "YYYY-MM-DD" inclusive (IST); null = no lower bound
+ * @property {string|null} to             - "YYYY-MM-DD" inclusive (IST); null = no upper bound
+ * @property {string[]} channels          - empty = all
+ * @property {string} orderType           - "all" | any value present in the sheet's Order Type column (e.g. "B2C", "DS", "Manual", "Stores")
+ * @property {string} paymentMode         - "all" | specific value
+ * @property {string} status              - "realized" | "all" | specific Status value
+ * @property {string} state               - empty = all
+ * @property {string} printMethod         - empty = all; canonical value (DTG, DTF, Screenprint, etc.)
+ * @property {string} acceptanceStatus    - empty/null/"all" = all; "Accepted" | "Awaiting" | "Rejected"
+ * @property {string|null} madeBy         - null = all; exact string match on Order.madeBy
+ * @property {string[]} excludeStatuses   - statuses to exclude after status filter is applied; empty = exclude nothing
  */
+
+const { REALIZED_STATUSES } = require('./parse');
 
 /**
  * Default FilterSpec — realized orders only, no other constraints.
  * @type {FilterSpec}
  */
 const DEFAULT_FILTER_SPEC = {
-  from:        null,
-  to:          null,
-  channels:    [],
-  orderType:   'all',
-  paymentMode: 'all',
-  status:      'realized',
-  state:       '',
-  printMethod: '',
+  from:             null,
+  to:               null,
+  channels:         [],
+  orderType:        'all',
+  paymentMode:      'all',
+  status:           'realized',
+  state:            '',
+  printMethod:      '',
+  acceptanceStatus: '',
+  madeBy:           null,
+  excludeStatuses:  [],
 };
 
 /**
@@ -69,7 +77,24 @@ function parseFilterSpec(query, defaults) {
   const state = typeof query.state === 'string' ? query.state : d.state;
   const printMethod = typeof query.printMethod === 'string' ? query.printMethod : d.printMethod;
 
-  return { from, to, channels, orderType, paymentMode, status, state, printMethod };
+  // acceptanceStatus: empty/"all" = no filter
+  const acceptanceStatus = typeof query.acceptanceStatus === 'string' ? query.acceptanceStatus : d.acceptanceStatus;
+
+  // madeBy: exact string match; empty/null = no filter
+  let madeBy = d.madeBy;
+  if (typeof query.madeBy === 'string') {
+    const trimmed = query.madeBy.trim();
+    madeBy = trimmed || null;
+  }
+
+  // excludeStatuses: comma-separated string OR array → string[]
+  let excludeStatuses = d.excludeStatuses || [];
+  if (query.excludeStatuses) {
+    const raw = Array.isArray(query.excludeStatuses) ? query.excludeStatuses : [query.excludeStatuses];
+    excludeStatuses = raw.flatMap(s => s.split(',')).map(s => s.trim()).filter(Boolean);
+  }
+
+  return { from, to, channels, orderType, paymentMode, status, state, printMethod, acceptanceStatus, madeBy, excludeStatuses };
 }
 
 /**
@@ -132,14 +157,30 @@ function applyFilters(orders, spec) {
       }
     }
 
+    // Exclude statuses (applied after status filter)
+    if (spec.excludeStatuses && spec.excludeStatuses.length > 0) {
+      const lower = spec.excludeStatuses.map(s => s.toLowerCase());
+      if (lower.includes(order.status.toLowerCase())) return false;
+    }
+
     // State (shipping state)
     if (spec.state) {
       if (order.shipping.state.toLowerCase() !== spec.state.toLowerCase()) return false;
     }
 
-    // Print method (first tag)
+    // Print method — canonical value, case-insensitive match
     if (spec.printMethod) {
       if (order.printMethod.toLowerCase() !== spec.printMethod.toLowerCase()) return false;
+    }
+
+    // Acceptance status — empty/"all" = no filter (case-insensitive)
+    if (spec.acceptanceStatus && spec.acceptanceStatus !== 'all') {
+      if ((order.acceptanceStatus || '').toLowerCase() !== spec.acceptanceStatus.toLowerCase()) return false;
+    }
+
+    // Made-by — exact string match; null/empty = no filter
+    if (spec.madeBy) {
+      if (order.madeBy !== spec.madeBy) return false;
     }
 
     return true;
@@ -156,10 +197,54 @@ function summarizeFilterApplied(spec) {
   return Object.assign({}, spec);
 }
 
+/**
+ * Resolve the literal sorted array of status display names that the active
+ * filter currently includes. Used to power stat tooltips.
+ *
+ * Logic:
+ *   1. Collect distinct status display values from allOrders.
+ *   2. Apply spec.status lens (realized = REALIZED_STATUSES only; specific value = only that; all = keep all).
+ *   3. Subtract spec.excludeStatuses (case-insensitive).
+ *   4. Sort ascending.
+ *
+ * @param {FilterSpec} spec
+ * @param {import('./parse').Order[]} allOrders
+ * @returns {string[]}
+ */
+function resolveStatusList(spec, allOrders) {
+  // Collect distinct display values (preserve first-seen casing)
+  const seen = new Map(); // lower → display
+  for (const o of allOrders) {
+    const raw = o.status || '';
+    const key = raw.toLowerCase();
+    if (!seen.has(key)) seen.set(key, raw);
+  }
+
+  let candidates = Array.from(seen.values()); // display-casing strings
+
+  // Apply status lens
+  if (!spec.status || spec.status === 'realized') {
+    candidates = candidates.filter(s => REALIZED_STATUSES.has(s.toLowerCase()));
+  } else if (spec.status !== 'all') {
+    // Specific status — case-insensitive, return display casing from data
+    const specLower = spec.status.toLowerCase();
+    candidates = candidates.filter(s => s.toLowerCase() === specLower);
+  }
+
+  // Subtract excludeStatuses
+  if (spec.excludeStatuses && spec.excludeStatuses.length > 0) {
+    const excludeLower = spec.excludeStatuses.map(s => s.toLowerCase());
+    candidates = candidates.filter(s => !excludeLower.includes(s.toLowerCase()));
+  }
+
+  return candidates.sort((a, b) => a.localeCompare(b));
+}
+
 module.exports = {
   DEFAULT_FILTER_SPEC,
   parseFilterSpec,
   validateFilterSpec,
   applyFilters,
   summarizeFilterApplied,
+  resolveStatusList,
 };

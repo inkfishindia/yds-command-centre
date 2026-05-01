@@ -19,15 +19,30 @@
   "
   @keydown.escape.window="
     if (dailySalesDrill.open) { closeDrillSheet(); return; }
+    if (dailySalesActiveTooltip) { closeDsTooltip(); return; }
     if (_dsFilterDropdownOpen) { closeDsFilterDropdown(); }
   "
   style="display:contents"
 >
 
 <!-- Page header -->
-<div class="ds-page-header">
-  <h2 class="ds-page-title">Daily Sales</h2>
-  <div class="ds-page-actions">
+<div class="view-header-bar">
+  <div class="view-header-left">
+    <div class="view-header-text">
+      <h2 class="view-header-title">Daily Sales</h2>
+    </div>
+  </div>
+  <div class="view-header-actions">
+    <a
+      href="https://admin.yourdesignstore.in/admin/admin/orders"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="btn-open-sheet"
+      title="Open YDS Admin → Orders (export source)"
+    >
+      <span class="btn-open-sheet__icon">↗</span>
+      <span>Admin Orders</span>
+    </a>
     <a
       x-show="dailySales?.meta?.sheet?.url || dailySales?.source?.sourceUrl"
       :href="dailySales?.meta?.sheet?.url || dailySales?.source?.sourceUrl"
@@ -40,190 +55,153 @@
       <span x-text="dailySales?.meta?.sheet?.label || 'Open in Sheets'"></span>
     </a>
     <button
-      class="ds-refresh-btn"
+      class="btn btn-small btn-icon"
       @click="loadDailySales()"
       :disabled="dailySalesLoading"
       aria-label="Refresh sales data"
     >
-      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <path d="M13.65 2.35A8 8 0 1 0 15 8h-2a6 6 0 1 1-1.05-3.36L10 6h5V1l-1.35 1.35z" fill="currentColor"/>
-      </svg>
-      <span x-text="dailySalesLoading ? 'Loading…' : 'Refresh'"></span>
+      <i data-lucide="rotate-cw" class="dc-icon-sm" aria-hidden="true"></i>
+      <span x-text="dailySalesLoading ? 'Loading...' : 'Refresh'"></span>
     </button>
   </div>
 </div>
 
-<!-- ── v4 Freshness Banner ───────────────────────────────────────── -->
-<!-- Sticky below page header (z-index 8), above filter strip (z-index 9). -->
+<!-- ── v4/v5 Freshness Banner ─────────────────────────────────────── -->
+<!-- Sticky below page header (z-index 8), above lens strip. -->
 <div
   class="ds-freshness-banner"
-  :class="{ 'ds-freshness-banner--unavailable': !dailySales?.freshness?.dataCutoff }"
+  :class="{
+    'ds-freshness-banner--unavailable': dailySales && _isSheetsError(),
+    'ds-freshness-banner--error':       dailySales && _isSheetsError(),
+    'ds-freshness-banner--stale':       dailySales && !_isSheetsError() && _computeStaleDays() !== null
+  }"
   role="status"
   aria-live="polite"
   aria-label="Data freshness"
   x-show="dailySales"
 >
-  <p class="ds-freshness-banner__primary">
-    <span
-      x-show="dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff"
-      x-text="'Data through ' + formatDataCutoff(dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff)"
-    ></span>
-    <span
-      x-show="!dailySales?.yesterday?.date && !dailySales?.freshness?.dataCutoff"
-    >Data unavailable — Sheets unreachable</span>
-  </p>
-  <p class="ds-freshness-banner__secondary">
-    <span
-      x-show="dailySales?.freshness?.latestOrder?.time"
-      x-text="dailySales?.freshness?.latestOrder?.time + ' ' + (dailySales?.yesterday?.date === dailySales?.freshness?.dataCutoff ? 'yesterday' : 'today')"
-    ></span>
-    <span
-      x-show="!dailySales?.freshness?.latestOrder?.time && dailySales?.freshness?.fetchedAt"
-      x-text="'Fetched ' + formatRelativeTime(dailySales?.freshness?.fetchedAt)"
-    ></span>
-  </p>
+  <!-- Error state: Sheets unreachable -->
+  <template x-if="dailySales && _isSheetsError()">
+    <p class="ds-freshness-banner__primary">
+      Data unavailable — Sheets unreachable
+    </p>
+  </template>
+  <template x-if="dailySales && _isSheetsError()">
+    <p class="ds-freshness-banner__secondary">
+      <span x-text="dailySales?.freshness?.fetchedAt ? 'Last attempted ' + formatRelativeTime(dailySales?.freshness?.fetchedAt) + '.' : 'Click refresh to retry.'"></span>
+      <button
+        class="ds-refresh-btn"
+        style="display:inline-flex; padding:2px 8px; font-size:11px; margin-left:6px;"
+        @click="loadDailySales()"
+        :disabled="dailySalesLoading"
+        aria-label="Retry loading sales data"
+      >
+        <i data-lucide="rotate-cw" class="dc-icon-sm" aria-hidden="true"></i>
+        Retry
+      </button>
+    </p>
+  </template>
+
+  <!-- Stale state: dataCutoff lags yesterday by ≥2 days -->
+  <template x-if="dailySales && !_isSheetsError() && _computeStaleDays() !== null">
+    <p class="ds-freshness-banner__primary"
+      x-text="'Data is stale — last import was ' + _computeStaleDays() + ' day' + (_computeStaleDays() === 1 ? '' : 's') + ' ago (through ' + formatCutoffShort(dailySales?.freshness?.dataCutoff) + ')'">
+    </p>
+  </template>
+  <template x-if="dailySales && !_isSheetsError() && _computeStaleDays() !== null">
+    <p class="ds-freshness-banner__secondary">
+      Check Sheets sync status or reimport manually.
+      <button
+        class="ds-refresh-btn"
+        style="display:inline-flex; padding:2px 8px; font-size:11px; margin-left:6px;"
+        @click="loadDailySales()"
+        :disabled="dailySalesLoading"
+        aria-label="Retry loading sales data"
+      >
+        <i data-lucide="rotate-cw" class="dc-icon-sm" aria-hidden="true"></i>
+        Retry
+      </button>
+    </p>
+  </template>
+
+  <!-- Normal state -->
+  <template x-if="dailySales && !_isSheetsError() && _computeStaleDays() === null">
+    <p class="ds-freshness-banner__primary">
+      <span
+        x-show="dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff"
+        x-text="'Data through ' + formatDataCutoff(dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff)"
+      ></span>
+    </p>
+  </template>
+  <template x-if="dailySales && !_isSheetsError() && _computeStaleDays() === null">
+    <p class="ds-freshness-banner__secondary">
+      <span
+        x-show="dailySales?.freshness?.latestOrder?.time"
+        x-text="dailySales?.freshness?.latestOrder?.time + ' ' + (dailySales?.yesterday?.date === dailySales?.freshness?.dataCutoff ? 'yesterday' : 'today')"
+      ></span>
+      <span
+        x-show="!dailySales?.freshness?.latestOrder?.time && dailySales?.freshness?.fetchedAt"
+        x-text="'Fetched ' + formatRelativeTime(dailySales?.freshness?.fetchedAt)"
+      ></span>
+    </p>
+  </template>
 </div>
 
-<!-- ── Phase 2: Filter Strip ─────────────────────────────────────── -->
-<!-- Sticky below page header, above content. z-index 9 (below nav at 10). -->
+<!-- ── v5 Lens Segment Control ─────────────────────────────────────── -->
+<!-- Sticky below freshness banner, above filter strip. z-index between 8 and 9. -->
+<div
+  class="ds-lens-strip"
+  role="radiogroup"
+  aria-label="Data view lenses"
+  x-show="dailySales"
+>
+  <button
+    class="ds-lens-pill"
+    :class="{ 'ds-lens-pill--active': dailySalesLens === 'realized' }"
+    @click="applyLensFilter('realized')"
+    role="radio"
+    :aria-checked="dailySalesLens === 'realized'"
+    aria-label="Realized orders lens — delivered and fulfilled orders only"
+    :disabled="dailySalesLoading"
+  >Realized</button>
+  <button
+    class="ds-lens-pill"
+    :class="{ 'ds-lens-pill--active': dailySalesLens === 'active' }"
+    @click="applyLensFilter('active')"
+    role="radio"
+    :aria-checked="dailySalesLens === 'active'"
+    aria-label="Active orders lens — all orders excluding cancelled, RTO, lost, draft"
+    :disabled="dailySalesLoading"
+  >Active</button>
+  <button
+    class="ds-lens-pill"
+    :class="{ 'ds-lens-pill--active': dailySalesLens === 'all' }"
+    @click="applyLensFilter('all')"
+    role="radio"
+    :aria-checked="dailySalesLens === 'all'"
+    aria-label="All orders lens — every order regardless of status"
+    :disabled="dailySalesLoading"
+  >All</button>
+  <span
+    class="ds-lens-strip__custom-label"
+    x-show="dailySalesLens === 'custom'"
+    aria-live="polite"
+  >Custom</span>
+</div>
+
+<!-- ── v5 Filter Strip (reworked per UI Spec §2) ──────────────────── -->
+<!-- Row 1 = Order Type chips, Row 2 = Print Method chips,
+     Row 3 = Payment chips, Row 4 = dropdowns.
+     Channel multi-select removed — Order Type chips are the canonical segment. -->
 <div
   class="ds-filter-strip"
   role="region"
   aria-label="Sales filters"
   aria-live="polite"
 >
-  <!-- Date range -->
-  <div class="ds-filter-group">
-    <div class="ds-filter-dropdown" x-data>
-      <button
-        class="ds-filter-dropdown__trigger"
-        :class="{ 'ds-filter-dropdown__trigger--active': dailySalesFilters.from || dailySalesFilters.to, 'ds-filter-dropdown__trigger--open': _dsFilterDropdownOpen === 'date' }"
-        @click="toggleDsFilterDropdown('date')"
-        aria-haspopup="listbox"
-        :aria-expanded="_dsFilterDropdownOpen === 'date'"
-        aria-label="Date range filter"
-        :disabled="dailySalesLoading"
-      >
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <rect x="1" y="2" width="14" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M5 1v3M11 1v3M1 6h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        <span x-text="dsDateRangeLabel()"></span>
-        <svg class="ds-filter-dropdown__trigger-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-          <path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
 
-      <div
-        x-show="_dsFilterDropdownOpen === 'date'"
-        class="ds-filter-dropdown__panel"
-        @click.outside="closeDsFilterDropdown()"
-        role="listbox"
-        aria-label="Date range options"
-      >
-        <div class="ds-filter-dropdown__panel-header">
-          Date Range
-          <button class="ds-filter-dropdown__close" @click="closeDsFilterDropdown()" aria-label="Close date filter">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </button>
-        </div>
-        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('today')" role="option">Today</div>
-        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('yesterday')" role="option">Yesterday</div>
-        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('7d')" role="option">Last 7 days</div>
-        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('30d')" role="option">Last 30 days</div>
-        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('mtd')" role="option">Month to date</div>
-        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('ytd')" role="option">FY Year to date</div>
-        <div class="ds-filter-dropdown__panel-header" style="border-top: 1px solid var(--border); margin-top: 4px;">Custom range</div>
-        <div style="padding: 8px 12px; display: flex; flex-direction: column; gap: 6px;">
-          <label style="font-size: 11px; color: var(--text-secondary);">From
-            <input
-              type="date"
-              class="ds-date-input"
-              :value="dailySalesFilters.from || ''"
-              @change="setDailyFilter('from', $event.target.value || null)"
-            />
-          </label>
-          <label style="font-size: 11px; color: var(--text-secondary);">To
-            <input
-              type="date"
-              class="ds-date-input"
-              :value="dailySalesFilters.to || ''"
-              @change="setDailyFilter('to', $event.target.value || null)"
-            />
-          </label>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Channel multi-select -->
-  <div class="ds-filter-group">
-    <div class="ds-filter-dropdown">
-      <button
-        class="ds-filter-dropdown__trigger"
-        :class="{ 'ds-filter-dropdown__trigger--active': dailySalesFilters.channels && dailySalesFilters.channels.length > 0, 'ds-filter-dropdown__trigger--open': _dsFilterDropdownOpen === 'channel' }"
-        @click="toggleDsFilterDropdown('channel')"
-        aria-haspopup="listbox"
-        :aria-expanded="_dsFilterDropdownOpen === 'channel'"
-        aria-label="Channel filter"
-        :disabled="dailySalesLoading"
-      >
-        Channel
-        <span
-          class="ds-filter-chip--active-count"
-          x-show="dailySalesFilters.channels && dailySalesFilters.channels.length > 0"
-          x-text="dailySalesFilters.channels.length"
-        ></span>
-        <svg class="ds-filter-dropdown__trigger-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-          <path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-
-      <div
-        x-show="_dsFilterDropdownOpen === 'channel'"
-        class="ds-filter-dropdown__panel"
-        @click.outside="closeDsFilterDropdown()"
-        role="listbox"
-        aria-label="Channel options"
-        aria-multiselectable="true"
-      >
-        <div class="ds-filter-dropdown__panel-header">
-          Channels
-          <button class="ds-filter-dropdown__close" @click="closeDsFilterDropdown()" aria-label="Close channel filter">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </button>
-        </div>
-        <template x-for="ch in (dailySales?.filters?.available?.channels || [])" :key="ch">
-          <label
-            class="ds-filter-dropdown__item"
-            :class="{ 'ds-filter-dropdown__item--selected': isDailyChannelActive(ch) }"
-            role="option"
-            :aria-selected="isDailyChannelActive(ch)"
-          >
-            <input
-              type="checkbox"
-              :checked="isDailyChannelActive(ch)"
-              @change="toggleDailyChannel(ch)"
-            />
-            <span x-text="ch"></span>
-          </label>
-        </template>
-        <div
-          x-show="!dailySales?.filters?.available?.channels?.length"
-          class="ds-filter-dropdown__item"
-          style="color: var(--text-secondary);"
-        >No channels available</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Order Type pills — rendered dynamically from filters.available.orderTypes
-       so canonical values (B2C / DS / Manual / Stores) auto-appear once tagged in the sheet -->
-  <div class="ds-filter-group" role="group" aria-label="Order type filter">
+  <!-- Row 1 — Order Type chips -->
+  <div class="ds-filter-row" role="group" aria-label="Order type filter">
     <button
       class="ds-filter-chip"
       :class="{ 'ds-filter-chip--active': !dailySalesFilters.orderType || dailySalesFilters.orderType === 'all' }"
@@ -241,21 +219,42 @@
     </template>
   </div>
 
-  <!-- Payment Mode pills -->
-  <div class="ds-filter-group" role="group" aria-label="Payment mode filter">
-    <template x-for="pm in (['all', ...(dailySales?.filters?.available?.paymentModes || [])])" :key="pm">
+  <!-- Row 2 — Print Method chips (dynamic, includes unknown per UI Spec §2) -->
+  <div class="ds-filter-row" role="group" aria-label="Print method filter">
+    <button
+      class="ds-filter-chip"
+      :class="{ 'ds-filter-chip--active': !dailySalesFilters.printMethod }"
+      @click="setDailyFilter('printMethod', '')"
+      :disabled="dailySalesLoading"
+    >All Methods</button>
+    <template x-for="pm in (dailySales?.filters?.available?.printMethods ?? [])" :key="pm">
       <button
         class="ds-filter-chip"
-        :class="{ 'ds-filter-chip--active': pm === 'all' ? (!dailySalesFilters.paymentMode || dailySalesFilters.paymentMode === 'all') : dailySalesFilters.paymentMode === pm }"
-        @click="setDailyFilter('paymentMode', pm)"
+        :class="{ 'ds-filter-chip--active': dailySalesFilters.printMethod === pm }"
+        @click="setDailyFilter('printMethod', pm)"
         :disabled="dailySalesLoading"
-        x-text="pm === 'all' ? 'All Payments' : pm"
+        x-text="pm"
       ></button>
     </template>
   </div>
 
-  <!-- Status dropdown -->
-  <div class="ds-filter-group">
+  <!-- Row 3 — Payment Mode chips -->
+  <div class="ds-filter-row" role="group" aria-label="Payment mode filter">
+    <template x-for="p in (['all', ...(dailySales?.filters?.available?.paymentModes || [])])" :key="p">
+      <button
+        class="ds-filter-chip"
+        :class="{ 'ds-filter-chip--active': p === 'all' ? (!dailySalesFilters.paymentMode || dailySalesFilters.paymentMode === 'all') : dailySalesFilters.paymentMode === p }"
+        @click="setDailyFilter('paymentMode', p)"
+        :disabled="dailySalesLoading"
+        x-text="p === 'all' ? 'All Payments' : p"
+      ></button>
+    </template>
+  </div>
+
+  <!-- Row 4 — Status dropdown + Acceptance dropdown + Date dropdown + State dropdown + Reset -->
+  <div class="ds-filter-row ds-filter-row--dropdowns">
+
+    <!-- Order Status dropdown -->
     <div class="ds-filter-dropdown">
       <button
         class="ds-filter-dropdown__trigger"
@@ -263,15 +262,14 @@
         @click="toggleDsFilterDropdown('status')"
         aria-haspopup="listbox"
         :aria-expanded="_dsFilterDropdownOpen === 'status'"
-        aria-label="Status filter"
+        aria-label="Order Status filter"
         :disabled="dailySalesLoading"
       >
-        <span x-text="dailySalesFilters.status === 'realized' ? 'Realized' : (dailySalesFilters.status === 'all' ? 'All Statuses' : dailySalesFilters.status)"></span>
+        <span x-text="dailySalesFilters.status === 'realized' ? 'Order Status' : (dailySalesFilters.status === 'all' ? 'All Statuses' : dailySalesFilters.status)"></span>
         <svg class="ds-filter-dropdown__trigger-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
           <path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
-
       <div
         x-show="_dsFilterDropdownOpen === 'status'"
         class="ds-filter-dropdown__panel"
@@ -280,55 +278,169 @@
         aria-label="Status options"
       >
         <div class="ds-filter-dropdown__panel-header">
-          Status
+          Order Status
           <button class="ds-filter-dropdown__close" @click="closeDsFilterDropdown()" aria-label="Close status filter">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
         </div>
-        <div
-          class="ds-filter-dropdown__item"
-          :class="{ 'ds-filter-dropdown__item--selected': dailySalesFilters.status === 'realized' }"
-          @click="setDailyFilter('status', 'realized'); closeDsFilterDropdown()"
-          role="option"
-          :aria-selected="dailySalesFilters.status === 'realized'"
-        >Realized (default)</div>
-        <div
-          class="ds-filter-dropdown__item"
-          :class="{ 'ds-filter-dropdown__item--selected': dailySalesFilters.status === 'all' }"
-          @click="setDailyFilter('status', 'all'); closeDsFilterDropdown()"
-          role="option"
-          :aria-selected="dailySalesFilters.status === 'all'"
-        >All Statuses</div>
+        <div class="ds-filter-dropdown__item" :class="{ 'ds-filter-dropdown__item--selected': dailySalesFilters.status === 'realized' }" @click="setDailyFilter('status', 'realized'); closeDsFilterDropdown()" role="option" :aria-selected="dailySalesFilters.status === 'realized'">Realized (default)</div>
+        <div class="ds-filter-dropdown__item" :class="{ 'ds-filter-dropdown__item--selected': dailySalesFilters.status === 'all' }" @click="setDailyFilter('status', 'all'); closeDsFilterDropdown()" role="option" :aria-selected="dailySalesFilters.status === 'all'">All Statuses</div>
         <template x-for="st in (dailySales?.filters?.available?.statuses || [])" :key="st">
-          <div
-            class="ds-filter-dropdown__item"
-            :class="{ 'ds-filter-dropdown__item--selected': dailySalesFilters.status === st }"
-            @click="setDailyFilter('status', st); closeDsFilterDropdown()"
-            role="option"
-            :aria-selected="dailySalesFilters.status === st"
-            x-text="st"
-          ></div>
+          <div class="ds-filter-dropdown__item" :class="{ 'ds-filter-dropdown__item--selected': dailySalesFilters.status === st }" @click="setDailyFilter('status', st); closeDsFilterDropdown()" role="option" :aria-selected="dailySalesFilters.status === st" x-text="st"></div>
         </template>
       </div>
     </div>
-  </div>
 
-  <!-- Reset button — only visible when filters are non-default -->
-  <div class="ds-filter-group" x-show="isDailyFilterActive()">
-    <button
-      class="ds-filter-reset"
-      @click="resetDailyFilters()"
-      :disabled="dailySalesLoading"
-      aria-label="Reset all filters"
-    >
-      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-        <path d="M2 2l6 6M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-      Reset
-    </button>
-  </div>
+    <!-- Acceptance dropdown (NEW) -->
+    <div class="ds-filter-dropdown">
+      <button
+        class="ds-filter-dropdown__trigger"
+        :class="{ 'ds-filter-dropdown__trigger--active': !!dailySalesFilters.acceptanceStatus, 'ds-filter-dropdown__trigger--open': _dsFilterDropdownOpen === 'acceptance' }"
+        @click="toggleDsFilterDropdown('acceptance')"
+        aria-haspopup="listbox"
+        :aria-expanded="_dsFilterDropdownOpen === 'acceptance'"
+        aria-label="Acceptance status filter"
+        :disabled="dailySalesLoading"
+      >
+        <span x-text="dailySalesFilters.acceptanceStatus ? dailySalesFilters.acceptanceStatus : 'Acceptance'"></span>
+        <svg class="ds-filter-dropdown__trigger-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div
+        x-show="_dsFilterDropdownOpen === 'acceptance'"
+        class="ds-filter-dropdown__panel"
+        @click.outside="closeDsFilterDropdown()"
+        role="listbox"
+        aria-label="Acceptance options"
+      >
+        <div class="ds-filter-dropdown__panel-header">
+          Acceptance
+          <button class="ds-filter-dropdown__close" @click="closeDsFilterDropdown()" aria-label="Close acceptance filter">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <div class="ds-filter-dropdown__item" :class="{ 'ds-filter-dropdown__item--selected': !dailySalesFilters.acceptanceStatus }" @click="setDailyFilter('acceptanceStatus', ''); closeDsFilterDropdown()" role="option" :aria-selected="!dailySalesFilters.acceptanceStatus">All</div>
+        <div class="ds-filter-dropdown__item" :class="{ 'ds-filter-dropdown__item--selected': dailySalesFilters.acceptanceStatus === 'Accepted' }" @click="setDailyFilter('acceptanceStatus', 'Accepted'); closeDsFilterDropdown()" role="option">Accepted</div>
+        <div class="ds-filter-dropdown__item" :class="{ 'ds-filter-dropdown__item--selected': dailySalesFilters.acceptanceStatus === 'Awaiting' }" @click="setDailyFilter('acceptanceStatus', 'Awaiting'); closeDsFilterDropdown()" role="option">Awaiting</div>
+        <div class="ds-filter-dropdown__item" :class="{ 'ds-filter-dropdown__item--selected': dailySalesFilters.acceptanceStatus === 'Rejected' }" @click="setDailyFilter('acceptanceStatus', 'Rejected'); closeDsFilterDropdown()" role="option">Rejected</div>
+      </div>
+    </div>
+
+    <!-- Date range dropdown -->
+    <div class="ds-filter-dropdown" x-data>
+      <button
+        class="ds-filter-dropdown__trigger"
+        :class="{ 'ds-filter-dropdown__trigger--active': dailySalesFilters.from || dailySalesFilters.to, 'ds-filter-dropdown__trigger--open': _dsFilterDropdownOpen === 'date' }"
+        @click="toggleDsFilterDropdown('date')"
+        aria-haspopup="listbox"
+        :aria-expanded="_dsFilterDropdownOpen === 'date'"
+        aria-label="Date range filter"
+        :disabled="dailySalesLoading"
+      >
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="1" y="2" width="14" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M5 1v3M11 1v3M1 6h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span x-text="dsDateRangeLabel()"></span>
+        <svg class="ds-filter-dropdown__trigger-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div
+        x-show="_dsFilterDropdownOpen === 'date'"
+        class="ds-filter-dropdown__panel"
+        @click.outside="closeDsFilterDropdown()"
+        role="listbox"
+        aria-label="Date range options"
+      >
+        <div class="ds-filter-dropdown__panel-header">
+          Date Range
+          <button class="ds-filter-dropdown__close" @click="closeDsFilterDropdown()" aria-label="Close date filter">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('today')" role="option">Today</div>
+        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('yesterday')" role="option">Yesterday</div>
+        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('7d')" role="option">Last 7 days</div>
+        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('30d')" role="option">Last 30 days</div>
+        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('mtd')" role="option">Month to date</div>
+        <div class="ds-filter-dropdown__item" @click="applyDateRangePreset('ytd')" role="option">FY Year to date</div>
+        <div class="ds-filter-dropdown__panel-header ds-filter-panel-divider">Custom range</div>
+        <div class="ds-filter-date-panel">
+          <label class="ds-filter-label">From
+            <input type="date" class="ds-date-input" :value="dailySalesFilters.from || ''" @change="setDailyFilter('from', $event.target.value || null)"/>
+          </label>
+          <label class="ds-filter-label">To
+            <input type="date" class="ds-date-input" :value="dailySalesFilters.to || ''" @change="setDailyFilter('to', $event.target.value || null)"/>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- State dropdown (NEW) — top 10 states shown, searchable -->
+    <div class="ds-filter-dropdown">
+      <button
+        class="ds-filter-dropdown__trigger"
+        :class="{ 'ds-filter-dropdown__trigger--active': !!dailySalesFilters.state, 'ds-filter-dropdown__trigger--open': _dsFilterDropdownOpen === 'state' }"
+        @click="toggleDsFilterDropdown('state')"
+        aria-haspopup="listbox"
+        :aria-expanded="_dsFilterDropdownOpen === 'state'"
+        aria-label="State filter"
+        :disabled="dailySalesLoading"
+      >
+        <span x-text="dailySalesFilters.state || 'State'"></span>
+        <svg class="ds-filter-dropdown__trigger-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div
+        x-show="_dsFilterDropdownOpen === 'state'"
+        class="ds-filter-dropdown__panel ds-filter-dropdown__panel--state"
+        @click.outside="closeDsFilterDropdown()"
+        x-data="{ stateSearch: '' }"
+        role="listbox"
+        aria-label="State options"
+      >
+        <div class="ds-filter-dropdown__panel-header">
+          State
+          <button class="ds-filter-dropdown__close" @click="closeDsFilterDropdown()" aria-label="Close state filter">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <div class="ds-filter-state-search">
+          <input
+            type="text"
+            class="ds-date-input ds-state-search-input"
+            placeholder="Search states…"
+            x-model="stateSearch"
+            @click.stop
+          />
+        </div>
+        <div class="ds-filter-dropdown__item" :class="{ 'ds-filter-dropdown__item--selected': !dailySalesFilters.state }" @click="setDailyFilter('state', ''); closeDsFilterDropdown()" role="option">All States</div>
+        <template x-for="st in (dailySales?.filters?.available?.states || []).filter(s => !stateSearch || s.toLowerCase().includes(stateSearch.toLowerCase())).slice(0, 15)" :key="st">
+          <div class="ds-filter-dropdown__item" :class="{ 'ds-filter-dropdown__item--selected': dailySalesFilters.state === st }" @click="setDailyFilter('state', st); closeDsFilterDropdown()" role="option" x-text="st"></div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Reset — turns accent when any filter active -->
+    <div x-show="isDailyFilterActive()">
+      <button
+        class="ds-filter-reset"
+        :class="{ 'ds-filter-reset--active': isDailyFilterActive() }"
+        @click="resetDailyFilters()"
+        :disabled="dailySalesLoading"
+        aria-label="Reset all filters"
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M2 2l6 6M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Reset
+      </button>
+    </div>
+
+  </div><!-- end row 4 -->
 </div>
 
 <!-- ── Loading skeleton ─────────────────────────────────────── -->
@@ -449,12 +561,158 @@
     </div>
   </div>
 
-  <!-- ── 1. Yesterday Strip (v4 hero) ─────────────────────────── -->
+  <!-- ── 1. Today Strip (v4.2 hero — always shown, mirrors Yesterday structure) ── -->
   <div>
     <p class="ds-period-label">
-      Yesterday
-      <span x-show="dailySales?.yesterday?.date" x-text="' · ' + formatCutoffShort(dailySales?.yesterday?.date)"></span>
+      Today
+      <span x-text="' · ' + formatCutoffShort(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }))"></span>
+      <span class="ds-period-label-in-progress"> · in progress</span>
     </p>
+    <div class="ds-hero-strip">
+
+      <!-- Orders -->
+      <div class="ds-stat-card ds-stat-card--dual">
+        <span class="ds-stat-label">Orders</span>
+        <!-- Placed (primary) -->
+        <div class="ds-stat-metric-group">
+          <span class="ds-stat-metric-value" x-text="dailySales?.today?.allStatuses?.orders ?? '—'"></span>
+          <span class="ds-stat-metric-label">placed</span>
+        </div>
+        <!-- Realized (secondary) -->
+        <div class="ds-stat-metric-group ds-stat-metric-group--secondary">
+          <span class="ds-stat-metric-value" x-text="dailySales?.today?.orders ?? '—'"></span>
+          <span class="ds-stat-metric-label">realized</span>
+        </div>
+        <!-- Delta vs yesterday (placed-vs-placed) -->
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.today?.allStatuses?.vsYesterday?.orders?.delta)"
+          x-show="dailySales?.today?.allStatuses?.vsYesterday?.orders != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.today?.allStatuses?.vsYesterday?.orders?.delta)"></span>
+          <span x-text="Math.abs(dailySales?.today?.allStatuses?.vsYesterday?.orders?.delta ?? 0)"></span>
+          <span>(<span x-text="formatPct(dailySales?.today?.allStatuses?.vsYesterday?.orders?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs yesterday</span>
+        </div>
+      </div>
+
+      <!-- Revenue -->
+      <div class="ds-stat-card ds-stat-card--dual">
+        <span class="ds-stat-label">Revenue</span>
+        <!-- Placed (primary) -->
+        <div class="ds-stat-metric-group">
+          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.today?.allStatuses?.revenue)"></span>
+          <span class="ds-stat-metric-label">placed</span>
+        </div>
+        <!-- Realized (secondary) -->
+        <div class="ds-stat-metric-group ds-stat-metric-group--secondary">
+          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.today?.revenue)"></span>
+          <span class="ds-stat-metric-label">realized</span>
+        </div>
+        <!-- Delta vs yesterday -->
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.today?.allStatuses?.vsYesterday?.revenue?.delta)"
+          x-show="dailySales?.today?.allStatuses?.vsYesterday?.revenue != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.today?.allStatuses?.vsYesterday?.revenue?.delta)"></span>
+          <span x-text="formatINR(Math.abs(dailySales?.today?.allStatuses?.vsYesterday?.revenue?.delta ?? 0))"></span>
+          <span>(<span x-text="formatPct(dailySales?.today?.allStatuses?.vsYesterday?.revenue?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs yesterday</span>
+        </div>
+      </div>
+
+      <!-- AOV -->
+      <div class="ds-stat-card ds-stat-card--dual">
+        <span class="ds-stat-label">AOV</span>
+        <!-- Placed (primary) -->
+        <div class="ds-stat-metric-group">
+          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.today?.allStatuses?.aov)"></span>
+          <span class="ds-stat-metric-label">avg placed</span>
+        </div>
+        <!-- Realized (secondary) -->
+        <div class="ds-stat-metric-group ds-stat-metric-group--secondary">
+          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.today?.aov)"></span>
+          <span class="ds-stat-metric-label">realized</span>
+        </div>
+        <!-- Delta vs yesterday -->
+        <div
+          class="ds-stat-delta"
+          :class="deltaClass(dailySales?.today?.allStatuses?.vsYesterday?.aov?.delta)"
+          x-show="dailySales?.today?.allStatuses?.vsYesterday?.aov != null"
+        >
+          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.today?.allStatuses?.vsYesterday?.aov?.delta)"></span>
+          <span x-text="formatINR(Math.abs(dailySales?.today?.allStatuses?.vsYesterday?.aov?.delta ?? 0))"></span>
+          <span>(<span x-text="formatPct(dailySales?.today?.allStatuses?.vsYesterday?.aov?.pct)"></span>)</span>
+          <span class="ds-stat-delta-suffix">vs yesterday</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 2. Yesterday Strip (v4 hero) ─────────────────────────── -->
+  <div style="position:relative;">
+    <p class="ds-period-label" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>
+        Yesterday
+        <span x-show="dailySales?.yesterday?.date" x-text="' · ' + formatCutoffShort(dailySales?.yesterday?.date)"></span>
+      </span>
+      <!-- Info icon -->
+      <button
+        class="ds-stat-card__info-icon"
+        style="position:static; margin-left:auto;"
+        @click="toggleDsTooltip('yesterday')"
+        :aria-expanded="dailySalesActiveTooltip === 'yesterday'"
+        aria-haspopup="dialog"
+        aria-controls="ds-tooltip-yesterday"
+        aria-label="Information about Yesterday data window"
+      >
+        <i data-lucide="info" class="dc-icon-sm" aria-hidden="true"></i>
+      </button>
+    </p>
+
+    <!-- Yesterday tooltip popover -->
+    <div
+      x-show="dailySalesActiveTooltip === 'yesterday'"
+      id="ds-tooltip-yesterday"
+      class="ds-stat-card__tooltip"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ds-tooltip-title-yesterday"
+      @click.outside="closeDsTooltip()"
+      style="right:0; bottom:auto; top:100%;"
+      x-data="{ tip: {} }"
+      x-effect="if (dailySalesActiveTooltip === 'yesterday') tip = dsTooltipData('yesterday')"
+    >
+      <h3 id="ds-tooltip-title-yesterday" class="ds-stat-card__tooltip-title" x-text="tip.title || 'Yesterday'"></h3>
+      <div class="ds-stat-card__tooltip-row">
+        <span class="ds-stat-card__tooltip-label">Window</span>
+        <span class="ds-stat-card__tooltip-value--mono" x-text="tip.window || '—'"></span>
+      </div>
+      <div class="ds-stat-card__tooltip-row">
+        <span class="ds-stat-card__tooltip-label"
+          x-text="'Includes (' + (tip.includesCount || 0) + ' statuses)'"></span>
+        <span class="ds-stat-card__tooltip-value" x-text="tip.includes || '—'"></span>
+      </div>
+      <div class="ds-stat-card__tooltip-row">
+        <span class="ds-stat-card__tooltip-label">Excludes (status)</span>
+        <span class="ds-stat-card__tooltip-value" x-text="tip.excludes || '—'"></span>
+      </div>
+      <div class="ds-stat-card__tooltip-row">
+        <span class="ds-stat-card__tooltip-label">Other filters</span>
+        <span class="ds-stat-card__tooltip-value" x-text="tip.otherFilters || '—'"></span>
+      </div>
+    </div>
+
+    <!-- Mobile backdrop -->
+    <div
+      class="ds-tooltip-backdrop"
+      x-show="dailySalesActiveTooltip === 'yesterday'"
+      @click="closeDsTooltip()"
+      aria-hidden="true"
+    ></div>
+
     <div class="ds-hero-strip">
 
       <!-- Orders -->
@@ -538,98 +796,154 @@
     </div>
   </div>
 
-  <!-- ── 2. Today Strip (v4.1 — conditional, renders only when data exists) ── -->
-  <div x-show="(dailySales?.today?.allStatuses?.orders ?? 0) > 0">
-    <p class="ds-period-label">Today (in progress)</p>
-    <div class="ds-today-strip">
+  <!-- ── 2b. MTD by Channel (NEW — Panel 3) ───────────────────── -->
+  <!-- 2×2 mobile, 4-across desktop. Click card applies orderType filter. -->
+  <div
+    x-show="dailySales?.mtdByChannel && Object.values(dailySales.mtdByChannel).some(c => c.orders > 0)"
+    class="ds-mtd-channel-section"
+  >
+    <p class="ds-period-label">
+      Month-to-Date by Channel
+      <span
+        x-show="dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff"
+        x-text="' · through ' + formatCutoffShort(dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff)"
+      ></span>
+    </p>
+    <div class="ds-mtd-channel-grid">
 
-      <!-- Orders -->
-      <div class="ds-stat-card ds-stat-card--dual">
-        <span class="ds-stat-label">Orders</span>
-        <!-- Placed (primary) -->
-        <div class="ds-stat-metric-group">
-          <span class="ds-stat-metric-value" x-text="dailySales?.today?.allStatuses?.orders ?? '—'"></span>
-          <span class="ds-stat-metric-label">placed</span>
-        </div>
-        <!-- Realized (secondary) -->
-        <div class="ds-stat-metric-group ds-stat-metric-group--secondary">
-          <span class="ds-stat-metric-value" x-text="dailySales?.today?.orders ?? '—'"></span>
-          <span class="ds-stat-metric-label">realized</span>
-        </div>
-        <!-- Delta vs yesterday so far -->
-        <div
-          class="ds-stat-delta"
-          :class="deltaClass(dailySales?.today?.allStatuses?.vsYesterday?.orders?.delta)"
-          x-show="dailySales?.today?.allStatuses?.vsYesterday?.orders != null"
-        >
-          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.today?.allStatuses?.vsYesterday?.orders?.delta)"></span>
-          <span x-text="Math.abs(dailySales?.today?.allStatuses?.vsYesterday?.orders?.delta ?? 0)"></span>
-          <span>(<span x-text="formatPct(dailySales?.today?.allStatuses?.vsYesterday?.orders?.pct)"></span>)</span>
-          <span class="ds-stat-delta-suffix">vs yesterday so far</span>
-        </div>
+      <!-- D2C (B2C) -->
+      <div
+        class="ds-mtd-channel-card ds-mtd-channel-card--d2c"
+        :class="{ 'ds-mtd-channel-card--active': isMtdChannelActive('D2C') }"
+        role="button"
+        tabindex="0"
+        aria-label="Filter by D2C channel"
+        @click="applyMtdChannelFilter('D2C')"
+        @keydown.enter="applyMtdChannelFilter('D2C')"
+      >
+        <span class="ds-mtd-channel-label">D2C</span>
+        <span class="ds-mtd-channel-sub">(B2C orders)</span>
+        <span class="ds-mtd-channel-revenue" x-text="formatINR(dailySales?.mtdByChannel?.['D2C']?.revenue ?? 0)"></span>
+        <span class="ds-mtd-channel-orders" x-text="(dailySales?.mtdByChannel?.['D2C']?.orders ?? 0) + ' orders'"></span>
+        <span class="ds-mtd-channel-aov" x-text="'AOV ' + formatINR(dailySales?.mtdByChannel?.['D2C']?.aov ?? 0)"></span>
       </div>
 
-      <!-- Revenue -->
-      <div class="ds-stat-card ds-stat-card--dual">
-        <span class="ds-stat-label">Revenue</span>
-        <!-- Placed (primary) -->
-        <div class="ds-stat-metric-group">
-          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.today?.allStatuses?.revenue)"></span>
-          <span class="ds-stat-metric-label">placed</span>
-        </div>
-        <!-- Realized (secondary) -->
-        <div class="ds-stat-metric-group ds-stat-metric-group--secondary">
-          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.today?.revenue)"></span>
-          <span class="ds-stat-metric-label">realized</span>
-        </div>
-        <!-- Delta vs yesterday so far -->
-        <div
-          class="ds-stat-delta"
-          :class="deltaClass(dailySales?.today?.allStatuses?.vsYesterday?.revenue?.delta)"
-          x-show="dailySales?.today?.allStatuses?.vsYesterday?.revenue != null"
-        >
-          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.today?.allStatuses?.vsYesterday?.revenue?.delta)"></span>
-          <span x-text="formatINR(Math.abs(dailySales?.today?.allStatuses?.vsYesterday?.revenue?.delta ?? 0))"></span>
-          <span>(<span x-text="formatPct(dailySales?.today?.allStatuses?.vsYesterday?.revenue?.pct)"></span>)</span>
-          <span class="ds-stat-delta-suffix">vs yesterday so far</span>
-        </div>
+      <!-- Corporate (Manual) -->
+      <div
+        class="ds-mtd-channel-card ds-mtd-channel-card--corporate"
+        :class="{ 'ds-mtd-channel-card--active': isMtdChannelActive('Corporate') }"
+        role="button"
+        tabindex="0"
+        aria-label="Filter by Corporate channel"
+        @click="applyMtdChannelFilter('Corporate')"
+        @keydown.enter="applyMtdChannelFilter('Corporate')"
+      >
+        <span class="ds-mtd-channel-label">Corporate</span>
+        <span class="ds-mtd-channel-sub">(Manual orders)</span>
+        <span class="ds-mtd-channel-revenue" x-text="formatINR(dailySales?.mtdByChannel?.['Corporate']?.revenue ?? 0)"></span>
+        <span class="ds-mtd-channel-orders" x-text="(dailySales?.mtdByChannel?.['Corporate']?.orders ?? 0) + ' orders'"></span>
+        <span class="ds-mtd-channel-aov" x-text="'AOV ' + formatINR(dailySales?.mtdByChannel?.['Corporate']?.aov ?? 0)"></span>
       </div>
 
-      <!-- AOV -->
-      <div class="ds-stat-card ds-stat-card--dual">
-        <span class="ds-stat-label">AOV</span>
-        <!-- Placed (primary) -->
-        <div class="ds-stat-metric-group">
-          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.today?.allStatuses?.aov)"></span>
-          <span class="ds-stat-metric-label">avg placed</span>
-        </div>
-        <!-- Realized (secondary) -->
-        <div class="ds-stat-metric-group ds-stat-metric-group--secondary">
-          <span class="ds-stat-metric-value" x-text="formatINR(dailySales?.today?.aov)"></span>
-          <span class="ds-stat-metric-label">realized</span>
-        </div>
-        <!-- Delta vs yesterday so far -->
-        <div
-          class="ds-stat-delta"
-          :class="deltaClass(dailySales?.today?.allStatuses?.vsYesterday?.aov?.delta)"
-          x-show="dailySales?.today?.allStatuses?.vsYesterday?.aov != null"
-        >
-          <span class="ds-delta-arrow" x-text="deltaArrow(dailySales?.today?.allStatuses?.vsYesterday?.aov?.delta)"></span>
-          <span x-text="formatINR(Math.abs(dailySales?.today?.allStatuses?.vsYesterday?.aov?.delta ?? 0))"></span>
-          <span>(<span x-text="formatPct(dailySales?.today?.allStatuses?.vsYesterday?.aov?.pct)"></span>)</span>
-          <span class="ds-stat-delta-suffix">vs yesterday so far</span>
-        </div>
+      <!-- Partner – DS -->
+      <div
+        class="ds-mtd-channel-card ds-mtd-channel-card--ds"
+        :class="{ 'ds-mtd-channel-card--active': isMtdChannelActive('Partner – DS') }"
+        role="button"
+        tabindex="0"
+        aria-label="Filter by Partner DS channel"
+        @click="applyMtdChannelFilter('Partner – DS')"
+        @keydown.enter="applyMtdChannelFilter('Partner – DS')"
+      >
+        <span class="ds-mtd-channel-label">Partner – DS</span>
+        <span class="ds-mtd-channel-sub">(DS orders)</span>
+        <span class="ds-mtd-channel-revenue" x-text="formatINR(dailySales?.mtdByChannel?.['Partner – DS']?.revenue ?? 0)"></span>
+        <span class="ds-mtd-channel-orders" x-text="(dailySales?.mtdByChannel?.['Partner – DS']?.orders ?? 0) + ' orders'"></span>
+        <span class="ds-mtd-channel-aov" x-text="'AOV ' + formatINR(dailySales?.mtdByChannel?.['Partner – DS']?.aov ?? 0)"></span>
+      </div>
+
+      <!-- Partner – Stores -->
+      <div
+        class="ds-mtd-channel-card ds-mtd-channel-card--stores"
+        :class="{ 'ds-mtd-channel-card--active': isMtdChannelActive('Partner – Stores') }"
+        role="button"
+        tabindex="0"
+        aria-label="Filter by Partner Stores channel"
+        @click="applyMtdChannelFilter('Partner – Stores')"
+        @keydown.enter="applyMtdChannelFilter('Partner – Stores')"
+      >
+        <span class="ds-mtd-channel-label">Partner – Stores</span>
+        <span class="ds-mtd-channel-sub">(Stores orders)</span>
+        <span class="ds-mtd-channel-revenue" x-text="formatINR(dailySales?.mtdByChannel?.['Partner – Stores']?.revenue ?? 0)"></span>
+        <span class="ds-mtd-channel-orders" x-text="(dailySales?.mtdByChannel?.['Partner – Stores']?.orders ?? 0) + ' orders'"></span>
+        <span class="ds-mtd-channel-aov" x-text="'AOV ' + formatINR(dailySales?.mtdByChannel?.['Partner – Stores']?.aov ?? 0)"></span>
       </div>
 
     </div>
   </div>
 
-  <!-- ── 3. Month-to-Date Strip ─────────────────────────────── -->
-  <div>
-    <p class="ds-period-label">
-      Month-to-Date
-      <span x-show="dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff" x-text="' · through ' + formatCutoffShort(dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff)"></span>
+  <!-- ── 3. Month-to-Date Strip ──────────────────────────────── -->
+  <div style="position:relative;">
+    <p class="ds-period-label" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>
+        Month-to-Date
+        <span x-show="dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff" x-text="' · through ' + formatCutoffShort(dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff)"></span>
+      </span>
+      <!-- Info icon -->
+      <button
+        class="ds-stat-card__info-icon"
+        style="position:static; margin-left:auto;"
+        @click="toggleDsTooltip('mtd')"
+        :aria-expanded="dailySalesActiveTooltip === 'mtd'"
+        aria-haspopup="dialog"
+        aria-controls="ds-tooltip-mtd"
+        aria-label="Information about Month-to-Date data window"
+      >
+        <i data-lucide="info" class="dc-icon-sm" aria-hidden="true"></i>
+      </button>
     </p>
+
+    <!-- MTD tooltip popover -->
+    <div
+      x-show="dailySalesActiveTooltip === 'mtd'"
+      id="ds-tooltip-mtd"
+      class="ds-stat-card__tooltip"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ds-tooltip-title-mtd"
+      @click.outside="closeDsTooltip()"
+      style="right:0; bottom:auto; top:100%;"
+      x-data="{ tip: {} }"
+      x-effect="if (dailySalesActiveTooltip === 'mtd') tip = dsTooltipData('mtd')"
+    >
+      <h3 id="ds-tooltip-title-mtd" class="ds-stat-card__tooltip-title" x-text="tip.title || 'Month-to-Date'"></h3>
+      <div class="ds-stat-card__tooltip-row">
+        <span class="ds-stat-card__tooltip-label">Window</span>
+        <span class="ds-stat-card__tooltip-value--mono" x-text="tip.window || '—'"></span>
+      </div>
+      <div class="ds-stat-card__tooltip-row">
+        <span class="ds-stat-card__tooltip-label"
+          x-text="'Includes (' + (tip.includesCount || 0) + ' statuses)'"></span>
+        <span class="ds-stat-card__tooltip-value" x-text="tip.includes || '—'"></span>
+      </div>
+      <div class="ds-stat-card__tooltip-row">
+        <span class="ds-stat-card__tooltip-label">Excludes (status)</span>
+        <span class="ds-stat-card__tooltip-value" x-text="tip.excludes || '—'"></span>
+      </div>
+      <div class="ds-stat-card__tooltip-row">
+        <span class="ds-stat-card__tooltip-label">Other filters</span>
+        <span class="ds-stat-card__tooltip-value" x-text="tip.otherFilters || '—'"></span>
+      </div>
+    </div>
+
+    <!-- Mobile backdrop -->
+    <div
+      class="ds-tooltip-backdrop"
+      x-show="dailySalesActiveTooltip === 'mtd'"
+      @click="closeDsTooltip()"
+      aria-hidden="true"
+    ></div>
+
     <div class="ds-mtd-strip">
 
       <div class="ds-stat-card">
@@ -680,12 +994,68 @@
     </div>
   </div>
 
-  <!-- ── 3. Year-to-Date Strip ──────────────────────────────── -->
-  <div>
-    <p class="ds-period-label">
-      <span x-text="(dailySales?.source?.ytdDisplayLabel || 'FY') + ' Year-to-Date'"></span>
-      <span x-show="dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff" x-text="' · through ' + formatCutoffShort(dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff)"></span>
+  <!-- ── 4. Year-to-Date Strip ──────────────────────────────── -->
+  <div style="position:relative;">
+    <p class="ds-period-label" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>
+        <span x-text="(dailySales?.source?.ytdDisplayLabel || 'FY') + ' Year-to-Date'"></span>
+        <span x-show="dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff" x-text="' · through ' + formatCutoffShort(dailySales?.yesterday?.date || dailySales?.freshness?.dataCutoff)"></span>
+      </span>
+      <!-- Info icon -->
+      <button
+        class="ds-stat-card__info-icon"
+        style="position:static; margin-left:auto;"
+        @click="toggleDsTooltip('ytd')"
+        :aria-expanded="dailySalesActiveTooltip === 'ytd'"
+        aria-haspopup="dialog"
+        aria-controls="ds-tooltip-ytd"
+        aria-label="Information about Year-to-Date data window"
+      >
+        <i data-lucide="info" class="dc-icon-sm" aria-hidden="true"></i>
+      </button>
     </p>
+
+    <!-- YTD tooltip popover -->
+    <div
+      x-show="dailySalesActiveTooltip === 'ytd'"
+      id="ds-tooltip-ytd"
+      class="ds-stat-card__tooltip"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ds-tooltip-title-ytd"
+      @click.outside="closeDsTooltip()"
+      style="right:0; bottom:auto; top:100%;"
+      x-data="{ tip: {} }"
+      x-effect="if (dailySalesActiveTooltip === 'ytd') tip = dsTooltipData('ytd')"
+    >
+      <h3 id="ds-tooltip-title-ytd" class="ds-stat-card__tooltip-title" x-text="tip.title || 'Year-to-Date'"></h3>
+      <div class="ds-stat-card__tooltip-row">
+        <span class="ds-stat-card__tooltip-label">Window</span>
+        <span class="ds-stat-card__tooltip-value--mono" x-text="tip.window || '—'"></span>
+      </div>
+      <div class="ds-stat-card__tooltip-row">
+        <span class="ds-stat-card__tooltip-label"
+          x-text="'Includes (' + (tip.includesCount || 0) + ' statuses)'"></span>
+        <span class="ds-stat-card__tooltip-value" x-text="tip.includes || '—'"></span>
+      </div>
+      <div class="ds-stat-card__tooltip-row">
+        <span class="ds-stat-card__tooltip-label">Excludes (status)</span>
+        <span class="ds-stat-card__tooltip-value" x-text="tip.excludes || '—'"></span>
+      </div>
+      <div class="ds-stat-card__tooltip-row">
+        <span class="ds-stat-card__tooltip-label">Other filters</span>
+        <span class="ds-stat-card__tooltip-value" x-text="tip.otherFilters || '—'"></span>
+      </div>
+    </div>
+
+    <!-- Mobile backdrop -->
+    <div
+      class="ds-tooltip-backdrop"
+      x-show="dailySalesActiveTooltip === 'ytd'"
+      @click="closeDsTooltip()"
+      aria-hidden="true"
+    ></div>
+
     <div class="ds-ytd-strip">
 
       <div class="ds-stat-card">
@@ -899,13 +1269,107 @@
     </div>
   </div>
 
+  <!-- ── 4b. FY Weekly Trend (NEW — Panel 7) ──────────────── -->
+  <!-- Hand-rolled SVG bar chart. One bar per FY week. -->
+  <div
+    x-show="dailySales?.weeklyTrend?.length > 0"
+    class="ds-trend-section"
+  >
+    <div class="ds-trend-header">
+      <p class="ds-period-label">FY Weekly Trend</p>
+      <div class="ds-trend-toggle" role="group" aria-label="Weekly metric toggle">
+        <button
+          class="ds-trend-toggle-btn"
+          :class="{ 'ds-trend-toggle-btn--active': _dsWeeklyMetric === 'revenue' }"
+          @click="setDsWeeklyMetric('revenue')"
+        >Revenue</button>
+        <button
+          class="ds-trend-toggle-btn"
+          :class="{ 'ds-trend-toggle-btn--active': _dsWeeklyMetric === 'orders' }"
+          @click="setDsWeeklyMetric('orders')"
+        >Orders</button>
+      </div>
+    </div>
+
+    <div
+      class="ds-trend-chart ds-weekly-chart"
+      @mouseleave="dsWeeklyHideTooltip()"
+    >
+      <template x-if="dailySales?.weeklyTrend?.length > 0">
+        <svg
+          class="ds-trend-svg"
+          :viewBox="`0 0 ${_dsWeeklyChartData()?.W ?? 600} ${_dsWeeklyChartData()?.H ?? 180}`"
+          preserveAspectRatio="xMidYMid meet"
+          aria-label="FY weekly revenue and orders trend"
+          role="img"
+        >
+          <!-- Grid lines -->
+          <template x-for="(gl, gi) in (_dsWeeklyChartData()?.gridLines || [])" :key="gi">
+            <g>
+              <line
+                class="ds-trend-grid-line"
+                :x1="0"
+                :x2="_dsWeeklyChartData()?.W ?? 600"
+                :y1="gl.y"
+                :y2="gl.y"
+              ></line>
+              <text
+                class="ds-trend-axis-text ds-trend-axis-text--left"
+                :x="46"
+                :y="Number(gl.y) + 3"
+                x-text="gl.label"
+              ></text>
+            </g>
+          </template>
+
+          <!-- Bars -->
+          <template x-for="(bar, bi) in (_dsWeeklyChartData()?.bars || [])" :key="bi">
+            <g>
+              <rect
+                :x="bar.x"
+                :y="bar.y"
+                :width="bar.width"
+                :height="bar.height"
+                :class="bar.isCurrent ? 'ds-weekly-bar--current' : 'ds-weekly-bar'"
+                rx="2"
+                @mousemove="dsWeeklyShowTooltip(bar, $event)"
+              ></rect>
+              <!-- Week label on X-axis -->
+              <text
+                class="ds-trend-axis-text"
+                :x="bar.cx"
+                :y="(_dsWeeklyChartData()?.chartH ?? 180) + 14"
+                text-anchor="middle"
+                x-text="bar.label"
+              ></text>
+            </g>
+          </template>
+        </svg>
+      </template>
+
+      <!-- Tooltip -->
+      <div
+        x-show="_dsWeeklyTooltip.visible"
+        class="ds-trend-tooltip"
+        :style="`left:${_dsWeeklyTooltip.x}px; top:${_dsWeeklyTooltip.y}px`"
+        role="tooltip"
+        aria-live="polite"
+      >
+        <div class="ds-trend-tooltip-date" x-text="`${_dsWeeklyTooltip.week}: ${_dsWeeklyTooltip.dateRange}`"></div>
+        <div class="ds-trend-tooltip-revenue" x-text="'Rev: ' + _dsWeeklyTooltip.revenue"></div>
+        <div class="ds-trend-tooltip-orders" x-text="'Orders: ' + _dsWeeklyTooltip.orders"></div>
+        <div class="ds-trend-tooltip-metric" x-text="'AOV: ' + _dsWeeklyTooltip.aov"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── 5. Mix Breakdowns ──────────────────────────────────── -->
   <!-- Each row is now drillable -->
   <div>
     <p class="ds-period-label">Mix Breakdown</p>
     <div class="ds-mix-grid">
 
-      <!-- Sales Channel -->
+      <!-- Sales Channel — display label translated (COMMMERCE→COMMERCE) -->
       <div class="ds-mix-card">
         <p class="ds-mix-title">Sales Channel</p>
         <template x-for="(item, idx) in (dailySales?.mix?.salesChannel ?? [])" :key="idx">
@@ -913,21 +1377,22 @@
             class="ds-mix-row ds-mix-row--drillable"
             role="button"
             tabindex="0"
-            :aria-label="`Drill into ${item.name} channel orders`"
+            :aria-label="`Drill into ${dsSalesChannelLabel(item.name)} channel orders`"
             @click="openDrillSheet({ type: 'channel', value: item.name }, $event.currentTarget)"
             @keydown.enter="openDrillSheet({ type: 'channel', value: item.name }, $event.currentTarget)"
           >
-            <span class="ds-mix-name" x-text="item.name"></span>
+            <!-- Display label translated; raw item.name used for filter wiring -->
+            <span class="ds-mix-name" x-text="dsSalesChannelLabel(item.name)"></span>
             <div class="ds-mix-bar-wrap" aria-hidden="true">
               <div class="ds-mix-bar" :style="`width:${item.pctRevenue ?? 0}%`"></div>
             </div>
             <span class="ds-mix-percent" x-text="`${(item.pctRevenue ?? 0).toFixed(0)}%`"></span>
           </div>
         </template>
-        <div x-show="!(dailySales?.mix?.salesChannel?.length)" class="ds-mix-row" style="color: var(--text-secondary)">No data</div>
+        <div x-show="!(dailySales?.mix?.salesChannel?.length)" class="ds-mix-row ds-mix-row-empty">No data</div>
       </div>
 
-      <!-- Order Type -->
+      <!-- Order Type — display label translated (Manual→Corporate, B2C→D2C, DS→Drop-ship, Stores→B2B Stores) -->
       <div class="ds-mix-card">
         <p class="ds-mix-title">Order Type</p>
         <template x-for="(item, idx) in (dailySales?.mix?.orderType ?? [])" :key="idx">
@@ -935,18 +1400,19 @@
             class="ds-mix-row ds-mix-row--drillable"
             role="button"
             tabindex="0"
-            :aria-label="`Drill into ${item.name} order type`"
+            :aria-label="`Drill into ${dsOrderTypeLabel(item.name)} orders`"
             @click="openDrillSheet({ type: 'orderType', value: item.name }, $event.currentTarget)"
             @keydown.enter="openDrillSheet({ type: 'orderType', value: item.name }, $event.currentTarget)"
           >
-            <span class="ds-mix-name" x-text="item.name"></span>
+            <!-- Display label is translated; raw item.name used for drill filter -->
+            <span class="ds-mix-name" x-text="dsOrderTypeLabel(item.name)"></span>
             <div class="ds-mix-bar-wrap" aria-hidden="true">
               <div class="ds-mix-bar" :style="`width:${item.pctRevenue ?? 0}%`"></div>
             </div>
             <span class="ds-mix-percent" x-text="`${(item.pctRevenue ?? 0).toFixed(0)}%`"></span>
           </div>
         </template>
-        <div x-show="!(dailySales?.mix?.orderType?.length)" class="ds-mix-row" style="color: var(--text-secondary)">No data</div>
+        <div x-show="!(dailySales?.mix?.orderType?.length)" class="ds-mix-row ds-mix-row-empty">No data</div>
       </div>
 
       <!-- Print Method -->
@@ -968,7 +1434,7 @@
             <span class="ds-mix-percent" x-text="`${(item.pctRevenue ?? 0).toFixed(0)}%`"></span>
           </div>
         </template>
-        <div x-show="!(dailySales?.mix?.printMethod?.length)" class="ds-mix-row" style="color: var(--text-secondary)">No data</div>
+        <div x-show="!(dailySales?.mix?.printMethod?.length)" class="ds-mix-row ds-mix-row-empty">No data</div>
       </div>
 
       <!-- Payment Mode -->
@@ -990,7 +1456,7 @@
             <span class="ds-mix-percent" x-text="`${(item.pctRevenue ?? 0).toFixed(0)}%`"></span>
           </div>
         </template>
-        <div x-show="!(dailySales?.mix?.paymentMode?.length)" class="ds-mix-row" style="color: var(--text-secondary)">No data</div>
+        <div x-show="!(dailySales?.mix?.paymentMode?.length)" class="ds-mix-row ds-mix-row-empty">No data</div>
       </div>
 
       <!-- Status -->
@@ -1012,7 +1478,16 @@
             <span class="ds-mix-percent" x-text="`${(item.pctRevenue ?? 0).toFixed(0)}%`"></span>
           </div>
         </template>
-        <div x-show="!(dailySales?.mix?.status?.length)" class="ds-mix-row" style="color: var(--text-secondary)">No data</div>
+        <div x-show="!(dailySales?.mix?.status?.length)" class="ds-mix-row ds-mix-row-empty">No data</div>
+      </div>
+
+      <!-- Account Tier — placeholder, deferred to Pass 3 (needs server-side aggregation).
+           OPEN LOOP: backend needs to expose mix.accountTier aggregated per Decision #75.
+           Card 6 per UI Spec §5 Panel 8. Hidden until backend ships it. -->
+      <!-- x-show="false" intentional — this is a deferred placeholder -->
+      <div class="ds-mix-card" x-show="false" aria-hidden="true">
+        <p class="ds-mix-title">Account Tier</p>
+        <div class="ds-mix-row ds-mix-row-empty">Pass 3 — backend aggregation pending</div>
       </div>
 
     </div>
@@ -1059,9 +1534,13 @@
     </div>
   </div>
 
-  <!-- ── 7. Today's Orders Feed ─────────────────────────────── -->
+  <!-- ── 7. Today's Orders Feed (v5 — Panel 10) ──────────────── -->
+  <!-- Row background: amber if Awaiting, red-tint if Rejected, white otherwise. -->
   <div>
-    <p class="ds-period-label">Today's Orders</p>
+    <p class="ds-period-label">
+      Today's Orders
+      <span x-text="' · ' + formatCutoffShort(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }))"></span>
+    </p>
 
     <!-- Empty state -->
     <div x-show="!(dailySales?.todaysOrders?.length)" class="ds-empty">
@@ -1082,26 +1561,64 @@
         <template x-for="(order, idx) in (dailySales?.todaysOrders ?? [])" :key="idx">
           <div
             class="ds-order-row ds-order-row--drillable"
-            role="listitem button"
+            :class="dsOrderRowBg(order.acceptanceStatus)"
+            role="listitem"
             tabindex="0"
-            :aria-label="`View details for order ${order.orderNumber}`"
-            @click="openDrillSheet({ type: 'state', value: order.shipping?.state || order.state || '' }, $event.currentTarget)"
-            @keydown.enter="openDrillSheet({ type: 'state', value: order.shipping?.state || order.state || '' }, $event.currentTarget)"
+            :aria-label="`Order ${order.orderNumber} — ${order.customer} — ${order.acceptanceStatus || 'no acceptance status'}`"
+            @click="openDrillSheet({ type: 'orderType', value: order.channelGroup || '' }, $event.currentTarget)"
+            @keydown.enter="openDrillSheet({ type: 'orderType', value: order.channelGroup || '' }, $event.currentTarget)"
           >
+            <!-- Top row: orderNumber · customer · amount · status · time -->
             <div class="ds-order-row-top">
               <span class="ds-order-number" x-text="order.orderNumber"></span>
-              <span class="ds-order-customer" x-text="order.customer"></span>
+              <span class="ds-order-customer" x-text="(order.customer || '').substring(0, 20)"></span>
               <span class="ds-order-amount" x-text="formatINR(order.amount)"></span>
-            </div>
-            <div class="ds-order-row-bottom">
-              <span class="ds-order-time" x-text="order.time"></span>
               <span
                 class="ds-status-badge"
                 :class="dsStatusClass(order.status)"
                 x-text="order.status"
               ></span>
-              <span x-show="order.salesChannel" class="ds-channel-pill" x-text="order.salesChannel"></span>
-              <span x-show="order.tag" class="ds-tag-method" x-text="order.tag"></span>
+              <span class="ds-order-time" x-text="order.time"></span>
+            </div>
+            <!-- Bottom row: channelGroup pill · printMethod pill · shippingState · acceptanceStatus badge -->
+            <div class="ds-order-row-bottom">
+              <!-- Channel group pill -->
+              <span
+                x-show="order.channelGroup"
+                class="ds-cg-pill"
+                :class="dsChannelGroupClass(order.channelGroup)"
+                x-text="order.channelGroup"
+              ></span>
+              <!-- Print method pill — hidden if unknown -->
+              <span
+                x-show="order.tag && order.tag !== '(unknown)'"
+                class="ds-tag-method"
+                x-text="order.tag"
+              ></span>
+              <!-- Shipping state -->
+              <span
+                x-show="order.shippingState"
+                class="ds-order-state"
+                x-text="order.shippingState"
+              ></span>
+              <!-- Acceptance status badge -->
+              <span
+                x-show="order.acceptanceStatus"
+                class="ds-acceptance-badge"
+                :class="dsAcceptanceClass(order.acceptanceStatus)"
+              >
+                <!-- Icon -->
+                <template x-if="order.acceptanceStatus === 'Accepted'">
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </template>
+                <template x-if="order.acceptanceStatus === 'Awaiting'">
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.4"/><path d="M6 3.5v3l1.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                </template>
+                <template x-if="order.acceptanceStatus === 'Rejected'">
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </template>
+                <span x-text="order.acceptanceStatus"></span>
+              </span>
             </div>
           </div>
         </template>
@@ -1109,61 +1626,189 @@
     </div>
   </div>
 
-  <!-- ── 8. Concerns Block ──────────────────────────────────── -->
-  <div x-show="(dailySales?.concerns?.pendingAcceptance?.length || 0) + (dailySales?.concerns?.stuckOrders?.length || 0) > 0">
-    <p class="ds-period-label">Concerns</p>
+  <!-- ── 8. Concerns (v5 — Panel 11, three collapsible sections) ─ -->
+  <!-- Hidden when all three buckets are empty. -->
+  <div
+    x-show="(dailySales?.concerns?.pendingAcceptance?.length || 0) + (dailySales?.concerns?.rejectedOrders?.length || 0) + (dailySales?.concerns?.stuckOrders?.length || 0) > 0"
+  >
+    <p class="ds-period-label">
+      Concerns
+      <span class="ds-concern-count-pills">
+        <span x-show="dailySales?.concerns?.pendingAcceptance?.length" class="ds-concern-count-pill ds-concern-count-pill--pending" x-text="`Pending: ${dailySales?.concerns?.pendingAcceptance?.length || 0}`"></span>
+        <span x-show="dailySales?.concerns?.rejectedOrders?.length" class="ds-concern-count-pill ds-concern-count-pill--rejected" x-text="`Rejected: ${dailySales?.concerns?.rejectedOrders?.length || 0}`"></span>
+        <span x-show="dailySales?.concerns?.stuckOrders?.length" class="ds-concern-count-pill ds-concern-count-pill--stuck" x-text="`Stuck: ${dailySales?.concerns?.stuckOrders?.length || 0}`"></span>
+      </span>
+    </p>
 
     <div class="ds-concerns" role="region" aria-label="Orders needing attention">
-      <div class="ds-concerns-header">
-        <svg class="ds-concern-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
-        </svg>
-        <span>Needs Attention</span>
-        <span class="ds-concerns-sub" x-text="`(${(dailySales?.concerns?.pendingAcceptance?.length || 0) + (dailySales?.concerns?.stuckOrders?.length || 0)} items)`"></span>
+
+      <!-- Pending Acceptance section -->
+      <div x-show="dailySales?.concerns?.pendingAcceptance?.length" class="ds-concerns-section">
+        <button
+          class="ds-concerns-section-header"
+          @click="_dsConcernsPendingOpen = !_dsConcernsPendingOpen"
+          :aria-expanded="_dsConcernsPendingOpen"
+        >
+          <svg class="ds-concerns-section-chevron" :class="{ 'ds-concerns-section-chevron--open': _dsConcernsPendingOpen }" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="ds-concerns-section-title">Pending Acceptance</span>
+          <span class="ds-concerns-section-meta">
+            <span x-text="(dailySales?.concerns?.pendingAcceptance?.length || 0) + ' orders'"></span>
+            <span x-show="dailySales?.concerns?.pendingRevenue"> · <span x-text="formatINR(dailySales?.concerns?.pendingRevenue)"></span> at risk</span>
+          </span>
+        </button>
+
+        <div x-show="_dsConcernsPendingOpen" class="ds-concerns-table-wrap">
+          <table class="ds-concerns-table" aria-label="Pending acceptance orders">
+            <thead>
+              <tr>
+                <th>Order #</th>
+                <th>Customer</th>
+                <th>Amount</th>
+                <th>Channel</th>
+                <th>Made By</th>
+                <th>Days</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="(item, idx) in (dailySales?.concerns?.pendingAcceptance ?? [])" :key="idx">
+                <tr class="ds-concerns-table-row">
+                  <td class="ds-concern-number" x-text="item.orderNumber"></td>
+                  <td x-text="item.customer"></td>
+                  <td x-text="formatINR(item.amount)"></td>
+                  <td>
+                    <span x-show="item.channel" class="ds-cg-pill" :class="dsChannelGroupClass(item.channel)" x-text="item.channel"></span>
+                  </td>
+                  <td x-text="item.madeBy || '—'"></td>
+                  <td class="ds-concern-days" x-text="`${item.daysOpen ?? item.daysAgo ?? 0}d`"></td>
+                  <td class="ds-concerns-actions">
+                    <a
+                      :href="`https://admin.yourdesignstore.in/admin/admin/orders?q=${item.orderNumber}`"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="ds-concerns-action-btn ds-concerns-action-btn--accept"
+                      title="Accept order in Admin"
+                    >Accept</a>
+                    <a
+                      :href="`https://admin.yourdesignstore.in/admin/admin/orders?q=${item.orderNumber}`"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="ds-concerns-action-btn ds-concerns-action-btn--reject"
+                      title="Reject order in Admin"
+                    >Reject</a>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <!-- Pending Acceptance -->
-      <div x-show="dailySales?.concerns?.pendingAcceptance?.length">
-        <p class="ds-concerns-group-label">Pending Acceptance</p>
-        <template x-for="(item, idx) in (dailySales?.concerns?.pendingAcceptance ?? [])" :key="idx">
-          <div class="ds-concern-item">
-            <svg class="ds-concern-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
-            </svg>
-            <div class="ds-concern-body">
-              <span class="ds-concern-number" x-text="item.orderNumber"></span>
-              <span class="ds-concern-customer" x-text="item.customer"></span>
-              <span class="ds-concern-amount" x-text="formatINR(item.amount)"></span>
-              <span class="ds-concern-badge">Pending</span>
-              <span class="ds-concern-days" x-text="`${item.daysAgo}d ago`"></span>
-              <span x-show="item.channel" class="ds-channel-pill" x-text="item.channel" style="margin-left:4px"></span>
-            </div>
-          </div>
-        </template>
+      <!-- Rejected Orders section (NEW) -->
+      <div x-show="dailySales?.concerns?.rejectedOrders?.length" class="ds-concerns-section">
+        <button
+          class="ds-concerns-section-header"
+          @click="_dsConcernsRejectedOpen = !_dsConcernsRejectedOpen"
+          :aria-expanded="_dsConcernsRejectedOpen"
+        >
+          <svg class="ds-concerns-section-chevron" :class="{ 'ds-concerns-section-chevron--open': _dsConcernsRejectedOpen }" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="ds-concerns-section-title">Rejected Orders</span>
+          <span class="ds-concerns-section-meta">
+            <span x-text="(dailySales?.concerns?.rejectedOrders?.length || 0) + ' orders'"></span>
+            <span x-show="dailySales?.concerns?.rejectedRevenue"> · <span x-text="formatINR(dailySales?.concerns?.rejectedRevenue)"></span> at risk</span>
+          </span>
+        </button>
+
+        <div x-show="_dsConcernsRejectedOpen" class="ds-concerns-table-wrap">
+          <table class="ds-concerns-table" aria-label="Rejected orders">
+            <thead>
+              <tr>
+                <th>Order #</th>
+                <th>Customer</th>
+                <th>Amount</th>
+                <th>Channel</th>
+                <th>Made By</th>
+                <th>Reason</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="(item, idx) in (dailySales?.concerns?.rejectedOrders ?? [])" :key="idx">
+                <tr class="ds-concerns-table-row ds-concerns-table-row--rejected">
+                  <td class="ds-concern-number" x-text="item.orderNumber"></td>
+                  <td x-text="item.customer"></td>
+                  <td x-text="formatINR(item.amount)"></td>
+                  <td>
+                    <span x-show="item.channel" class="ds-cg-pill" :class="dsChannelGroupClass(item.channel)" x-text="item.channel"></span>
+                  </td>
+                  <td x-text="item.madeBy || '—'"></td>
+                  <td class="ds-concern-reason">Rejected</td>
+                  <td class="ds-concerns-actions">
+                    <a
+                      :href="`https://admin.yourdesignstore.in/admin/admin/orders?q=${item.orderNumber}`"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="ds-concerns-action-btn ds-concerns-action-btn--resolve"
+                      title="Resolve in Admin"
+                    >Resolve</a>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <!-- Stuck Orders -->
-      <div x-show="dailySales?.concerns?.stuckOrders?.length">
-        <p class="ds-concerns-group-label">Stuck Orders</p>
-        <template x-for="(item, idx) in (dailySales?.concerns?.stuckOrders ?? [])" :key="idx">
-          <div class="ds-concern-item">
-            <svg class="ds-concern-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0zm-9 3.75h.008v.008H12v-.008z"/>
-            </svg>
-            <div class="ds-concern-body">
-              <span class="ds-concern-number" x-text="item.orderNumber"></span>
-              <span class="ds-concern-customer" x-text="item.customer"></span>
-              <span class="ds-concern-amount" x-text="formatINR(item.amount)"></span>
-              <span
-                class="ds-concern-badge"
-                x-text="item.status || 'Stuck'"
-              ></span>
-              <span class="ds-concern-days" x-text="`${item.daysAgo}d ago`"></span>
-              <span x-show="item.channel" class="ds-channel-pill" x-text="item.channel" style="margin-left:4px"></span>
-            </div>
-          </div>
-        </template>
+      <!-- Stuck Orders section -->
+      <div x-show="dailySales?.concerns?.stuckOrders?.length" class="ds-concerns-section">
+        <button
+          class="ds-concerns-section-header"
+          @click="_dsConcernsStuckOpen = !_dsConcernsStuckOpen"
+          :aria-expanded="_dsConcernsStuckOpen"
+        >
+          <svg class="ds-concerns-section-chevron" :class="{ 'ds-concerns-section-chevron--open': _dsConcernsStuckOpen }" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="ds-concerns-section-title">Stuck Orders</span>
+          <span class="ds-concerns-section-meta">
+            <span x-text="(dailySales?.concerns?.stuckOrders?.length || 0) + ' orders'"></span>
+          </span>
+        </button>
+
+        <div x-show="_dsConcernsStuckOpen" class="ds-concerns-table-wrap">
+          <table class="ds-concerns-table" aria-label="Stuck orders">
+            <thead>
+              <tr>
+                <th>Order #</th>
+                <th>Customer</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Made By</th>
+                <th>Days open</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="(item, idx) in (dailySales?.concerns?.stuckOrders ?? [])" :key="idx">
+                <tr class="ds-concerns-table-row">
+                  <td class="ds-concern-number" x-text="item.orderNumber"></td>
+                  <td x-text="item.customer"></td>
+                  <td x-text="formatINR(item.amount)"></td>
+                  <td>
+                    <span class="ds-status-badge" :class="dsStatusClass(item.status)" x-text="item.status || '—'"></span>
+                  </td>
+                  <td x-text="item.madeBy || '—'"></td>
+                  <td class="ds-concern-days" x-text="`${item.daysOpen ?? item.daysAgo ?? 0}d`"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
       </div>
+
     </div>
   </div>
 
@@ -1234,7 +1879,7 @@
               (<span x-text="dailySales?.dataQuality?.acceptanceMix?.total ? ((dailySales.dataQuality.acceptanceMix.accepted / dailySales.dataQuality.acceptanceMix.total) * 100).toFixed(0) + '%' : '0%'"></span>)
             </span>
           </div>
-          <span style="font-size:11px; color: var(--text-secondary); margin-left: 4px;">Accepted</span>
+          <span class="ds-acceptance-label">Accepted</span>
         </div>
         <div class="ds-acceptance-bar-label">
           <span class="ds-acceptance-bar-label-dot ds-acceptance-bar-label-dot--rejected"></span>
@@ -1244,7 +1889,7 @@
               (<span x-text="dailySales?.dataQuality?.acceptanceMix?.total ? ((dailySales.dataQuality.acceptanceMix.rejected / dailySales.dataQuality.acceptanceMix.total) * 100).toFixed(0) + '%' : '0%'"></span>)
             </span>
           </div>
-          <span style="font-size:11px; color: var(--text-secondary); margin-left: 4px;">Rejected</span>
+          <span class="ds-acceptance-label">Rejected</span>
         </div>
         <div class="ds-acceptance-bar-label">
           <span class="ds-acceptance-bar-label-dot ds-acceptance-bar-label-dot--awaiting"></span>
@@ -1254,7 +1899,7 @@
               (<span x-text="dailySales?.dataQuality?.acceptanceMix?.total ? ((dailySales.dataQuality.acceptanceMix.awaiting / dailySales.dataQuality.acceptanceMix.total) * 100).toFixed(0) + '%' : '0%'"></span>)
             </span>
           </div>
-          <span style="font-size:11px; color: var(--text-secondary); margin-left: 4px;">Awaiting</span>
+          <span class="ds-acceptance-label">Awaiting</span>
         </div>
       </div>
 
@@ -1271,7 +1916,7 @@
           ></span>
           <span
             x-show="(dailySales?.dataQuality?.duplicates?.length ?? 0) > 50"
-            style="font-size:11px; color: var(--text-secondary); font-weight: 400;"
+            class="ds-duplicate-overflow-note"
           >(showing top 50)</span>
         </div>
         <template x-for="(dup, idx) in (dailySales?.dataQuality?.duplicates ?? []).slice(0, 50)" :key="idx">
@@ -1282,6 +1927,120 @@
           </div>
         </template>
       </div>
+
+      <!-- Tag Coverage (v5 NEW) -->
+      <div
+        class="ds-dq-section"
+        x-show="dailySales?.dataQuality?.tagCoverage"
+      >
+        <div class="ds-dq-section-title">Print Method Tag Coverage</div>
+        <div class="ds-dq-tag-bar-wrap">
+          <div
+            class="ds-dq-tag-bar"
+            :class="{
+              'ds-dq-tag-bar--warn': (dailySales?.dataQuality?.tagCoverage?.overall?.pct ?? 100) < 50 && (dailySales?.dataQuality?.tagCoverage?.overall?.pct ?? 100) >= 20,
+              'ds-dq-tag-bar--danger': (dailySales?.dataQuality?.tagCoverage?.overall?.pct ?? 100) < 20
+            }"
+          >
+            <div
+              class="ds-dq-tag-bar-fill"
+              :style="`width: ${dailySales?.dataQuality?.tagCoverage?.overall?.pct ?? 0}%`"
+            ></div>
+          </div>
+          <span
+            class="ds-dq-tag-pct"
+            :class="{
+              'ds-dq-tag-pct--warn': (dailySales?.dataQuality?.tagCoverage?.overall?.pct ?? 100) < 50,
+              'ds-dq-tag-pct--danger': (dailySales?.dataQuality?.tagCoverage?.overall?.pct ?? 100) < 20
+            }"
+            x-text="`Print method tagged: ${dailySales?.dataQuality?.tagCoverage?.overall?.pct ?? 0}% of orders`"
+          ></span>
+        </div>
+        <div class="ds-dq-tag-breakdown">
+          <template x-for="[key, val] in Object.entries(dailySales?.dataQuality?.tagCoverage?.byOrderType ?? {})" :key="key">
+            <span class="ds-dq-tag-item">
+              <span x-text="key === 'Manual' ? 'Corporate' : key"></span>:
+              <span x-text="`${val.pct}%`" :class="{ 'ds-dq-warn': val.pct < 50, 'ds-dq-danger': val.pct < 20 }"></span>
+            </span>
+          </template>
+        </div>
+      </div>
+
+      <!-- Unattributed Partner Orders (v5 NEW) -->
+      <div
+        class="ds-dq-section ds-dq-section--oneliner"
+        x-show="(dailySales?.dataQuality?.unattributedPartnerOrders ?? 0) > 0"
+      >
+        <span class="ds-dq-warn-icon" aria-hidden="true">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1L1 12h12L7 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M7 5.5v3M7 9.5v.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        </span>
+        <span x-text="`${dailySales?.dataQuality?.unattributedPartnerOrders ?? 0} partner orders with no Order Made By`"></span>
+        <a
+          href="https://admin.yourdesignstore.in/admin/admin/orders"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="ds-dq-link"
+        >investigate</a>
+      </div>
+
+      <!-- Unrecognised Tags (v5 NEW) -->
+      <div
+        class="ds-dq-section ds-dq-section--oneliner"
+        x-show="dailySales?.dataQuality?.unknownTags?.length > 0"
+      >
+        <span class="ds-dq-warn-icon" aria-hidden="true">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1L1 12h12L7 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M7 5.5v3M7 9.5v.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        </span>
+        <span>
+          <span x-text="(dailySales?.dataQuality?.unknownTags?.length ?? 0)"></span>
+          unrecognised tag value<span x-show="(dailySales?.dataQuality?.unknownTags?.length ?? 0) !== 1">s</span>:
+          <template x-for="(tag, ti) in (dailySales?.dataQuality?.unknownTags ?? []).slice(0, 5)" :key="ti">
+            <span class="ds-dq-tag-raw">
+              <span x-text="`'${tag.raw}' (${tag.count})`"></span><span x-show="ti < Math.min((dailySales?.dataQuality?.unknownTags?.length ?? 0), 5) - 1">, </span>
+            </span>
+          </template>
+        </span>
+      </div>
+
+      <!-- Unexpected Status Combinations (v5 NEW) -->
+      <div
+        class="ds-dq-section"
+        x-show="dailySales?.dataQuality?.unexpectedStatusCombinations?.length > 0"
+        x-data="{ _dqComboExpanded: false }"
+      >
+        <button
+          class="ds-dq-combo-toggle"
+          @click="_dqComboExpanded = !_dqComboExpanded"
+          :aria-expanded="_dqComboExpanded"
+        >
+          <svg class="ds-concerns-section-chevron" :class="{ 'ds-concerns-section-chevron--open': _dqComboExpanded }" width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>
+            <span x-text="dailySales?.dataQuality?.unexpectedStatusCombinations?.length ?? 0"></span>
+            unexpected status combination<span x-show="(dailySales?.dataQuality?.unexpectedStatusCombinations?.length ?? 0) !== 1">s</span>
+          </span>
+        </button>
+        <div x-show="_dqComboExpanded" class="ds-dq-combo-table-wrap">
+          <table class="ds-concerns-table ds-dq-combo-table" aria-label="Unexpected status combinations">
+            <thead>
+              <tr><th>Order #</th><th>Status</th><th>Acceptance</th></tr>
+            </thead>
+            <tbody>
+              <template x-for="(row, ri) in (dailySales?.dataQuality?.unexpectedStatusCombinations ?? [])" :key="ri">
+                <tr>
+                  <td class="ds-concern-number" x-text="row.orderNumber"></td>
+                  <td x-text="row.status"></td>
+                  <td>
+                    <span class="ds-acceptance-badge" :class="dsAcceptanceClass(row.acceptanceStatus)" x-text="row.acceptanceStatus"></span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1321,7 +2080,7 @@
 
     <!-- Sticky header -->
     <div class="ds-drill-sheet__header">
-      <div style="flex:1; min-width:0;">
+      <div class="ds-drill-header-main">
         <div class="ds-drill-sheet__header-title" x-text="dailySalesDrill.title"></div>
         <div class="ds-drill-sheet__header-meta">
           <span x-show="!dailySalesDrill.loading">
@@ -1330,7 +2089,7 @@
           <span x-show="!dailySalesDrill.loading && dailySalesDrill.orders.length > 0">
             · <span x-text="formatINR(dsDrillTotalRevenue())"></span>
           </span>
-          <span x-show="dailySalesDrill.loading" style="color: var(--text-muted);">Loading…</span>
+          <span x-show="dailySalesDrill.loading" class="ds-drill-loading-text">Loading…</span>
         </div>
       </div>
       <button
@@ -1373,7 +2132,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0z"/>
         </svg>
         <p class="ds-drill-sheet__empty-text">No orders match this filter.</p>
-        <p style="font-size:12px; color: var(--text-muted); margin-top:4px;">Try adjusting your date range or filters.</p>
+        <p class="ds-drill-empty-hint">Try adjusting your date range or filters.</p>
       </div>
 
       <!-- Orders list -->
@@ -1402,19 +2161,18 @@
       <!-- Load more -->
       <div
         x-show="dailySalesDrill.hasMore && !dailySalesDrill.loading"
-        style="padding: 12px 16px; text-align: center;"
+        class="ds-drill-no-results"
       >
         <button
-          class="ds-refresh-btn"
+          class="btn btn-small btn-icon"
           @click="loadMoreDrillOrders()"
-          style="margin: 0 auto;"
         >Load more</button>
       </div>
 
       <!-- Loading more indicator -->
       <div
         x-show="dailySalesDrill.loading && dailySalesDrill.orders.length > 0"
-        style="padding: 12px 16px; text-align: center; color: var(--text-secondary); font-size: 12px;"
+        class="ds-drill-no-results-text"
       >Loading more…</div>
 
     </div>

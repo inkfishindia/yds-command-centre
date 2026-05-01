@@ -8,6 +8,7 @@ const SHEETS_PATH    = path.join(__dirname, '../server/services/sheets.js');
 const SERVICE_PATH   = path.join(__dirname, '../server/services/daily-sales-service.js');
 const INDEX_PATH     = path.join(__dirname, '../server/services/daily-sales/index.js');
 const PARSE_PATH     = path.join(__dirname, '../server/services/daily-sales/parse.js');
+const TAXONOMY_PATH  = path.join(__dirname, '../server/services/daily-sales/taxonomy.js');
 const FILTERS_PATH   = path.join(__dirname, '../server/services/daily-sales/filters.js');
 const AGG_PATH       = path.join(__dirname, '../server/services/daily-sales/aggregations.js');
 const DQ_PATH        = path.join(__dirname, '../server/services/daily-sales/data-quality.js');
@@ -102,6 +103,7 @@ function clearMocks() {
   delete require.cache[SERVICE_PATH];
   delete require.cache[INDEX_PATH];
   delete require.cache[PARSE_PATH];
+  delete require.cache[TAXONOMY_PATH];
   delete require.cache[FILTERS_PATH];
   delete require.cache[AGG_PATH];
   delete require.cache[DQ_PATH];
@@ -537,7 +539,8 @@ describe('Daily Sales Service — mix aggregation', () => {
 describe('Daily Sales Service — concerns', () => {
   afterEach(() => clearMocks());
 
-  it('orders with Acceptance Status Pending appear in pendingAcceptance', async () => {
+  it('concerns: awaiting → pendingAcceptance, rejected → rejectedOrders, accepted excluded (new spec §7)', async () => {
+    // New spec: pendingAcceptance = Order Placed + awaiting; rejectedOrders = Order Placed + rejected
     const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0);
     mockSheets(async (key) => {
       if (key === 'SALES_CURRENT_MONTH') {
@@ -545,9 +548,9 @@ describe('Daily Sales Service — concerns', () => {
           available: true,
           headers: HEADERS,
           rows: [
-            makeRow({ 'Order #': 'PA1', 'Date': '28-04-2026', 'Acceptance Status': 'Pending', 'Total Amount with tax': '500' }),
-            makeRow({ 'Order #': 'PA2', 'Date': '28-04-2026', 'Acceptance Status': 'Accepted', 'Total Amount with tax': '300' }),
-            makeRow({ 'Order #': 'PA3', 'Date': '28-04-2026', 'Acceptance Status': 'Rejected', 'Total Amount with tax': '200' }),
+            makeRow({ 'Order #': 'PA1', 'Date': '28-04-2026', 'Status': 'Order Placed', 'Acceptance Status': 'Awaiting', 'Total Amount with tax': '500' }),
+            makeRow({ 'Order #': 'PA2', 'Date': '28-04-2026', 'Status': 'Order Placed', 'Acceptance Status': 'Accepted', 'Total Amount with tax': '300' }),
+            makeRow({ 'Order #': 'PA3', 'Date': '28-04-2026', 'Status': 'Order Placed', 'Acceptance Status': 'Rejected', 'Total Amount with tax': '200' }),
           ],
         };
       }
@@ -556,9 +559,15 @@ describe('Daily Sales Service — concerns', () => {
     const svc = require(SERVICE_PATH);
     const result = await svc.getDashboard(nowMs);
     const paNums = result.concerns.pendingAcceptance.map(x => x.orderNumber);
-    assert.ok(paNums.includes('PA1'), 'Pending should be in pendingAcceptance');
-    assert.ok(paNums.includes('PA3'), 'Rejected should be in pendingAcceptance');
+    const rejNums = result.concerns.rejectedOrders.map(x => x.orderNumber);
+    // awaiting → pendingAcceptance only
+    assert.ok(paNums.includes('PA1'), 'Awaiting should be in pendingAcceptance');
     assert.ok(!paNums.includes('PA2'), 'Accepted should NOT be in pendingAcceptance');
+    assert.ok(!paNums.includes('PA3'), 'Rejected should NOT be in pendingAcceptance (goes to rejectedOrders)');
+    // rejected → rejectedOrders only
+    assert.ok(rejNums.includes('PA3'), 'Rejected should be in rejectedOrders');
+    assert.ok(!rejNums.includes('PA1'), 'Awaiting should NOT be in rejectedOrders');
+    assert.ok(!rejNums.includes('PA2'), 'Accepted should NOT be in rejectedOrders');
   });
 
   it('orders older than 5 days not in terminal statuses appear in stuckOrders', async () => {
@@ -1115,9 +1124,11 @@ describe('parseOrder — normalized Order schema', () => {
     assert.equal(o.date, null);
   });
 
-  it('Tags with multiple values: only first tag becomes printMethod', () => {
+  it('Tags with multiple values: only first tag becomes printMethod (normalised)', () => {
+    // 'Sublimation' is not in PRINT_METHOD_MAP → '(unknown)'; DTF is the second tag
     const o = parseOrder(makeRow({ 'Tags': 'Sublimation, DTF, Embroidery', 'Order #': 'X3' }), 'tab1');
-    assert.equal(o.printMethod, 'Sublimation');
+    assert.equal(o.printMethod, '(unknown)');
+    assert.equal(o.printMethod2, 'DTF');
   });
 
   it('empty Tags: printMethod becomes "(unknown)"', () => {
@@ -1670,9 +1681,9 @@ describe('Daily Sales — filters: orderType case-insensitive', () => {
   });
 });
 
-// ── Blocker 2: acceptanceStatus case-insensitive in concerns ──────────────────
+// ── Blocker 2: concerns — new spec §7 (awaiting → pending, rejected → separate) ─
 
-describe('Daily Sales — aggregations: pendingAcceptance case-insensitive', () => {
+describe('Daily Sales — aggregations: concerns new spec §7', () => {
   it('awaiting (mixed case) all flow into pendingAcceptance', () => {
     const { buildConcerns } = require(AGG_PATH);
     const { parseOrder } = require(PARSE_PATH);
@@ -1693,7 +1704,9 @@ describe('Daily Sales — aggregations: pendingAcceptance case-insensitive', () 
     }
   });
 
-  it('pending (mixed case) flows into pendingAcceptance', () => {
+  it('pending (mixed case) does NOT flow into pendingAcceptance (new spec: only awaiting qualifies)', () => {
+    // New spec §7: pendingAcceptance = Order Placed + awaiting ONLY.
+    // "Pending" acceptanceStatus is no longer a qualifier — it goes nowhere (not a recognised value).
     const { buildConcerns } = require(AGG_PATH);
     const { parseOrder } = require(PARSE_PATH);
     const nowMs = Date.UTC(2026, 3, 28, 12, 0, 0);
@@ -1705,15 +1718,20 @@ describe('Daily Sales — aggregations: pendingAcceptance case-insensitive', () 
         'Acceptance Status': acc,
         'Status': 'Order Placed',
       }), 'tab');
-      const { pendingAcceptance } = buildConcerns([order], nowMs);
+      const { pendingAcceptance, rejectedOrders } = buildConcerns([order], nowMs);
       assert.equal(
-        pendingAcceptance.length, 1,
-        `acceptanceStatus "${acc}" should appear in pendingAcceptance`
+        pendingAcceptance.length, 0,
+        `acceptanceStatus "${acc}" should NOT appear in pendingAcceptance (only awaiting qualifies)`
+      );
+      assert.equal(
+        rejectedOrders.length, 0,
+        `acceptanceStatus "${acc}" should NOT appear in rejectedOrders`
       );
     }
   });
 
-  it('rejected (case-insensitive) flows into pendingAcceptance', () => {
+  it('rejected (case-insensitive) flows into rejectedOrders (NOT pendingAcceptance)', () => {
+    // New spec §7: rejected → rejectedOrders bucket (separate from pendingAcceptance)
     const { buildConcerns } = require(AGG_PATH);
     const { parseOrder } = require(PARSE_PATH);
     const nowMs = Date.UTC(2026, 3, 28, 12, 0, 0);
@@ -1723,8 +1741,9 @@ describe('Daily Sales — aggregations: pendingAcceptance case-insensitive', () 
       'Acceptance Status': 'rejected',
       'Status': 'Order Placed',
     }), 'tab');
-    const { pendingAcceptance } = buildConcerns([order], nowMs);
-    assert.equal(pendingAcceptance.length, 1, 'lowercase rejected should appear in pendingAcceptance');
+    const { pendingAcceptance, rejectedOrders } = buildConcerns([order], nowMs);
+    assert.equal(pendingAcceptance.length, 0, 'lowercase rejected should NOT be in pendingAcceptance');
+    assert.equal(rejectedOrders.length, 1, 'lowercase rejected should be in rejectedOrders');
   });
 
   it('accepted does NOT flow into pendingAcceptance', () => {
@@ -2103,5 +2122,1435 @@ describe('Daily Sales Service — freshness.dataCutoff (v4)', () => {
 
     assert.ok(result.freshness.fetchedAt, 'fetchedAt should still be present');
     assert.ok('dataCutoff' in result.freshness, 'dataCutoff key should exist in freshness');
+  });
+});
+
+// ── Phase 2: dedup blank orderNumber (Task 1) ─────────────────────────────────
+
+describe('Daily Sales Phase 2 — deduplicateIntraTab blank orderNumber', () => {
+  afterEach(() => clearMocks());
+
+  it('4 rows with blank Order# all pass through (not collapsed to 1)', () => {
+    // Simulate the deduplicateIntraTab behaviour via getDashboard with 4 blank-#
+    // rows and verify the total count is preserved.
+    // We test the index.js function indirectly via getDashboard so the full
+    // pipeline is exercised.
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0);
+    mockSheets(async (key) => {
+      if (key === 'SALES_YTD') {
+        return {
+          available: true,
+          headers: HEADERS,
+          rows: [
+            makeRow({ 'Order #': '',    'Date': '28-04-2026', 'Status': 'Draft Order', 'Total Amount with tax': '18102' }),
+            makeRow({ 'Order #': '',    'Date': '28-04-2026', 'Status': 'Draft Order', 'Total Amount with tax': '18102' }),
+            makeRow({ 'Order #': '',    'Date': '28-04-2026', 'Status': 'Draft Order', 'Total Amount with tax': '18102' }),
+            makeRow({ 'Order #': '',    'Date': '28-04-2026', 'Status': 'Draft Order', 'Total Amount with tax': '18102' }),
+            makeRow({ 'Order #': 'R1',  'Date': '28-04-2026', 'Status': 'Delivered',   'Total Amount with tax': '1000' }),
+          ],
+        };
+      }
+      return { available: false };
+    });
+
+    const idx = require(INDEX_PATH);
+    idx.clearCache();
+    return idx.getDashboard({ filterSpec: { status: 'all', channels: [], orderType: 'all', paymentMode: 'all', from: null, to: null, state: '', printMethod: '', excludeStatuses: [] }, nowMs })
+      .then(result => {
+        // dataQuality.total counts allOrders after intra-tab dedup and cross-tab dedup
+        assert.equal(result.dataQuality.total, 5, 'All 5 rows (4 blank + 1 named) should survive dedup');
+
+        // Draft Order mix count should be 4, not 1
+        const draftEntry = result.mix.status && result.mix.status.find
+          ? result.mix.status.find(e => e.name && e.name.toLowerCase() === 'draft order')
+          : null;
+        if (draftEntry) {
+          assert.equal(draftEntry.orders, 4, 'Draft Order count in mix should be 4');
+        }
+        // At minimum, dataQuality.total must be 5
+        assert.ok(result.dataQuality.total >= 5, 'dedup must not collapse blank-# rows');
+      });
+  });
+
+  it('named orderNumber rows still dedup (last wins)', () => {
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0);
+    mockSheets(async (key) => {
+      if (key === 'SALES_YTD') {
+        return {
+          available: true,
+          headers: HEADERS,
+          rows: [
+            makeRow({ 'Order #': 'DUP1', 'Date': '28-04-2026', 'Status': 'Delivered', 'Total Amount with tax': '1000' }),
+            makeRow({ 'Order #': 'DUP1', 'Date': '28-04-2026', 'Status': 'Delivered', 'Total Amount with tax': '1200' }),
+            makeRow({ 'Order #': 'UNQ1', 'Date': '28-04-2026', 'Status': 'Delivered', 'Total Amount with tax': '500' }),
+          ],
+        };
+      }
+      return { available: false };
+    });
+
+    const idx = require(INDEX_PATH);
+    idx.clearCache();
+    return idx.getDashboard({ filterSpec: { status: 'all', channels: [], orderType: 'all', paymentMode: 'all', from: null, to: null, state: '', printMethod: '', excludeStatuses: [] }, nowMs })
+      .then(result => {
+        assert.equal(result.dataQuality.total, 2, 'DUP1 dedups to 1 + UNQ1 = 2 total');
+      });
+  });
+});
+
+// ── Phase 2: statusBucket (Task 2) ────────────────────────────────────────────
+
+describe('Daily Sales Phase 2 — statusBucket', () => {
+  let parseOrder, statusBucket;
+
+  beforeEach(() => {
+    ({ parseOrder, statusBucket } = require(PARSE_PATH));
+  });
+  afterEach(() => clearMocks());
+
+  it('statusBucket("Order Placed") → "in_flight"', () => {
+    assert.equal(statusBucket('Order Placed'), 'in_flight');
+  });
+
+  it('statusBucket("Processing") → "in_flight" (case-insensitive)', () => {
+    assert.equal(statusBucket('Processing'), 'in_flight');
+    assert.equal(statusBucket('processing'), 'in_flight');
+    assert.equal(statusBucket('PROCESSING'), 'in_flight');
+  });
+
+  it('statusBucket("Cancelled") → "cancelled"', () => {
+    assert.equal(statusBucket('Cancelled'), 'cancelled');
+    assert.equal(statusBucket('cancelled'), 'cancelled');
+  });
+
+  it('statusBucket("RTO") → "cancelled"', () => {
+    assert.equal(statusBucket('RTO'), 'cancelled');
+    assert.equal(statusBucket('rto'), 'cancelled');
+  });
+
+  it('statusBucket("Returned") → "cancelled"', () => {
+    assert.equal(statusBucket('Returned'), 'cancelled');
+  });
+
+  it('statusBucket("Lost") → "cancelled"', () => {
+    assert.equal(statusBucket('Lost'), 'cancelled');
+  });
+
+  it('statusBucket("Draft Order") → "draft"', () => {
+    assert.equal(statusBucket('Draft Order'), 'draft');
+    assert.equal(statusBucket('draft order'), 'draft');
+  });
+
+  it('statusBucket("Delivered") → "realized"', () => {
+    assert.equal(statusBucket('Delivered'), 'realized');
+    assert.equal(statusBucket('delivered'), 'realized');
+  });
+
+  it('statusBucket("Fullfilled") → "realized"', () => {
+    assert.equal(statusBucket('Fullfilled'), 'realized');
+  });
+
+  it('statusBucket("Partially Fullfilled") → "realized"', () => {
+    assert.equal(statusBucket('Partially Fullfilled'), 'realized');
+  });
+
+  it('statusBucket("Some Unknown Status") → "other"', () => {
+    assert.equal(statusBucket('Some Unknown Status'), 'other');
+    assert.equal(statusBucket(''), 'other');
+  });
+
+  it('parseOrder sets o.statusBucket correctly', () => {
+    const cases = [
+      { status: 'Order Placed',        expected: 'in_flight' },
+      { status: 'Delivered',           expected: 'realized'  },
+      { status: 'Cancelled',           expected: 'cancelled' },
+      { status: 'Draft Order',         expected: 'draft'     },
+      { status: 'Something Else',      expected: 'other'     },
+    ];
+    for (const { status, expected } of cases) {
+      const o = parseOrder(makeRow({ 'Status': status, 'Order #': `B-${status}` }), 'tab');
+      assert.equal(o.statusBucket, expected, `status="${status}" → statusBucket="${expected}"`);
+    }
+  });
+});
+
+// ── Phase 2: excludeStatuses filter (Task 3) ──────────────────────────────────
+
+describe('Daily Sales Phase 2 — excludeStatuses filter', () => {
+  let applyFilters, parseOrder;
+
+  beforeEach(() => {
+    ({ applyFilters } = require(FILTERS_PATH));
+    ({ parseOrder } = require(PARSE_PATH));
+  });
+  afterEach(() => clearMocks());
+
+  function makeOrders(specs) {
+    return specs.map(({ status, num }, i) =>
+      parseOrder(makeRow({ 'Order #': num || `E${i + 1}`, 'Status': status, 'Date': '28-04-2026' }), 'tab')
+    );
+  }
+
+  it('excludeStatuses=["Cancelled"] removes cancelled from status=all results', () => {
+    const orders = makeOrders([
+      { status: 'Delivered' },
+      { status: 'Order Placed' },
+      { status: 'Cancelled' },
+      { status: 'RTO' },
+      { status: 'Fulfilled' },
+    ]);
+    const result = applyFilters(orders, {
+      status: 'all', channels: [], orderType: 'all', paymentMode: 'all',
+      from: null, to: null, state: '', printMethod: '', excludeStatuses: ['Cancelled'],
+    });
+    assert.equal(result.length, 4, 'Cancelled removed → 4 remaining');
+    assert.ok(!result.some(o => o.status === 'Cancelled'), 'Cancelled should not appear');
+  });
+
+  it('excludeStatuses is case-insensitive (excludes "cancelled" even if spec uses "Cancelled")', () => {
+    const orders = makeOrders([
+      { status: 'Delivered' },
+      { status: 'cancelled' }, // lowercase source
+    ]);
+    const result = applyFilters(orders, {
+      status: 'all', channels: [], orderType: 'all', paymentMode: 'all',
+      from: null, to: null, state: '', printMethod: '', excludeStatuses: ['Cancelled'],
+    });
+    assert.equal(result.length, 1, 'lowercase "cancelled" should also be excluded');
+  });
+
+  it('excludeStatuses=[] (empty) excludes nothing', () => {
+    const orders = makeOrders([
+      { status: 'Delivered' },
+      { status: 'Cancelled' },
+    ]);
+    const result = applyFilters(orders, {
+      status: 'all', channels: [], orderType: 'all', paymentMode: 'all',
+      from: null, to: null, state: '', printMethod: '', excludeStatuses: [],
+    });
+    assert.equal(result.length, 2);
+  });
+
+  it('excludeStatuses + status="realized": subtracts excluded from realized set', () => {
+    const orders = makeOrders([
+      { status: 'Delivered' },
+      { status: 'Fullfilled' },
+      { status: 'Cancelled' },
+      { status: 'Order Placed' },
+    ]);
+    // realized filter → Delivered + Fullfilled; then exclude Delivered → only Fullfilled
+    const result = applyFilters(orders, {
+      status: 'realized', channels: [], orderType: 'all', paymentMode: 'all',
+      from: null, to: null, state: '', printMethod: '', excludeStatuses: ['Delivered'],
+    });
+    assert.equal(result.length, 1, 'Only Fullfilled should remain');
+    assert.equal(result[0].status, 'Fullfilled');
+  });
+
+  it('parseFilterSpec parses excludeStatuses from comma-separated string', () => {
+    const { parseFilterSpec } = require(FILTERS_PATH);
+    const spec = parseFilterSpec({ excludeStatuses: 'Cancelled,RTO' });
+    assert.deepEqual(spec.excludeStatuses, ['Cancelled', 'RTO']);
+  });
+
+  it('parseFilterSpec parses excludeStatuses from array', () => {
+    const { parseFilterSpec } = require(FILTERS_PATH);
+    const spec = parseFilterSpec({ excludeStatuses: ['Cancelled', 'RTO'] });
+    assert.deepEqual(spec.excludeStatuses, ['Cancelled', 'RTO']);
+  });
+
+  it('parseFilterSpec defaults excludeStatuses to []', () => {
+    const { parseFilterSpec } = require(FILTERS_PATH);
+    const spec = parseFilterSpec({});
+    assert.deepEqual(spec.excludeStatuses, []);
+  });
+});
+
+// ── Phase 2: resolveStatusList + appliedStatusList (Tasks 4) ──────────────────
+
+describe('Daily Sales Phase 2 — resolveStatusList', () => {
+  let resolveStatusList, parseOrder;
+
+  beforeEach(() => {
+    ({ resolveStatusList } = require(FILTERS_PATH));
+    ({ parseOrder } = require(PARSE_PATH));
+  });
+  afterEach(() => clearMocks());
+
+  function makeOrders(statuses) {
+    return statuses.map((s, i) =>
+      parseOrder(makeRow({ 'Order #': `RS${i}`, 'Status': s, 'Date': '28-04-2026' }), 'tab')
+    );
+  }
+
+  it('default spec (realized) → only realized statuses present in data', () => {
+    const orders = makeOrders(['Delivered', 'Fullfilled', 'Cancelled', 'Order Placed', 'Draft Order']);
+    const { DEFAULT_FILTER_SPEC } = require(FILTERS_PATH);
+    const list = resolveStatusList(DEFAULT_FILTER_SPEC, orders);
+    assert.ok(list.includes('Delivered'), 'Delivered should be in list');
+    assert.ok(list.includes('Fullfilled'), 'Fullfilled should be in list');
+    assert.ok(!list.includes('Cancelled'), 'Cancelled should NOT be in list');
+    assert.ok(!list.includes('Order Placed'), 'Order Placed should NOT be in list');
+  });
+
+  it('status=all → all statuses present in data', () => {
+    const orders = makeOrders(['Delivered', 'Cancelled', 'Order Placed']);
+    const list = resolveStatusList({ status: 'all', excludeStatuses: [] }, orders);
+    assert.ok(list.includes('Delivered'));
+    assert.ok(list.includes('Cancelled'));
+    assert.ok(list.includes('Order Placed'));
+  });
+
+  it('status=all, excludeStatuses=["Cancelled","RTO"] → all except those two', () => {
+    const orders = makeOrders(['Delivered', 'Cancelled', 'RTO', 'Order Placed']);
+    const list = resolveStatusList({ status: 'all', excludeStatuses: ['Cancelled', 'RTO'] }, orders);
+    assert.ok(list.includes('Delivered'));
+    assert.ok(list.includes('Order Placed'));
+    assert.ok(!list.includes('Cancelled'));
+    assert.ok(!list.includes('RTO'));
+  });
+
+  it('result is sorted ascending', () => {
+    const orders = makeOrders(['Fullfilled', 'Delivered', 'Partially Fullfilled']);
+    const { DEFAULT_FILTER_SPEC } = require(FILTERS_PATH);
+    const list = resolveStatusList(DEFAULT_FILTER_SPEC, orders);
+    const sorted = [...list].sort((a, b) => a.localeCompare(b));
+    assert.deepEqual(list, sorted, 'list should be sorted ascending');
+  });
+
+  it('getDashboard response includes filters.appliedStatusList', async () => {
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0);
+    mockSheets(async (key) => {
+      if (key === 'SALES_CURRENT_MONTH') {
+        return {
+          available: true, headers: HEADERS,
+          rows: [
+            makeRow({ 'Order #': 'AL1', 'Date': '28-04-2026', 'Status': 'Delivered',   'Total Amount with tax': '1000' }),
+            makeRow({ 'Order #': 'AL2', 'Date': '28-04-2026', 'Status': 'Fullfilled',  'Total Amount with tax': '800'  }),
+            makeRow({ 'Order #': 'AL3', 'Date': '28-04-2026', 'Status': 'Cancelled',   'Total Amount with tax': '500'  }),
+            makeRow({ 'Order #': 'AL4', 'Date': '28-04-2026', 'Status': 'Order Placed','Total Amount with tax': '200'  }),
+          ],
+        };
+      }
+      return { available: false };
+    });
+
+    const idx = require(INDEX_PATH);
+    idx.clearCache();
+    const result = await idx.getDashboard({ nowMs }); // default filter = realized
+
+    assert.ok(Array.isArray(result.filters.appliedStatusList), 'appliedStatusList should be an array');
+    assert.ok(result.filters.appliedStatusList.includes('Delivered'), 'Delivered should be in appliedStatusList');
+    assert.ok(result.filters.appliedStatusList.includes('Fullfilled'), 'Fullfilled should be in appliedStatusList');
+    assert.ok(!result.filters.appliedStatusList.includes('Cancelled'), 'Cancelled should NOT be in appliedStatusList');
+    assert.ok(!result.filters.appliedStatusList.includes('Order Placed'), 'Order Placed should NOT be in appliedStatusList');
+  });
+
+  it('getDashboard with status=all and excludeStatuses → appliedStatusList omits excluded', async () => {
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0);
+    mockSheets(async (key) => {
+      if (key === 'SALES_CURRENT_MONTH') {
+        return {
+          available: true, headers: HEADERS,
+          rows: [
+            makeRow({ 'Order #': 'AX1', 'Date': '28-04-2026', 'Status': 'Delivered',   'Total Amount with tax': '1000' }),
+            makeRow({ 'Order #': 'AX2', 'Date': '28-04-2026', 'Status': 'Cancelled',   'Total Amount with tax': '500'  }),
+            makeRow({ 'Order #': 'AX3', 'Date': '28-04-2026', 'Status': 'RTO',          'Total Amount with tax': '300'  }),
+            makeRow({ 'Order #': 'AX4', 'Date': '28-04-2026', 'Status': 'Order Placed','Total Amount with tax': '200'  }),
+          ],
+        };
+      }
+      return { available: false };
+    });
+
+    const idx = require(INDEX_PATH);
+    idx.clearCache();
+    const result = await idx.getDashboard({
+      filterSpec: { status: 'all', channels: [], orderType: 'all', paymentMode: 'all', from: null, to: null, state: '', printMethod: '', excludeStatuses: ['Cancelled', 'RTO'] },
+      nowMs,
+    });
+
+    assert.ok(Array.isArray(result.filters.appliedStatusList));
+    assert.ok(result.filters.appliedStatusList.includes('Delivered'));
+    assert.ok(result.filters.appliedStatusList.includes('Order Placed'));
+    assert.ok(!result.filters.appliedStatusList.includes('Cancelled'), 'Cancelled excluded');
+    assert.ok(!result.filters.appliedStatusList.includes('RTO'), 'RTO excluded');
+  });
+});
+
+// ── Phase 2: buildAvailableFilters casing fix (Task 5) ────────────────────────
+
+describe('Daily Sales Phase 2 — buildAvailableFilters casing normalisation', () => {
+  afterEach(() => clearMocks());
+
+  it('printMethod "DTG" and "dtg" collapse to one chip', async () => {
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0);
+    mockSheets(async (key) => {
+      if (key === 'SALES_CURRENT_MONTH') {
+        return {
+          available: true, headers: HEADERS,
+          rows: [
+            makeRow({ 'Order #': 'PM1', 'Date': '28-04-2026', 'Status': 'Delivered', 'Total Amount with tax': '1000', 'Tags': 'DTG' }),
+            makeRow({ 'Order #': 'PM2', 'Date': '28-04-2026', 'Status': 'Delivered', 'Total Amount with tax': '800',  'Tags': 'dtg' }),
+            makeRow({ 'Order #': 'PM3', 'Date': '28-04-2026', 'Status': 'Delivered', 'Total Amount with tax': '600',  'Tags': 'DTF' }),
+          ],
+        };
+      }
+      return { available: false };
+    });
+
+    const idx = require(INDEX_PATH);
+    idx.clearCache();
+    const result = await idx.getDashboard({ nowMs });
+    const methods = result.filters.available.printMethods;
+
+    assert.ok(Array.isArray(methods), 'printMethods should be an array');
+    assert.equal(methods.length, 2, 'DTG + dtg should collapse to 1; DTF stays = 2 total');
+
+    // Exactly one of "DTG" or "dtg" — not both
+    const dtgVariants = methods.filter(m => m.toLowerCase() === 'dtg');
+    assert.equal(dtgVariants.length, 1, 'Only one DTG variant should appear');
+
+    // DTF should still be present
+    assert.ok(methods.some(m => m.toLowerCase() === 'dtf'), 'DTF should be present');
+  });
+
+  it('statuses "Delivered" and "delivered" collapse to one chip', async () => {
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0);
+    mockSheets(async (key) => {
+      if (key === 'SALES_CURRENT_MONTH') {
+        return {
+          available: true, headers: HEADERS,
+          rows: [
+            makeRow({ 'Order #': 'CS1', 'Date': '28-04-2026', 'Status': 'Delivered',  'Total Amount with tax': '1000' }),
+            makeRow({ 'Order #': 'CS2', 'Date': '28-04-2026', 'Status': 'delivered',  'Total Amount with tax': '800'  }),
+            makeRow({ 'Order #': 'CS3', 'Date': '28-04-2026', 'Status': 'Cancelled',  'Total Amount with tax': '500'  }),
+          ],
+        };
+      }
+      return { available: false };
+    });
+
+    const idx = require(INDEX_PATH);
+    idx.clearCache();
+    const result = await idx.getDashboard({ nowMs });
+    const statuses = result.filters.available.statuses;
+
+    const deliveredVariants = statuses.filter(s => s.toLowerCase() === 'delivered');
+    assert.equal(deliveredVariants.length, 1, '"Delivered" and "delivered" must collapse to one chip');
+  });
+});
+
+// ── Pass 1: normalisePrintMethod ──────────────────────────────────────────────
+
+describe('Pass 1 — normalisePrintMethod', () => {
+  let normalisePrintMethod, PRINT_METHOD_MAP;
+
+  beforeEach(() => {
+    ({ normalisePrintMethod, PRINT_METHOD_MAP } = require(PARSE_PATH));
+  });
+  afterEach(() => clearMocks());
+
+  it('DTG canonical mappings', () => {
+    assert.equal(normalisePrintMethod('dtg'),  'DTG');
+    assert.equal(normalisePrintMethod('DTG'),  'DTG');
+    assert.equal(normalisePrintMethod('Dtg'),  'DTG');
+  });
+
+  it('DTF canonical mappings', () => {
+    assert.equal(normalisePrintMethod('dtf'),  'DTF');
+    assert.equal(normalisePrintMethod('DTF'),  'DTF');
+    assert.equal(normalisePrintMethod('DTF '), 'DTF'); // trailing space
+  });
+
+  it('Screenprint canonical mappings', () => {
+    assert.equal(normalisePrintMethod('SCREENPRINT'),                    'Screenprint');
+    assert.equal(normalisePrintMethod('screen print'),                   'Screenprint');
+    assert.equal(normalisePrintMethod('Screen Print'),                   'Screenprint');
+    assert.equal(normalisePrintMethod('Print: Water Based Screen Print'), 'Screenprint');
+    assert.equal(normalisePrintMethod('PRODUCTS -1 SCREEN PRINT'),       'Screenprint');
+    assert.equal(normalisePrintMethod('SCREENPRINT TEES'),               'Screenprint');
+  });
+
+  it('Embroidery canonical mappings', () => {
+    assert.equal(normalisePrintMethod('EMBROIDERY'), 'Embroidery');
+    assert.equal(normalisePrintMethod('embroidery'), 'Embroidery');
+  });
+
+  it('Puff canonical mappings', () => {
+    assert.equal(normalisePrintMethod('PUFF'),       'Puff');
+    assert.equal(normalisePrintMethod('puff'),       'Puff');
+    assert.equal(normalisePrintMethod('front puff'), 'Puff');
+  });
+
+  it('blank → (unknown)', () => {
+    assert.equal(normalisePrintMethod(''),    '(unknown)');
+    assert.equal(normalisePrintMethod('  '),  '(unknown)');
+    assert.equal(normalisePrintMethod(null),  '(unknown)');
+    assert.equal(normalisePrintMethod(undefined), '(unknown)');
+  });
+
+  it('unrecognised raw value → (unknown)', () => {
+    assert.equal(normalisePrintMethod('plan'),        '(unknown)');
+    assert.equal(normalisePrintMethod('Sublimation'), '(unknown)');
+    assert.equal(normalisePrintMethod('xyz'),         '(unknown)');
+  });
+
+  it('PRINT_METHOD_MAP exported and has expected keys', () => {
+    assert.ok(typeof PRINT_METHOD_MAP === 'object');
+    assert.ok('dtg' in PRINT_METHOD_MAP);
+    assert.ok('dtf' in PRINT_METHOD_MAP);
+    assert.ok('screenprint' in PRINT_METHOD_MAP);
+    assert.ok('embroidery' in PRINT_METHOD_MAP);
+    assert.ok('puff' in PRINT_METHOD_MAP);
+  });
+});
+
+// ── Pass 1: getChannelGroup ───────────────────────────────────────────────────
+
+describe('Pass 1 — getChannelGroup', () => {
+  let getChannelGroup, CHANNEL_GROUP_MAP;
+
+  beforeEach(() => {
+    ({ getChannelGroup, CHANNEL_GROUP_MAP } = require(PARSE_PATH));
+  });
+  afterEach(() => clearMocks());
+
+  it('B2C → D2C', () => {
+    assert.equal(getChannelGroup('B2C'), 'D2C');
+  });
+
+  it('Manual → Corporate', () => {
+    assert.equal(getChannelGroup('Manual'), 'Corporate');
+  });
+
+  it('DS → Partner – DS', () => {
+    assert.equal(getChannelGroup('DS'), 'Partner – DS');
+  });
+
+  it('Stores → Partner – Stores', () => {
+    assert.equal(getChannelGroup('Stores'), 'Partner – Stores');
+  });
+
+  it('blank → Other', () => {
+    assert.equal(getChannelGroup(''),          'Other');
+    assert.equal(getChannelGroup('(unknown)'), 'Other');
+    assert.equal(getChannelGroup(undefined),   'Other');
+  });
+
+  it('CHANNEL_GROUP_MAP exported with all four keys', () => {
+    assert.ok(typeof CHANNEL_GROUP_MAP === 'object');
+    assert.equal(CHANNEL_GROUP_MAP['B2C'],    'D2C');
+    assert.equal(CHANNEL_GROUP_MAP['Manual'], 'Corporate');
+    assert.equal(CHANNEL_GROUP_MAP['DS'],     'Partner – DS');
+    assert.equal(CHANNEL_GROUP_MAP['Stores'], 'Partner – Stores');
+  });
+});
+
+// ── Pass 1: parseOrder derived fields ────────────────────────────────────────
+
+describe('Pass 1 — parseOrder derived fields', () => {
+  let parseOrder, PARTNER_LOOKUP;
+
+  beforeEach(() => {
+    ({ parseOrder, PARTNER_LOOKUP } = require(PARSE_PATH));
+  });
+  afterEach(() => clearMocks());
+
+  it('B2C row: channelGroup, isB2C, isPartner, revenueTier=low', () => {
+    const o = parseOrder(makeRow({
+      'Order #': 'B2C1', 'Order Type': 'B2C', 'Total Amount with tax': '1500',
+      'Status': 'Delivered',
+    }), 'tab');
+    assert.equal(o.channelGroup, 'D2C');
+    assert.equal(o.isB2C,        true);
+    assert.equal(o.isCorporate,  false);
+    assert.equal(o.isDS,         false);
+    assert.equal(o.isStores,     false);
+    assert.equal(o.isPartner,    false);
+    assert.equal(o.revenueTier,  'low');
+    assert.equal(o.isB2BClient,  false);
+  });
+
+  it('Manual + GSTIN row: isB2BClient=true, channelGroup=Corporate', () => {
+    const o = parseOrder(makeRow({
+      'Order #': 'MAN1', 'Order Type': 'Manual',
+      'GSTIN': '27AABCU9603R1ZX',
+      'Total Amount with tax': '50000',
+    }), 'tab');
+    assert.equal(o.channelGroup,  'Corporate');
+    assert.equal(o.isCorporate,   true);
+    assert.equal(o.isB2BClient,   true);
+    assert.equal(o.revenueTier,   'high');
+  });
+
+  it('DS row with known partner in PARTNER_LOOKUP: accountTier set', () => {
+    const o = parseOrder(makeRow({
+      'Order #': 'DS1', 'Order Type': 'DS',
+      'Order Made By': 'Ather Basics Store',
+      'Total Amount with tax': '5000',
+    }), 'tab');
+    assert.equal(o.channelGroup,  'Partner – DS');
+    assert.equal(o.isDS,          true);
+    assert.equal(o.isPartner,     true);
+    assert.equal(o.madeBy,        'Ather Basics Store');
+    assert.equal(o.accountTier,   'Platinum');
+    assert.equal(o.isMadeByBlank, false);
+    assert.equal(o.revenueTier,   'mid'); // 5000 ≥ 3000
+  });
+
+  it('DS row with blank madeBy: isMadeByBlank=true, accountTier=null', () => {
+    const o = parseOrder(makeRow({
+      'Order #': 'DS2', 'Order Type': 'DS',
+      'Order Made By': '',
+      'Total Amount with tax': '400',
+    }), 'tab');
+    assert.equal(o.isDS,          true);
+    assert.equal(o.madeBy,        null);
+    assert.equal(o.isMadeByBlank, true);
+    assert.equal(o.accountTier,   null);
+    assert.equal(o.revenueTier,   'micro');
+  });
+
+  it('multi-tag row: DTG,SLEEVES DTF → printMethod=DTG, printMethod2=DTF', () => {
+    const o = parseOrder(makeRow({
+      'Order #': 'MT1', 'Tags': 'DTG,SLEEVES DTF',
+    }), 'tab');
+    assert.equal(o.printMethod,  'DTG');
+    // 'SLEEVES DTF' is not in PRINT_METHOD_MAP → (unknown)
+    assert.equal(o.printMethod2, '(unknown)');
+  });
+
+  it('raw SCREENPRINT normalises to canonical Screenprint', () => {
+    const o = parseOrder(makeRow({
+      'Order #': 'SP1', 'Tags': 'SCREENPRINT',
+    }), 'tab');
+    assert.equal(o.printMethod, 'Screenprint');
+    assert.equal(o.isTagged,    true);
+  });
+
+  it('Stores row with GSTIN: isB2BClient=true, isStores=true', () => {
+    const o = parseOrder(makeRow({
+      'Order #': 'ST1', 'Order Type': 'Stores',
+      'GSTIN': '37AAJCV0709R1ZO',
+      'Total Amount with tax': '2452',
+    }), 'tab');
+    assert.equal(o.isStores,    true);
+    assert.equal(o.isPartner,   true);
+    assert.equal(o.isB2BClient, true);
+    assert.equal(o.channelGroup, 'Partner – Stores');
+  });
+
+  it('isArun=true when Order Made By = "Arun Nair"', () => {
+    const o = parseOrder(makeRow({
+      'Order #': 'AR1', 'Order Made By': 'Arun Nair',
+    }), 'tab');
+    assert.equal(o.madeBy,  'Arun Nair');
+    assert.equal(o.isArun,  true);
+  });
+
+  it('fyWeek computed from fyOrdinal', () => {
+    // Apr 1 = fyOrdinal 1 → fyWeek 1
+    const o1 = parseOrder(makeRow({ 'Order #': 'FW1', 'Date': '01-04-2026' }), 'tab');
+    assert.equal(o1.fyWeek, 1);
+    // Apr 7 = fyOrdinal 7 → fyWeek 1
+    const o7 = parseOrder(makeRow({ 'Order #': 'FW7', 'Date': '07-04-2026' }), 'tab');
+    assert.equal(o7.fyWeek, 1);
+    // Apr 8 = fyOrdinal 8 → fyWeek 2
+    const o8 = parseOrder(makeRow({ 'Order #': 'FW8', 'Date': '08-04-2026' }), 'tab');
+    assert.equal(o8.fyWeek, 2);
+  });
+
+  it('fyWeek=null when date is null', () => {
+    const o = parseOrder(makeRow({ 'Order #': 'FWN', 'Date': '' }), 'tab');
+    assert.equal(o.fyWeek, null);
+  });
+
+  it('revenueTier=micro for NaN amount', () => {
+    const o = parseOrder(makeRow({ 'Order #': 'RT1', 'Total Amount with tax': 'invalid' }), 'tab');
+    assert.equal(o.revenueTier, 'micro');
+  });
+
+  it('PARTNER_LOOKUP exported with all 7 partners', () => {
+    const keys = Object.keys(PARTNER_LOOKUP);
+    assert.equal(keys.length, 7);
+    assert.ok('Ather Basics Store' in PARTNER_LOOKUP);
+    assert.equal(PARTNER_LOOKUP['Morgan Stanley Employee Swag Store'].tier, 'Platinum');
+    assert.equal(PARTNER_LOOKUP['Zatags Lifestyles Pvt Ltd'].tier, 'Gold');
+    assert.equal(PARTNER_LOOKUP['Doodleodrama'].tier, 'Silver');
+  });
+
+  it('gstin and partnerOrderNumber fields present on order', () => {
+    const o = parseOrder(makeRow({
+      'Order #': 'GST1',
+      'GSTIN': '27AABCU9603R1ZX',
+      'Partner Order Number': 'PO-12345',
+    }), 'tab');
+    assert.equal(o.gstin,              '27AABCU9603R1ZX');
+    assert.equal(o.partnerOrderNumber, 'PO-12345');
+    assert.equal(o.hasPartnerRef,      true);
+  });
+});
+
+// ── Pass 1: applyFilters — new params ────────────────────────────────────────
+
+describe('Pass 1 — applyFilters new params', () => {
+  let applyFilters, parseOrder;
+
+  beforeEach(() => {
+    applyFilters = require(FILTERS_PATH).applyFilters;
+    parseOrder   = require(PARSE_PATH).parseOrder;
+  });
+  afterEach(() => clearMocks());
+
+  function makeOrders(overrides) {
+    return overrides.map((ov, i) =>
+      parseOrder(makeRow({ 'Order #': `NP${i + 1}`, ...ov }), 'tab')
+    );
+  }
+
+  const baseSpec = {
+    from: null, to: null, channels: [], orderType: 'all',
+    paymentMode: 'all', status: 'all', state: '', printMethod: '',
+    acceptanceStatus: '', madeBy: null, excludeStatuses: [],
+  };
+
+  it('printMethod filter with canonical value works', () => {
+    const orders = makeOrders([
+      { 'Tags': 'DTG' },
+      { 'Tags': 'SCREENPRINT' },
+      { 'Tags': 'dtg' },
+    ]);
+    const result = applyFilters(orders, { ...baseSpec, printMethod: 'DTG' });
+    assert.equal(result.length, 2); // DTG + dtg both → 'DTG'
+  });
+
+  it('printMethod filter: Screenprint canonical match', () => {
+    const orders = makeOrders([
+      { 'Tags': 'SCREENPRINT' },
+      { 'Tags': 'screen print' },
+      { 'Tags': 'DTG' },
+    ]);
+    const result = applyFilters(orders, { ...baseSpec, printMethod: 'Screenprint' });
+    assert.equal(result.length, 2);
+  });
+
+  it('acceptanceStatus filter: Awaiting only', () => {
+    const orders = makeOrders([
+      { 'Acceptance Status': 'Accepted' },
+      { 'Acceptance Status': 'Awaiting' },
+      { 'Acceptance Status': 'Rejected' },
+      { 'Acceptance Status': 'Awaiting' },
+    ]);
+    const result = applyFilters(orders, { ...baseSpec, acceptanceStatus: 'Awaiting' });
+    assert.equal(result.length, 2);
+  });
+
+  it('acceptanceStatus filter: empty = all (no filter)', () => {
+    const orders = makeOrders([
+      { 'Acceptance Status': 'Accepted' },
+      { 'Acceptance Status': 'Awaiting' },
+    ]);
+    const result = applyFilters(orders, { ...baseSpec, acceptanceStatus: '' });
+    assert.equal(result.length, 2);
+  });
+
+  it('acceptanceStatus filter: "all" = all (no filter)', () => {
+    const orders = makeOrders([
+      { 'Acceptance Status': 'Accepted' },
+      { 'Acceptance Status': 'Rejected' },
+    ]);
+    const result = applyFilters(orders, { ...baseSpec, acceptanceStatus: 'all' });
+    assert.equal(result.length, 2);
+  });
+
+  it('acceptanceStatus filter is case-insensitive', () => {
+    const orders = makeOrders([
+      { 'Acceptance Status': 'Accepted' },
+      { 'Acceptance Status': 'accepted' },
+    ]);
+    const result = applyFilters(orders, { ...baseSpec, acceptanceStatus: 'Accepted' });
+    assert.equal(result.length, 2);
+  });
+
+  it('madeBy filter: exact match', () => {
+    const orders = makeOrders([
+      { 'Order Made By': 'Arun Nair',  'Order Type': 'Manual' },
+      { 'Order Made By': 'Muskan S',   'Order Type': 'Manual' },
+      { 'Order Made By': 'Arun Nair',  'Order Type': 'DS'     },
+    ]);
+    const result = applyFilters(orders, { ...baseSpec, madeBy: 'Arun Nair' });
+    assert.equal(result.length, 2);
+  });
+
+  it('madeBy filter: null = no filter', () => {
+    const orders = makeOrders([
+      { 'Order Made By': 'Arun Nair' },
+      { 'Order Made By': '' },
+    ]);
+    const result = applyFilters(orders, { ...baseSpec, madeBy: null });
+    assert.equal(result.length, 2);
+  });
+
+  it('combined: printMethod + acceptanceStatus + orderType', () => {
+    const orders = makeOrders([
+      { 'Tags': 'DTG', 'Acceptance Status': 'Accepted',  'Order Type': 'B2C' },
+      { 'Tags': 'DTG', 'Acceptance Status': 'Awaiting',  'Order Type': 'B2C' },
+      { 'Tags': 'DTF', 'Acceptance Status': 'Accepted',  'Order Type': 'B2C' },
+      { 'Tags': 'DTG', 'Acceptance Status': 'Accepted',  'Order Type': 'DS'  },
+    ]);
+    const result = applyFilters(orders, {
+      ...baseSpec,
+      printMethod: 'DTG', acceptanceStatus: 'Accepted', orderType: 'B2C',
+    });
+    assert.equal(result.length, 1);
+    assert.equal(result[0].orderNumber, 'NP1');
+  });
+});
+
+// ── Pass 1: parseFilterSpec — new params ─────────────────────────────────────
+
+describe('Pass 1 — parseFilterSpec new params', () => {
+  let parseFilterSpec;
+
+  beforeEach(() => {
+    parseFilterSpec = require(FILTERS_PATH).parseFilterSpec;
+  });
+  afterEach(() => clearMocks());
+
+  it('parses acceptanceStatus from query', () => {
+    const spec = parseFilterSpec({ acceptanceStatus: 'Awaiting' });
+    assert.equal(spec.acceptanceStatus, 'Awaiting');
+  });
+
+  it('acceptanceStatus defaults to empty string', () => {
+    const spec = parseFilterSpec({});
+    assert.equal(spec.acceptanceStatus, '');
+  });
+
+  it('parses madeBy from query', () => {
+    const spec = parseFilterSpec({ madeBy: 'Arun Nair' });
+    assert.equal(spec.madeBy, 'Arun Nair');
+  });
+
+  it('madeBy empty string → null', () => {
+    const spec = parseFilterSpec({ madeBy: '' });
+    assert.equal(spec.madeBy, null);
+  });
+
+  it('madeBy defaults to null', () => {
+    const spec = parseFilterSpec({});
+    assert.equal(spec.madeBy, null);
+  });
+});
+
+// ── Pass 1: mtdByChannel in dashboard payload ────────────────────────────────
+
+describe('Pass 1 — mtdByChannel in dashboard', () => {
+  afterEach(() => clearMocks());
+
+  it('mtdByChannel has all four channel group keys with correct aggregations', async () => {
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0); // Apr 28 2026
+
+    mockSheets(async (key) => {
+      if (key === 'SALES_CURRENT_MONTH') {
+        return {
+          available: true, headers: HEADERS,
+          rows: [
+            // D2C
+            makeRow({ 'Order #': 'D1', 'Date': '15-04-2026', 'Order Type': 'B2C',    'Total Amount with tax': '1000', 'Status': 'Delivered' }),
+            makeRow({ 'Order #': 'D2', 'Date': '20-04-2026', 'Order Type': 'B2C',    'Total Amount with tax': '2000', 'Status': 'Delivered' }),
+            // Corporate
+            makeRow({ 'Order #': 'C1', 'Date': '10-04-2026', 'Order Type': 'Manual', 'Total Amount with tax': '50000', 'Status': 'Delivered' }),
+            // Partner – DS
+            makeRow({ 'Order #': 'P1', 'Date': '05-04-2026', 'Order Type': 'DS',     'Total Amount with tax': '1500', 'Status': 'Delivered' }),
+            makeRow({ 'Order #': 'P2', 'Date': '12-04-2026', 'Order Type': 'DS',     'Total Amount with tax': '1500', 'Status': 'Delivered' }),
+            // Partner – Stores
+            makeRow({ 'Order #': 'S1', 'Date': '22-04-2026', 'Order Type': 'Stores', 'Total Amount with tax': '2452', 'Status': 'Delivered' }),
+          ],
+        };
+      }
+      return { available: false };
+    });
+
+    const idx = require(INDEX_PATH);
+    idx.clearCache();
+    const result = await idx.getDashboard({ nowMs });
+
+    assert.ok('mtdByChannel' in result, 'mtdByChannel should exist in payload');
+
+    const cg = result.mtdByChannel;
+    assert.ok('D2C' in cg,              'D2C key must be present');
+    assert.ok('Corporate' in cg,        'Corporate key must be present');
+    assert.ok('Partner – DS' in cg,     'Partner – DS key must be present');
+    assert.ok('Partner – Stores' in cg, 'Partner – Stores key must be present');
+
+    // D2C: 2 orders at 1000+2000 = 3000, aov = 1500
+    assert.equal(cg['D2C'].orders,  2);
+    assert.equal(cg['D2C'].revenue, 3000);
+    assert.equal(cg['D2C'].aov,     1500);
+
+    // Corporate: 1 order at 50000
+    assert.equal(cg['Corporate'].orders,  1);
+    assert.equal(cg['Corporate'].revenue, 50000);
+
+    // Partner – DS: 2 orders at 3000
+    assert.equal(cg['Partner – DS'].orders,  2);
+    assert.equal(cg['Partner – DS'].revenue, 3000);
+    assert.equal(cg['Partner – DS'].aov,     1500);
+
+    // Partner – Stores: 1 order
+    assert.equal(cg['Partner – Stores'].orders,  1);
+    assert.equal(cg['Partner – Stores'].revenue, 2452);
+  });
+
+  it('mtdByChannel: empty channel group still present with zeros', async () => {
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0);
+
+    mockSheets(async (key) => {
+      if (key === 'SALES_CURRENT_MONTH') {
+        return {
+          available: true, headers: HEADERS,
+          rows: [
+            // Only B2C orders — no Manual, DS, Stores
+            makeRow({ 'Order #': 'E1', 'Date': '15-04-2026', 'Order Type': 'B2C', 'Total Amount with tax': '1000', 'Status': 'Delivered' }),
+          ],
+        };
+      }
+      return { available: false };
+    });
+
+    const idx = require(INDEX_PATH);
+    idx.clearCache();
+    const result = await idx.getDashboard({ nowMs });
+
+    const cg = result.mtdByChannel;
+    // All four keys must be present
+    assert.equal(cg['D2C'].orders,              1);
+    assert.equal(cg['Corporate'].orders,        0);
+    assert.equal(cg['Corporate'].revenue,       0);
+    assert.equal(cg['Partner – DS'].orders,     0);
+    assert.equal(cg['Partner – Stores'].orders, 0);
+  });
+});
+
+// ── Pass 1: RTO terminal fix (regression) ────────────────────────────────────
+
+describe('Pass 1 — RTO terminal status fix', () => {
+  afterEach(() => clearMocks());
+
+  it('RTO order older than 5 days does NOT appear in stuckOrders', async () => {
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0); // Apr 28 2026
+
+    mockSheets(async (key) => {
+      if (key === 'SALES_CURRENT_MONTH') {
+        return {
+          available: true, headers: HEADERS,
+          rows: [
+            // 10 days old RTO — should NOT be stuck (terminal)
+            makeRow({ 'Order #': 'RTO1', 'Date': '18-04-2026', 'Status': 'RTO',          'Total Amount with tax': '500' }),
+            // 10 days old non-terminal — should be stuck
+            makeRow({ 'Order #': 'STK1', 'Date': '18-04-2026', 'Status': 'Order Placed', 'Total Amount with tax': '500' }),
+          ],
+        };
+      }
+      return { available: false };
+    });
+
+    const idx = require(INDEX_PATH);
+    idx.clearCache();
+    const result = await idx.getDashboard({ nowMs });
+
+    const stuckNums = result.concerns.stuckOrders.map(x => x.orderNumber);
+    assert.ok(!stuckNums.includes('RTO1'), 'RTO order must NOT appear in stuckOrders');
+    assert.ok(stuckNums.includes('STK1'),  'Old Order Placed must appear in stuckOrders');
+  });
+});
+
+// ── Pass 2 Part A: mtdByChannel _skippedRows suppressed ──────────────────────
+
+describe('Pass 2 Part A — mtdByChannel _skippedRows suppressed', () => {
+  afterEach(() => clearMocks());
+
+  it('each mtdByChannel group has exactly 3 keys: orders, revenue, aov', async () => {
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0);
+
+    mockSheets(async (key) => {
+      if (key === 'SALES_CURRENT_MONTH') {
+        return {
+          available: true, headers: HEADERS,
+          rows: [
+            makeRow({ 'Order #': 'MBC1', 'Date': '15-04-2026', 'Order Type': 'B2C',    'Total Amount with tax': '1000', 'Status': 'Delivered' }),
+            makeRow({ 'Order #': 'MBC2', 'Date': '15-04-2026', 'Order Type': 'Manual', 'Total Amount with tax': '2000', 'Status': 'Delivered' }),
+            makeRow({ 'Order #': 'MBC3', 'Date': '15-04-2026', 'Order Type': 'DS',     'Total Amount with tax': 'bad',  'Status': 'Delivered' }), // NaN row
+          ],
+        };
+      }
+      return { available: false };
+    });
+
+    const idx = require(INDEX_PATH);
+    idx.clearCache();
+    const result = await idx.getDashboard({ nowMs });
+
+    const CHANNEL_GROUPS = ['D2C', 'Corporate', 'Partner – DS', 'Partner – Stores'];
+    for (const group of CHANNEL_GROUPS) {
+      const keys = Object.keys(result.mtdByChannel[group]);
+      assert.deepEqual(keys.sort(), ['aov', 'orders', 'revenue'],
+        `${group} should have exactly 3 keys (no _skippedRows)`);
+    }
+  });
+});
+
+// ── Pass 2 Part B1: Concerns new contract ────────────────────────────────────
+
+describe('Pass 2 Part B1 — Concerns new contract', () => {
+  afterEach(() => clearMocks());
+
+  it('pendingAcceptance: Order Placed + awaiting ONLY', () => {
+    const { buildConcerns } = require(AGG_PATH);
+    const { parseOrder }   = require(PARSE_PATH);
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0);
+
+    const awaiting = parseOrder(makeRow({ 'Order #': 'B1A', 'Date': '28-04-2026', 'Status': 'Order Placed', 'Acceptance Status': 'Awaiting', 'Total Amount with tax': '1000' }), 'tab');
+    const rejected = parseOrder(makeRow({ 'Order #': 'B1B', 'Date': '28-04-2026', 'Status': 'Order Placed', 'Acceptance Status': 'Rejected', 'Total Amount with tax': '500' }), 'tab');
+    const accepted = parseOrder(makeRow({ 'Order #': 'B1C', 'Date': '28-04-2026', 'Status': 'Order Placed', 'Acceptance Status': 'Accepted', 'Total Amount with tax': '800' }), 'tab');
+    // Processing + awaiting → goes to stuckOrders if old enough, but not pendingAcceptance
+    const processing = parseOrder(makeRow({ 'Order #': 'B1D', 'Date': '28-04-2026', 'Status': 'Processing', 'Acceptance Status': 'Awaiting', 'Total Amount with tax': '200' }), 'tab');
+
+    const result = buildConcerns([awaiting, rejected, accepted, processing], nowMs);
+
+    // pendingAcceptance: only awaiting Order Placed
+    assert.equal(result.pendingAcceptance.length, 1, 'only 1 order qualifies for pendingAcceptance');
+    assert.equal(result.pendingAcceptance[0].orderNumber, 'B1A');
+
+    // rejectedOrders: only rejected Order Placed
+    assert.equal(result.rejectedOrders.length, 1, 'only 1 order qualifies for rejectedOrders');
+    assert.equal(result.rejectedOrders[0].orderNumber, 'B1B');
+  });
+
+  it('pendingRevenue and rejectedRevenue are sum of amountWithTax in each bucket', () => {
+    const { buildConcerns } = require(AGG_PATH);
+    const { parseOrder }   = require(PARSE_PATH);
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0);
+
+    const orders = [
+      parseOrder(makeRow({ 'Order #': 'PR1', 'Date': '28-04-2026', 'Status': 'Order Placed', 'Acceptance Status': 'Awaiting', 'Total Amount with tax': '1500' }), 'tab'),
+      parseOrder(makeRow({ 'Order #': 'PR2', 'Date': '28-04-2026', 'Status': 'Order Placed', 'Acceptance Status': 'Awaiting', 'Total Amount with tax': '2500' }), 'tab'),
+      parseOrder(makeRow({ 'Order #': 'PR3', 'Date': '28-04-2026', 'Status': 'Order Placed', 'Acceptance Status': 'Rejected', 'Total Amount with tax': '3000' }), 'tab'),
+    ];
+    const result = buildConcerns(orders, nowMs);
+
+    assert.equal(result.pendingRevenue, 4000, 'pendingRevenue = 1500 + 2500');
+    assert.equal(result.rejectedRevenue, 3000, 'rejectedRevenue = 3000');
+  });
+
+  it('every concern row carries madeBy field', () => {
+    const { buildConcerns } = require(AGG_PATH);
+    const { parseOrder }   = require(PARSE_PATH);
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0);
+
+    const order = parseOrder(makeRow({
+      'Order #': 'MB1', 'Date': '28-04-2026',
+      'Status': 'Order Placed', 'Acceptance Status': 'Awaiting',
+      'Order Made By': 'Arun Nair',
+      'Total Amount with tax': '999',
+    }), 'tab');
+    const result = buildConcerns([order], nowMs);
+
+    assert.ok('madeBy' in result.pendingAcceptance[0], 'pendingAcceptance row should have madeBy');
+    assert.equal(result.pendingAcceptance[0].madeBy, 'Arun Nair');
+  });
+
+  it('every concern row carries daysOpen and daysAgo (synonyms)', () => {
+    const { buildConcerns } = require(AGG_PATH);
+    const { parseOrder }   = require(PARSE_PATH);
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0); // Apr 28
+
+    const order = parseOrder(makeRow({
+      'Order #': 'DO1', 'Date': '22-04-2026', // 6 days ago
+      'Status': 'Order Placed', 'Acceptance Status': 'Awaiting',
+      'Total Amount with tax': '100',
+    }), 'tab');
+    const result = buildConcerns([order], nowMs);
+
+    const row = result.pendingAcceptance[0];
+    assert.ok('daysAgo' in row,  'row should have daysAgo');
+    assert.ok('daysOpen' in row, 'row should have daysOpen');
+    assert.equal(row.daysAgo,  6, 'daysAgo should be 6');
+    assert.equal(row.daysOpen, 6, 'daysOpen should be 6 (same as daysAgo)');
+  });
+
+  it('stuckOrders: Order Placed AND Processing both qualify if daysOpen > 5', () => {
+    const { buildConcerns } = require(AGG_PATH);
+    const { parseOrder }   = require(PARSE_PATH);
+    const nowMs = Date.UTC(2026, 3, 28, 0, 0, 0); // Apr 28
+
+    const orders = [
+      parseOrder(makeRow({ 'Order #': 'SK1', 'Date': '20-04-2026', 'Status': 'Order Placed', 'Acceptance Status': 'Accepted', 'Total Amount with tax': '500' }), 'tab'), // 8 days
+      parseOrder(makeRow({ 'Order #': 'SK2', 'Date': '20-04-2026', 'Status': 'Processing',   'Acceptance Status': 'Accepted', 'Total Amount with tax': '500' }), 'tab'), // 8 days
+      parseOrder(makeRow({ 'Order #': 'SK3', 'Date': '28-04-2026', 'Status': 'Order Placed', 'Acceptance Status': 'Accepted', 'Total Amount with tax': '500' }), 'tab'), // 0 days → NOT stuck
+      parseOrder(makeRow({ 'Order #': 'SK4', 'Date': '20-04-2026', 'Status': 'Delivered',    'Acceptance Status': 'Accepted', 'Total Amount with tax': '500' }), 'tab'), // terminal
+    ];
+    const result = buildConcerns(orders, nowMs);
+
+    const stuckNums = result.stuckOrders.map(x => x.orderNumber);
+    assert.ok(stuckNums.includes('SK1'), 'Order Placed 8 days old → stuck');
+    assert.ok(stuckNums.includes('SK2'), 'Processing 8 days old → stuck');
+    assert.ok(!stuckNums.includes('SK3'), 'Order today → NOT stuck');
+    assert.ok(!stuckNums.includes('SK4'), 'Delivered → NOT stuck');
+  });
+});
+
+// ── Pass 2 Part B2: Data Quality additions ───────────────────────────────────
+
+describe('Pass 2 Part B2 — detectTagCoverage', () => {
+  let detectTagCoverage, parseOrder;
+
+  beforeEach(() => {
+    detectTagCoverage = require(DQ_PATH).detectTagCoverage;
+    parseOrder = require(PARSE_PATH).parseOrder;
+  });
+  afterEach(() => clearMocks());
+
+  it('returns overall + byOrderType structure', () => {
+    const orders = [
+      parseOrder(makeRow({ 'Order #': 'TC1', 'Order Type': 'B2C',    'Tags': 'DTF' }), 'tab'),
+      parseOrder(makeRow({ 'Order #': 'TC2', 'Order Type': 'B2C',    'Tags': '' }), 'tab'),
+      parseOrder(makeRow({ 'Order #': 'TC3', 'Order Type': 'Manual', 'Tags': 'DTG' }), 'tab'),
+    ];
+    const result = detectTagCoverage(orders);
+
+    assert.ok('overall' in result, 'should have overall key');
+    assert.ok('byOrderType' in result, 'should have byOrderType key');
+    assert.ok('B2C'    in result.byOrderType);
+    assert.ok('DS'     in result.byOrderType);
+    assert.ok('Manual' in result.byOrderType);
+    assert.ok('Stores' in result.byOrderType);
+
+    assert.equal(result.overall.total,  3);
+    assert.equal(result.overall.tagged, 2); // TC1 + TC3 have real tags
+    assert.equal(result.overall.pct,   67); // Math.round(2/3*100) = 67
+  });
+
+  it('zero orders → all zeros, no division by zero', () => {
+    const result = detectTagCoverage([]);
+    assert.equal(result.overall.total,  0);
+    assert.equal(result.overall.tagged, 0);
+    assert.equal(result.overall.pct,    0);
+    assert.equal(result.byOrderType.B2C.pct, 0);
+  });
+
+  it('100% tagged → pct = 100', () => {
+    const orders = [
+      parseOrder(makeRow({ 'Order #': 'TC4', 'Order Type': 'B2C', 'Tags': 'DTG' }), 'tab'),
+      parseOrder(makeRow({ 'Order #': 'TC5', 'Order Type': 'B2C', 'Tags': 'DTF' }), 'tab'),
+    ];
+    const result = detectTagCoverage(orders);
+    assert.equal(result.byOrderType.B2C.pct, 100);
+  });
+
+  it('zero tagged → pct = 0', () => {
+    const orders = [
+      parseOrder(makeRow({ 'Order #': 'TC6', 'Order Type': 'DS', 'Tags': '' }), 'tab'),
+    ];
+    const result = detectTagCoverage(orders);
+    assert.equal(result.byOrderType.DS.pct, 0);
+  });
+});
+
+describe('Pass 2 Part B2 — detectUnknownTags', () => {
+  let detectUnknownTags, parseOrder;
+
+  beforeEach(() => {
+    detectUnknownTags = require(DQ_PATH).detectUnknownTags;
+    parseOrder = require(PARSE_PATH).parseOrder;
+  });
+  afterEach(() => clearMocks());
+
+  it('groups unknown tags by raw value, sorted desc by count', () => {
+    const orders = [
+      parseOrder(makeRow({ 'Order #': 'UT1', 'Tags': 'Sublimation' }), 'tab'),
+      parseOrder(makeRow({ 'Order #': 'UT2', 'Tags': 'Sublimation' }), 'tab'),
+      parseOrder(makeRow({ 'Order #': 'UT3', 'Tags': 'Plan Only' }), 'tab'),
+    ];
+    const result = detectUnknownTags(orders);
+    assert.ok(Array.isArray(result));
+    assert.equal(result[0].raw, 'Sublimation', 'highest count first');
+    assert.equal(result[0].count, 2);
+    assert.equal(result[1].raw, 'Plan Only');
+    assert.equal(result[1].count, 1);
+  });
+
+  it('case-insensitive grouping (Sublimation + sublimation → 1 bucket)', () => {
+    const orders = [
+      parseOrder(makeRow({ 'Order #': 'UT4', 'Tags': 'Sublimation' }), 'tab'),
+      parseOrder(makeRow({ 'Order #': 'UT5', 'Tags': 'sublimation' }), 'tab'),
+    ];
+    const result = detectUnknownTags(orders);
+    assert.equal(result.length, 1, 'should collapse to one group');
+    assert.equal(result[0].count, 2);
+  });
+
+  it('known tags (DTF, DTG) are not reported as unknown', () => {
+    const orders = [
+      parseOrder(makeRow({ 'Order #': 'UT6', 'Tags': 'DTF' }), 'tab'),
+      parseOrder(makeRow({ 'Order #': 'UT7', 'Tags': 'DTG' }), 'tab'),
+      parseOrder(makeRow({ 'Order #': 'UT8', 'Tags': 'Sublimation' }), 'tab'),
+    ];
+    const result = detectUnknownTags(orders);
+    assert.equal(result.length, 1, 'only Sublimation is unknown');
+    assert.equal(result[0].raw, 'Sublimation');
+  });
+
+  it('orders with blank Tags produce no unknown tags', () => {
+    const orders = [
+      parseOrder(makeRow({ 'Order #': 'UT9', 'Tags': '' }), 'tab'),
+    ];
+    const result = detectUnknownTags(orders);
+    assert.equal(result.length, 0, 'blank tags → nothing to report');
+  });
+
+  it('printMethodRaw is set on Order (raw first tag preserved)', () => {
+    const o1 = require(PARSE_PATH).parseOrder(makeRow({ 'Order #': 'PMR1', 'Tags': 'Sublimation, DTF' }), 'tab');
+    assert.equal(o1.printMethodRaw, 'Sublimation', 'raw first tag preserved before normalisation');
+    const o2 = require(PARSE_PATH).parseOrder(makeRow({ 'Order #': 'PMR2', 'Tags': '' }), 'tab');
+    assert.equal(o2.printMethodRaw, null, 'blank Tags → printMethodRaw is null');
+  });
+});
+
+describe('Pass 2 Part B2 — detectUnattributedPartnerOrders', () => {
+  let detectUnattributedPartnerOrders, parseOrder;
+
+  beforeEach(() => {
+    detectUnattributedPartnerOrders = require(DQ_PATH).detectUnattributedPartnerOrders;
+    parseOrder = require(PARSE_PATH).parseOrder;
+  });
+  afterEach(() => clearMocks());
+
+  it('counts orders where isMadeByBlank is true', () => {
+    const orders = [
+      parseOrder(makeRow({ 'Order #': 'AP1', 'Order Type': 'DS', 'Order Made By': '' }), 'tab'),   // isMadeByBlank
+      parseOrder(makeRow({ 'Order #': 'AP2', 'Order Type': 'DS', 'Order Made By': 'Ather Basics Store' }), 'tab'), // named → not blank
+      parseOrder(makeRow({ 'Order #': 'AP3', 'Order Type': 'B2C', 'Order Made By': '' }), 'tab'),  // B2C, not a partner → not blank
+    ];
+    const count = detectUnattributedPartnerOrders(orders);
+    assert.equal(count, 1, 'only AP1 (DS + blank madeBy) should be unattributed');
+  });
+
+  it('returns 0 for empty orders', () => {
+    assert.equal(detectUnattributedPartnerOrders([]), 0);
+  });
+});
+
+describe('Pass 2 Part B2 — detectUnexpectedStatusCombinations', () => {
+  let detectUnexpectedStatusCombinations, parseOrder;
+
+  beforeEach(() => {
+    detectUnexpectedStatusCombinations = require(DQ_PATH).detectUnexpectedStatusCombinations;
+    parseOrder = require(PARSE_PATH).parseOrder;
+  });
+  afterEach(() => clearMocks());
+
+  it('Rule 1: Delivered (realized) + acceptanceStatus != accepted → flagged', () => {
+    const o = parseOrder(makeRow({ 'Order #': 'USC1', 'Status': 'Delivered', 'Acceptance Status': 'Awaiting' }), 'tab');
+    const result = detectUnexpectedStatusCombinations([o]);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].orderNumber, 'USC1');
+  });
+
+  it('Rule 1 negative: Delivered + Accepted → NOT flagged', () => {
+    const o = parseOrder(makeRow({ 'Order #': 'USC2', 'Status': 'Delivered', 'Acceptance Status': 'Accepted' }), 'tab');
+    const result = detectUnexpectedStatusCombinations([o]);
+    assert.equal(result.length, 0);
+  });
+
+  it('Rule 2: Cancelled + awaiting → flagged', () => {
+    const o = parseOrder(makeRow({ 'Order #': 'USC3', 'Status': 'Cancelled', 'Acceptance Status': 'Awaiting' }), 'tab');
+    const result = detectUnexpectedStatusCombinations([o]);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].orderNumber, 'USC3');
+  });
+
+  it('Rule 2 negative: Cancelled + rejected → NOT flagged', () => {
+    const o = parseOrder(makeRow({ 'Order #': 'USC4', 'Status': 'Cancelled', 'Acceptance Status': 'Rejected' }), 'tab');
+    const result = detectUnexpectedStatusCombinations([o]);
+    assert.equal(result.length, 0);
+  });
+
+  it('Rule 3: Draft Order + accepted → flagged', () => {
+    const o = parseOrder(makeRow({ 'Order #': 'USC5', 'Status': 'Draft Order', 'Acceptance Status': 'Accepted' }), 'tab');
+    const result = detectUnexpectedStatusCombinations([o]);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].orderNumber, 'USC5');
+  });
+
+  it('Rule 3 negative: Draft Order + awaiting → NOT flagged', () => {
+    const o = parseOrder(makeRow({ 'Order #': 'USC6', 'Status': 'Draft Order', 'Acceptance Status': 'Awaiting' }), 'tab');
+    const result = detectUnexpectedStatusCombinations([o]);
+    assert.equal(result.length, 0);
+  });
+
+  it('cap at 50 violations enforced', () => {
+    const orders = Array.from({ length: 100 }, (_, i) =>
+      parseOrder(makeRow({ 'Order #': `CAP${i}`, 'Status': 'Delivered', 'Acceptance Status': 'Awaiting' }), 'tab')
+    );
+    const result = detectUnexpectedStatusCombinations(orders);
+    assert.equal(result.length, 50, 'results should be capped at 50');
+  });
+
+  it('returns array with orderNumber, status, acceptanceStatus', () => {
+    const o = parseOrder(makeRow({ 'Order #': 'USC7', 'Status': 'Delivered', 'Acceptance Status': 'Rejected' }), 'tab');
+    const result = detectUnexpectedStatusCombinations([o]);
+    assert.equal(result.length, 1);
+    assert.ok('orderNumber' in result[0]);
+    assert.ok('status' in result[0]);
+    assert.ok('acceptanceStatus' in result[0]);
+  });
+});
+
+// ── Pass 2 Part B3: Weekly Trend ─────────────────────────────────────────────
+
+describe('Pass 2 Part B3 — buildWeeklyTrend', () => {
+  let buildWeeklyTrend, parseOrder;
+
+  beforeEach(() => {
+    buildWeeklyTrend = require(AGG_PATH).buildWeeklyTrend;
+    parseOrder = require(PARSE_PATH).parseOrder;
+  });
+  afterEach(() => clearMocks());
+
+  it('W1 is Apr 1–7, W2 is Apr 8–14 (date range formatting)', () => {
+    // nowMs: Apr 8 2026 IST (UTC)
+    const nowMs = Date.UTC(2026, 3, 8, 0, 0, 0);
+    const result = buildWeeklyTrend([], nowMs);
+    assert.equal(result.length, 2, 'should have 2 weeks (W1 + partial W2)');
+    assert.equal(result[0].week, 1);
+    assert.ok(result[0].dateRange.startsWith('1 Apr'), `W1 should start "1 Apr", got "${result[0].dateRange}"`);
+    assert.equal(result[1].week, 2);
+    assert.ok(result[1].dateRange.startsWith('8 Apr'), `W2 should start "8 Apr", got "${result[1].dateRange}"`);
+  });
+
+  it('W1 end-date capped at today if week not complete', () => {
+    // Apr 3 2026 — only 3 days into W1
+    const nowMs = Date.UTC(2026, 3, 3, 0, 0, 0);
+    const result = buildWeeklyTrend([], nowMs);
+    assert.equal(result.length, 1);
+    assert.ok(result[0].dateRange.includes('3 Apr'), `W1 end should be "3 Apr", got "${result[0].dateRange}"`);
+  });
+
+  it('no future weeks emitted', () => {
+    // nowMs: Apr 10 2026 — current week is W2 (days 8-14)
+    const nowMs = Date.UTC(2026, 3, 10, 0, 0, 0);
+    const result = buildWeeklyTrend([], nowMs);
+    // W1 + W2 only
+    assert.equal(result.length, 2);
+    for (const w of result) {
+      assert.ok(w.week <= 2, `no week beyond current (2) should appear, got ${w.week}`);
+    }
+  });
+
+  it('orders are aggregated into correct week', () => {
+    // nowMs: Apr 14 2026 — end of W2
+    const nowMs = Date.UTC(2026, 3, 14, 0, 0, 0);
+    const orders = [
+      parseOrder(makeRow({ 'Order #': 'WT1', 'Date': '01-04-2026', 'Total Amount with tax': '1000', 'Status': 'Delivered' }), 'tab'), // W1
+      parseOrder(makeRow({ 'Order #': 'WT2', 'Date': '07-04-2026', 'Total Amount with tax': '2000', 'Status': 'Delivered' }), 'tab'), // W1
+      parseOrder(makeRow({ 'Order #': 'WT3', 'Date': '08-04-2026', 'Total Amount with tax': '500',  'Status': 'Delivered' }), 'tab'), // W2
+    ];
+    const result = buildWeeklyTrend(orders, nowMs);
+    assert.equal(result.length, 2);
+    const w1 = result[0];
+    const w2 = result[1];
+    assert.equal(w1.orders, 2,    'W1: 2 orders');
+    assert.equal(w1.revenue, 3000, 'W1: 1000+2000');
+    assert.equal(w1.aov, 1500,    'W1: 3000/2');
+    assert.equal(w2.orders, 1,    'W2: 1 order');
+    assert.equal(w2.revenue, 500, 'W2: 500');
+  });
+
+  it('getDashboard payload includes weeklyTrend array', async () => {
+    const nowMs = Date.UTC(2026, 3, 14, 0, 0, 0); // Apr 14 2026 = W2 of FY
+    mockSheets(async (key) => {
+      if (key === 'SALES_CURRENT_MONTH') {
+        return {
+          available: true, headers: HEADERS,
+          rows: [
+            makeRow({ 'Order #': 'WG1', 'Date': '05-04-2026', 'Status': 'Delivered', 'Total Amount with tax': '1000' }),
+            makeRow({ 'Order #': 'WG2', 'Date': '10-04-2026', 'Status': 'Delivered', 'Total Amount with tax': '2000' }),
+          ],
+        };
+      }
+      return { available: false };
+    });
+
+    const idx = require(INDEX_PATH);
+    idx.clearCache();
+    const result = await idx.getDashboard({ nowMs });
+
+    assert.ok(Array.isArray(result.weeklyTrend), 'weeklyTrend should be an array');
+    assert.ok(result.weeklyTrend.length >= 2, 'should have at least 2 weeks');
+    const entry = result.weeklyTrend[0];
+    assert.ok('week'      in entry, 'entry should have week');
+    assert.ok('dateRange' in entry, 'entry should have dateRange');
+    assert.ok('orders'    in entry, 'entry should have orders');
+    assert.ok('revenue'   in entry, 'entry should have revenue');
+    assert.ok('aov'       in entry, 'entry should have aov');
+  });
+});
+
+// ── Pass 2 Part B4: todaysOrders extended shape ───────────────────────────────
+
+describe('Pass 2 Part B4 — todaysOrders extended shape', () => {
+  let buildTodaysOrders, parseOrder;
+
+  beforeEach(() => {
+    buildTodaysOrders = require(AGG_PATH).buildTodaysOrders;
+    parseOrder = require(PARSE_PATH).parseOrder;
+  });
+  afterEach(() => clearMocks());
+
+  it('each row includes new fields: channelGroup, shippingState, acceptanceStatus, madeBy', () => {
+    const todayKey = '2026-04-28';
+    const order = parseOrder(makeRow({
+      'Order #': 'TO1', 'Date': '28-04-2026',
+      'Order Type': 'B2C',
+      'Shipping State': 'Maharashtra',
+      'Acceptance Status': 'Accepted',
+      'Order Made By': 'Arun Nair',
+      'Total Amount with tax': '1000',
+    }), 'tab');
+
+    const result = buildTodaysOrders([order], todayKey);
+    assert.equal(result.length, 1);
+    const row = result[0];
+    // Existing fields preserved
+    assert.ok('orderNumber'  in row, 'should have orderNumber');
+    assert.ok('customer'     in row, 'should have customer');
+    assert.ok('amount'       in row, 'should have amount');
+    assert.ok('status'       in row, 'should have status');
+    assert.ok('salesChannel' in row, 'should have salesChannel');
+    assert.ok('tag'          in row, 'should have tag');
+    assert.ok('time'         in row, 'should have time');
+    // New fields
+    assert.equal(row.channelGroup,    'D2C',         'channelGroup should be D2C');
+    assert.equal(row.shippingState,   'Maharashtra',  'shippingState should match');
+    assert.equal(row.acceptanceStatus,'Accepted',     'acceptanceStatus should match');
+    assert.equal(row.madeBy,          'Arun Nair',    'madeBy should match');
+  });
+
+  it('existing fields still present when order has null madeBy', () => {
+    const todayKey = '2026-04-28';
+    const order = parseOrder(makeRow({
+      'Order #': 'TO2', 'Date': '28-04-2026',
+      'Order Type': 'DS',
+      'Order Made By': '',
+      'Total Amount with tax': '500',
+    }), 'tab');
+
+    const result = buildTodaysOrders([order], todayKey);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].channelGroup, 'Partner – DS');
+    assert.equal(result[0].madeBy,       null);
   });
 });

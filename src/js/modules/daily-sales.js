@@ -31,21 +31,45 @@ export function createDailySalesModule() {
     // ── Phase 2: Filter state ─────────────────────────────────────
     // Mirrors filters.applied from the API response.
     dailySalesFilters: {
-      from: null,          // YYYY-MM-DD or null
-      to: null,            // YYYY-MM-DD or null
-      channels: [],        // string[]
-      orderType: 'all',    // 'all' | 'B2C' | 'B2B'
-      paymentMode: 'all',  // 'all' | specific value
-      status: 'realized',  // 'realized' | 'all' | specific status name
-      state: '',           // '' or specific state
-      printMethod: '',     // '' or specific tag
+      from: null,             // YYYY-MM-DD or null
+      to: null,               // YYYY-MM-DD or null
+      channels: [],           // string[]
+      orderType: 'all',       // 'all' | 'B2C' | 'B2B'
+      paymentMode: 'all',     // 'all' | specific value
+      status: 'realized',     // 'realized' | 'all' | specific status name
+      excludeStatuses: [],    // string[] — statuses to exclude (lens patch)
+      state: '',              // '' or specific state
+      printMethod: '',        // '' or specific tag/print method
+      acceptanceStatus: '',   // '' | 'Accepted' | 'Awaiting' | 'Rejected' (v5 new)
     },
 
-    // Which filter dropdown is open: 'date' | 'channel' | 'status' | null
+    // Which filter dropdown is open: 'date' | 'status' | 'acceptance' | 'state' | null
+    // Channel dropdown removed per UI Spec §14 — Order Type chips replace it
     _dsFilterDropdownOpen: null,
+
+    // ── v5 Weekly Trend chart ─────────────────────────────────────
+    _dsWeeklyMetric: 'revenue',  // 'revenue' | 'orders'
+    _dsWeeklyTooltip: {
+      visible: false,
+      x: 0, y: 0,
+      week: '', dateRange: '', orders: '', revenue: '', aov: '',
+    },
+
+    // ── v5 Concerns collapsible state ────────────────────────────
+    _dsConcernsPendingOpen: true,
+    _dsConcernsRejectedOpen: true,
+    _dsConcernsStuckOpen: false,
 
     // Debounce timer ref for filter changes
     _dsFilterDebounce: null,
+
+    // ── v5: Lens segment control ──────────────────────────────────
+    // 'realized' | 'active' | 'all' | 'custom'
+    dailySalesLens: 'realized',
+
+    // ── v5: Stat-card tooltip state ───────────────────────────────
+    // null | 'yesterday' | 'mtd' | 'ytd'
+    dailySalesActiveTooltip: null,
 
     // ── Phase 2: Drill sheet ──────────────────────────────────────
     dailySalesDrill: {
@@ -96,9 +120,17 @@ export function createDailySalesModule() {
     /**
      * Update a single filter key and debounce the reload by 500ms.
      * Prevents API spam when user clicks several chips in quick succession.
+     * When status or excludeStatuses change manually (not via applyLensFilter),
+     * check whether the result still matches a named lens — if not, mark as custom.
      */
     setDailyFilter(key, value) {
       this.dailySalesFilters[key] = value;
+
+      // When user manually touches status, re-evaluate lens
+      if (key === 'status' || key === 'excludeStatuses') {
+        this.dailySalesLens = this._detectLens();
+      }
+
       this._updateUrlHash();
 
       if (this._dsFilterDebounce) clearTimeout(this._dsFilterDebounce);
@@ -141,9 +173,12 @@ export function createDailySalesModule() {
         orderType: 'all',
         paymentMode: 'all',
         status: 'realized',
+        excludeStatuses: [],
         state: '',
         printMethod: '',
+        acceptanceStatus: '',
       };
+      this.dailySalesLens = 'realized';
       this._updateUrlHash();
       this.loadDailySales();
     },
@@ -219,8 +254,10 @@ export function createDailySalesModule() {
         (f.orderType && f.orderType !== 'all') ||
         (f.paymentMode && f.paymentMode !== 'all') ||
         (f.status && f.status !== 'realized') ||
+        (f.excludeStatuses && f.excludeStatuses.length > 0) ||
         f.state ||
-        f.printMethod
+        f.printMethod ||
+        f.acceptanceStatus
       );
     },
 
@@ -272,8 +309,10 @@ export function createDailySalesModule() {
       if (f.orderType && f.orderType !== 'all') params.set('orderType', f.orderType);
       if (f.paymentMode && f.paymentMode !== 'all') params.set('paymentMode', f.paymentMode);
       if (f.status && f.status !== 'realized') params.set('status', f.status);
+      if (f.excludeStatuses && f.excludeStatuses.length > 0) params.set('excludeStatuses', f.excludeStatuses.join(','));
       if (f.state) params.set('state', f.state);
       if (f.printMethod) params.set('printMethod', f.printMethod);
+      if (f.acceptanceStatus) params.set('acceptanceStatus', f.acceptanceStatus);
       return params.toString();
     },
 
@@ -288,16 +327,39 @@ export function createDailySalesModule() {
       if (!queryPart) return;
       const params = new URLSearchParams(queryPart);
 
-      this.dailySalesFilters = {
-        from: params.get('from') || null,
-        to: params.get('to') || null,
-        channels: params.get('channels') ? params.get('channels').split(',') : [],
-        orderType: params.get('orderType') || 'all',
-        paymentMode: params.get('paymentMode') || 'all',
-        status: params.get('status') || 'realized',
-        state: params.get('state') || '',
-        printMethod: params.get('printMethod') || '',
-      };
+      // Restore lens first; if present, derive status/excludeStatuses from it
+      const lensParam = params.get('lens');
+      if (lensParam && ['realized', 'active', 'all'].includes(lensParam)) {
+        this.dailySalesLens = lensParam;
+        const lensFilter = this._lensToFilter(lensParam);
+        this.dailySalesFilters = {
+          from: params.get('from') || null,
+          to: params.get('to') || null,
+          channels: params.get('channels') ? params.get('channels').split(',') : [],
+          orderType: params.get('orderType') || 'all',
+          paymentMode: params.get('paymentMode') || 'all',
+          status: lensFilter.status,
+          excludeStatuses: lensFilter.excludeStatuses,
+          state: params.get('state') || '',
+          printMethod: params.get('printMethod') || '',
+          acceptanceStatus: params.get('acceptanceStatus') || '',
+        };
+      } else {
+        // Custom or no lens — restore explicit filters
+        this.dailySalesLens = 'custom';
+        this.dailySalesFilters = {
+          from: params.get('from') || null,
+          to: params.get('to') || null,
+          channels: params.get('channels') ? params.get('channels').split(',') : [],
+          orderType: params.get('orderType') || 'all',
+          paymentMode: params.get('paymentMode') || 'all',
+          status: params.get('status') || 'realized',
+          excludeStatuses: params.get('excludeStatuses') ? params.get('excludeStatuses').split(',') : [],
+          state: params.get('state') || '',
+          printMethod: params.get('printMethod') || '',
+          acceptanceStatus: params.get('acceptanceStatus') || '',
+        };
+      }
     },
 
     /**
@@ -305,7 +367,32 @@ export function createDailySalesModule() {
      * Omits default values so clean state = just #daily-sales.
      */
     _updateUrlHash() {
-      const qs = this._filterToQueryString();
+      const f = this.dailySalesFilters;
+      const params = new URLSearchParams();
+
+      // Lens — written first for readability in the URL
+      if (this.dailySalesLens && this.dailySalesLens !== 'custom') {
+        params.set('lens', this.dailySalesLens);
+      }
+
+      // Non-lens filters
+      if (f.from) params.set('from', f.from);
+      if (f.to) params.set('to', f.to);
+      if (f.channels && f.channels.length > 0) params.set('channels', f.channels.join(','));
+      if (f.orderType && f.orderType !== 'all') params.set('orderType', f.orderType);
+      if (f.paymentMode && f.paymentMode !== 'all') params.set('paymentMode', f.paymentMode);
+
+      // When lens is custom, write explicit status/excludeStatuses to hash
+      if (this.dailySalesLens === 'custom') {
+        if (f.status && f.status !== 'realized') params.set('status', f.status);
+        if (f.excludeStatuses && f.excludeStatuses.length > 0) params.set('excludeStatuses', f.excludeStatuses.join(','));
+      }
+
+      if (f.state) params.set('state', f.state);
+      if (f.printMethod) params.set('printMethod', f.printMethod);
+      if (f.acceptanceStatus) params.set('acceptanceStatus', f.acceptanceStatus);
+
+      const qs = params.toString();
       const newHash = qs ? `#daily-sales?${qs}` : '#daily-sales';
       // Replace rather than push to avoid polluting browser history
       const url = window.location.pathname + window.location.search + newHash;
@@ -660,8 +747,8 @@ export function createDailySalesModule() {
 
       // Fill polygons: close path back along the bottom of the chart
       const bottomY = (PAD_TOP + chartH).toFixed(1);
-      const primaryFill = `${primaryPath} L ${toX(n - 1).toFixed(1)},${bottomY} L ${PAD_LEFT.toFixed(1)},${bottomY} Z`;
-      const secondaryFill = `${secondaryPath} L ${toX(n - 1).toFixed(1)},${bottomY} L ${PAD_LEFT.toFixed(1)},${bottomY} Z`;
+      const revenueFill = `${primaryPath} L ${toX(n - 1).toFixed(1)},${bottomY} L ${PAD_LEFT.toFixed(1)},${bottomY} Z`;
+      const ordersFill = `${secondaryPath} L ${toX(n - 1).toFixed(1)},${bottomY} L ${PAD_LEFT.toFixed(1)},${bottomY} Z`;
 
       // X-axis labels: show every 5th label (6 total for 30 days)
       const xLabels = [];
@@ -712,8 +799,8 @@ export function createDailySalesModule() {
       this._dsTrendPaths = {
         primaryPath,
         secondaryPath,
-        primaryFill,
-        secondaryFill,
+        revenueFill,
+        ordersFill,
         xLabels,
         gridLines,
         hoverCols,
@@ -750,7 +837,6 @@ export function createDailySalesModule() {
       const rect = container.getBoundingClientRect();
       const relX = event.clientX - rect.left;
       const relY = event.clientY - rect.top;
-      const metric = this._dsTrendMetric || 'revenue';
 
       // Keep tooltip in-bounds
       const TIP_W = 180;
@@ -774,6 +860,381 @@ export function createDailySalesModule() {
 
     dsTrendHideTooltip() {
       this._dsTrendTooltip = { ...this._dsTrendTooltip, visible: false };
+    },
+
+    // ── v5: Lens segment control ──────────────────────────────────
+
+    /**
+     * Map a lens name to the filter patch it applies.
+     * Single source of truth — used by applyLensFilter and _detectLens.
+     */
+    _lensToFilter(lens) {
+      const map = {
+        realized: { status: 'realized', excludeStatuses: [] },
+        active:   { status: 'all',      excludeStatuses: ['Cancelled', 'RTO', 'Lost', 'Draft Order'] },
+        all:      { status: 'all',      excludeStatuses: [] },
+      };
+      return map[lens] || map.realized;
+    },
+
+    /**
+     * Apply a named lens — patches status + excludeStatuses into filter state,
+     * marks selectedLens, updates hash, and triggers a debounced reload.
+     */
+    applyLensFilter(lens) {
+      const patch = this._lensToFilter(lens);
+      this.dailySalesLens = lens;
+      this.dailySalesFilters.status = patch.status;
+      this.dailySalesFilters.excludeStatuses = patch.excludeStatuses;
+      this._updateUrlHash();
+
+      if (this._dsFilterDebounce) clearTimeout(this._dsFilterDebounce);
+      this._dsFilterDebounce = setTimeout(() => {
+        this._dsFilterDebounce = null;
+        this.loadDailySales();
+      }, 300);
+    },
+
+    /**
+     * Inspect current filter state and return which named lens it matches,
+     * or 'custom' if it matches none.
+     */
+    _detectLens() {
+      const f = this.dailySalesFilters;
+      const status = f.status;
+      const excl = (f.excludeStatuses || []).slice().sort().join(',');
+
+      const lensExcl = {
+        realized: '',
+        active:   ['Cancelled', 'Draft Order', 'Lost', 'RTO'].sort().join(','),
+        all:      '',
+      };
+
+      if (status === 'realized' && excl === lensExcl.realized) return 'realized';
+      if (status === 'all'      && excl === lensExcl.active)   return 'active';
+      if (status === 'all'      && excl === lensExcl.all)       return 'all';
+      return 'custom';
+    },
+
+    // ── v5: Stat-card info tooltips ───────────────────────────────
+
+    /**
+     * Toggle a stat-card tooltip open/closed.
+     * id: 'yesterday' | 'mtd' | 'ytd'
+     */
+    toggleDsTooltip(id) {
+      this.dailySalesActiveTooltip = this.dailySalesActiveTooltip === id ? null : id;
+    },
+
+    /**
+     * Close any open stat-card tooltip.
+     */
+    closeDsTooltip() {
+      this.dailySalesActiveTooltip = null;
+    },
+
+    /**
+     * Build the tooltip data object for a given card.
+     * Returns { title, window, includes, excludes, otherFilters }
+     */
+    dsTooltipData(card) {
+      const ds = this.dailySales;
+      if (!ds) return {};
+
+      const cutoff = ds.yesterday?.date || ds.freshness?.dataCutoff || '';
+      const appliedStatusList = ds.filters?.appliedStatusList || [];
+      const excludeStatuses = ds.filters?.applied?.excludeStatuses || [];
+
+      // Compute card-specific window
+      let windowFrom = '';
+      let windowTo = cutoff;
+
+      if (card === 'yesterday') {
+        windowFrom = ds.yesterday?.date || cutoff;
+        windowTo = ds.yesterday?.date || cutoff;
+      } else if (card === 'mtd') {
+        // First of current month
+        if (cutoff) {
+          const [y, m] = cutoff.split('-').map(Number);
+          windowFrom = `${y}-${String(m).padStart(2, '0')}-01`;
+        }
+        windowTo = cutoff;
+      } else if (card === 'ytd') {
+        // April 1 of current Indian FY
+        if (cutoff) {
+          const [y, m] = cutoff.split('-').map(Number);
+          const fyYear = m >= 4 ? y : y - 1;
+          windowFrom = `${fyYear}-04-01`;
+        }
+        windowTo = cutoff;
+      }
+
+      const windowStr = windowFrom && windowTo
+        ? `${this.formatCutoffShort(windowFrom)} → ${this.formatCutoffShort(windowTo)} IST`
+        : '—';
+
+      // Includes
+      const includesStr = appliedStatusList.length > 0
+        ? appliedStatusList.join(', ')
+        : (this.dailySalesFilters.status === 'all' ? 'All statuses' : '—');
+
+      // Excludes
+      const excludesStr = excludeStatuses.length > 0 ? excludeStatuses.join(', ') : '—';
+
+      // Other non-default filters
+      const f = this.dailySalesFilters;
+      const others = [];
+      if (f.channels && f.channels.length > 0) others.push(`channel: ${f.channels.join(', ')}`);
+      if (f.orderType && f.orderType !== 'all') others.push(`type: ${f.orderType}`);
+      if (f.paymentMode && f.paymentMode !== 'all') others.push(`payment: ${f.paymentMode}`);
+      if (f.state) others.push(`state: ${f.state}`);
+      if (f.printMethod) others.push(`method: ${f.printMethod}`);
+      const otherStr = others.length > 0 ? others.join(' · ') : '—';
+
+      const titles = { yesterday: 'Yesterday', mtd: 'Month-to-Date', ytd: 'Year-to-Date' };
+
+      return {
+        title: titles[card] || card,
+        window: windowStr,
+        includes: includesStr,
+        includesCount: appliedStatusList.length,
+        excludes: excludesStr,
+        otherFilters: otherStr,
+      };
+    },
+
+    // ── v5: Banner stale-data helper ──────────────────────────────
+
+    /**
+     * Compute how many days the data is stale (dataCutoff vs yesterday.date).
+     * Returns integer ≥ 2 if stale, null otherwise (not stale / missing data).
+     */
+    _computeStaleDays() {
+      const cutoff = this.dailySales?.freshness?.dataCutoff;
+      const ydate = this.dailySales?.yesterday?.date;
+      if (!cutoff || !ydate) return null;
+
+      const cutoffMs = new Date(cutoff).getTime();
+      const ydateMs = new Date(ydate).getTime();
+      if (isNaN(cutoffMs) || isNaN(ydateMs)) return null;
+
+      const deltaDays = Math.round((ydateMs - cutoffMs) / 86400000);
+      return deltaDays >= 2 ? deltaDays : null;
+    },
+
+    /**
+     * Returns true when freshness data indicates a Sheets error
+     * (data is loaded but dataCutoff is null).
+     */
+    _isSheetsError() {
+      return !!this.dailySales && this.dailySales.freshness?.dataCutoff === null;
+    },
+
+    // ── v5: Weekly Trend (SVG bar chart) ─────────────────────────
+
+    setDsWeeklyMetric(metric) {
+      this._dsWeeklyMetric = metric;
+    },
+
+    /**
+     * Compute SVG bar chart data for the weekly trend panel.
+     * Returns { bars[], gridLines[], maxVal, W, H } or null.
+     */
+    _dsWeeklyChartData() {
+      const trend = this.dailySales?.weeklyTrend;
+      if (!Array.isArray(trend) || trend.length === 0) return null;
+
+      const metric = this._dsWeeklyMetric || 'revenue';
+      const W = 600;
+      const H = 180;
+      const PAD_LEFT = 48;
+      const PAD_RIGHT = 12;
+      const PAD_TOP = 12;
+      const PAD_BOTTOM = 28;
+      const chartW = W - PAD_LEFT - PAD_RIGHT;
+      const chartH = H - PAD_TOP - PAD_BOTTOM;
+
+      const values = trend.map(d => metric === 'orders' ? d.orders : d.revenue);
+      const maxVal = Math.max(...values, 1);
+      const n = trend.length;
+      const barW = Math.floor(chartW / n) - 4;
+      const xStep = chartW / n;
+
+      // Current week number (FY week = floor((fyOrdinal - 1) / 7) + 1)
+      // We consider the last week in the dataset as the current week
+      const currentWeek = trend[trend.length - 1]?.week;
+
+      const bars = trend.map((d, i) => {
+        const val = metric === 'orders' ? d.orders : d.revenue;
+        const barH = Math.max(2, (val / maxVal) * chartH);
+        const x = PAD_LEFT + i * xStep + (xStep - barW) / 2;
+        const y = PAD_TOP + chartH - barH;
+        return {
+          x: x.toFixed(1),
+          y: y.toFixed(1),
+          width: barW.toFixed(1),
+          height: barH.toFixed(1),
+          cx: (x + barW / 2).toFixed(1),
+          labelY: (PAD_TOP + chartH + 14).toFixed(1),
+          label: `W${d.week}`,
+          isCurrent: d.week === currentWeek,
+          week: d.week,
+          dateRange: d.dateRange,
+          orders: d.orders,
+          revenue: d.revenue,
+          aov: d.aov,
+        };
+      });
+
+      // Y-axis grid lines (3 lines)
+      const gridLines = [];
+      for (let g = 1; g <= 3; g++) {
+        const y = PAD_TOP + chartH - (g / 3) * chartH;
+        const val = maxVal * g / 3;
+        gridLines.push({
+          y: y.toFixed(1),
+          label: metric === 'orders' ? Math.round(val) : this._dsFormatAxisRevenue(val),
+        });
+      }
+
+      return { bars, gridLines, W, H, PAD_BOTTOM, PAD_TOP, chartH: PAD_TOP + chartH };
+    },
+
+    /**
+     * Show tooltip for weekly bar chart hover.
+     */
+    dsWeeklyShowTooltip(bar, event) {
+      const container = event.currentTarget?.closest('.ds-weekly-chart');
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const relX = event.clientX - rect.left;
+      const relY = event.clientY - rect.top;
+      const TIP_W = 180;
+      const TIP_H = 100;
+      let tipX = relX + 12;
+      let tipY = relY - 36;
+      if (tipX + TIP_W > rect.width) tipX = relX - TIP_W - 8;
+      if (tipY < 0) tipY = relY + 12;
+      if (tipY + TIP_H > rect.height) tipY = rect.height - TIP_H - 4;
+      this._dsWeeklyTooltip = {
+        visible: true,
+        x: tipX,
+        y: tipY,
+        week: `W${bar.week}`,
+        dateRange: bar.dateRange,
+        orders: bar.orders,
+        revenue: this.formatINR(bar.revenue),
+        aov: this.formatINR(bar.aov),
+      };
+    },
+
+    dsWeeklyHideTooltip() {
+      this._dsWeeklyTooltip = { ...this._dsWeeklyTooltip, visible: false };
+    },
+
+    // ── v5: MTD by Channel card click ────────────────────────────
+
+    /**
+     * Click on a channel card applies the matching orderType filter.
+     * If already active, deselects (returns to 'all').
+     * channelGroup: 'D2C' | 'Corporate' | 'Partner – DS' | 'Partner – Stores'
+     */
+    applyMtdChannelFilter(channelGroup) {
+      const map = {
+        'D2C':               'B2C',
+        'Corporate':         'Manual',
+        'Partner – DS':     'DS',
+        'Partner – Stores': 'Stores',
+      };
+      const orderType = map[channelGroup];
+      if (!orderType) return;
+      const current = this.dailySalesFilters.orderType;
+      this.setDailyFilter('orderType', current === orderType ? 'all' : orderType);
+    },
+
+    /**
+     * Returns true if the MTD channel card for a given channelGroup is active.
+     */
+    isMtdChannelActive(channelGroup) {
+      const map = {
+        'D2C':               'B2C',
+        'Corporate':         'Manual',
+        'Partner – DS':     'DS',
+        'Partner – Stores': 'Stores',
+      };
+      return this.dailySalesFilters.orderType === map[channelGroup];
+    },
+
+    // ── v5: Mix label translation ─────────────────────────────────
+
+    /**
+     * Translate Order Type raw value to display label per UI Spec §5 Panel 8.
+     * Template-only — raw value (item.name) still used for filter wiring.
+     */
+    dsOrderTypeLabel(raw) {
+      const map = { 'Manual': 'Corporate', 'B2C': 'D2C', 'DS': 'Drop-ship', 'Stores': 'B2B Stores' };
+      return map[raw] || raw;
+    },
+
+    /**
+     * Translate Sales Channel raw value to display label.
+     * Fixes COMMMERCE (3 m's) typo for display.
+     */
+    dsSalesChannelLabel(raw) {
+      if (!raw) return raw;
+      if (raw === 'COMMMERCE') return 'COMMERCE';
+      return raw;
+    },
+
+    // ── v5: Channel group pill color ─────────────────────────────
+
+    /**
+     * Returns CSS class suffix for channel group pill.
+     */
+    dsChannelGroupClass(channelGroup) {
+      if (!channelGroup) return 'ds-cg-pill--other';
+      const g = channelGroup.toLowerCase();
+      if (g === 'd2c') return 'ds-cg-pill--d2c';
+      if (g === 'corporate') return 'ds-cg-pill--corporate';
+      if (g.includes('ds')) return 'ds-cg-pill--ds';
+      if (g.includes('stores')) return 'ds-cg-pill--stores';
+      return 'ds-cg-pill--other';
+    },
+
+    // ── v5: Acceptance badge ──────────────────────────────────────
+
+    /**
+     * Returns CSS class for acceptance status badge.
+     */
+    dsAcceptanceClass(status) {
+      if (!status) return 'ds-acceptance--unknown';
+      const s = status.toLowerCase();
+      if (s === 'accepted') return 'ds-acceptance--accepted';
+      if (s === 'awaiting') return 'ds-acceptance--awaiting';
+      if (s === 'rejected') return 'ds-acceptance--rejected';
+      return 'ds-acceptance--unknown';
+    },
+
+    /**
+     * Returns row background class for order row based on acceptanceStatus.
+     */
+    dsOrderRowBg(acceptanceStatus) {
+      if (!acceptanceStatus) return '';
+      const s = acceptanceStatus.toLowerCase();
+      if (s === 'awaiting') return 'ds-order-row--awaiting';
+      if (s === 'rejected') return 'ds-order-row--rejected';
+      return '';
+    },
+
+    // ── v5: formatINRShort ────────────────────────────────────────
+
+    /**
+     * Compact INR formatter for axis labels: ₹47L, ₹4.7K, etc.
+     * Same as _dsFormatAxisRevenue but public for template use.
+     */
+    formatINRShort(amount) {
+      if (amount == null || isNaN(amount)) return '₹0';
+      return this._dsFormatAxisRevenue(amount);
     },
   };
 }
