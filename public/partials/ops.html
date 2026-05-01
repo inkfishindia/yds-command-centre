@@ -417,6 +417,7 @@
                 <option :value="v.Vendor" x-text="v.Vendor"></option>
               </template>
             </select>
+            <button class="btn btn-small" @click="opsStockFilters = { status: '', vendor: '', search: '' }">Clear</button>
           </div>
 
           <div x-show="opsStockLoading" class="skeleton-stack">
@@ -656,6 +657,7 @@
                 <option :value="v.Vendor" x-text="v.Vendor"></option>
               </template>
             </select>
+            <button class="btn btn-small" @click="opsProductsFilters = { tier: '', vendor: '', search: '' }">Clear</button>
           </div>
 
           <div x-show="opsProductsLoading" class="skeleton-stack">

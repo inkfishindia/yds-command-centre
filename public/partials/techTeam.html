@@ -333,6 +333,7 @@
             <option value="Chore">Chore</option>
           </select>
           <input type="text" x-model="techSprintSearch" placeholder="Search items..." class="filter-search">
+          <button class="btn btn-small" @click="techSystemFilter = ''; techPriorityFilter = ''; techTypeFilter = ''; techSprintSearch = ''">Clear</button>
         </div>
         <div class="kanban-board tech-sprint-board">
           <template x-for="status in ['Backlog', 'This Sprint', 'In Progress', 'In Review', 'Blocked', 'Done']" :key="status">

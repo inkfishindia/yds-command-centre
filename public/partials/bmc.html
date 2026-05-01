@@ -167,6 +167,9 @@
               <button class="filter-pill" :class="bmcFilter === 'owners' && 'filter-pill-active'" @click="bmcFilter = 'owners'">Owned</button>
               <button class="filter-pill" :class="bmcFilter === 'money' && 'filter-pill-active'" @click="bmcFilter = 'money'">Money</button>
             </div>
+            <div class="bmc-toolbar-group">
+              <button class="btn btn-small" @click="bmcSearch = ''; bmcFilter = 'highlights'; bmcFocus = ''">Clear</button>
+            </div>
             <div class="bmc-toolbar-group" x-show="bmcFocus">
               <span class="bmc-focus-label">Focused: <span x-text="getBmcFocusLabel()"></span></span>
               <button class="filter-pill" @click="clearBmcFocus()">Clear Focus</button>

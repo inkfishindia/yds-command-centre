@@ -289,6 +289,7 @@
               <option value="Retail">Retail</option>
               <option value="Corporate">Corporate</option>
             </select>
+            <button class="btn btn-small" @click="crmLeadFilters = { status: '', category: '', search: '' }">Clear</button>
             <span class="text-muted" style="margin-left: auto;" x-text="crmLeadsTotal + ' leads'"></span>
           </div>
           <div x-show="crmLeadsLoading" class="skeleton-stack">
@@ -357,6 +358,7 @@
               <option value="Arun">Arun</option>
               <option value="Ashwini">Ashwini</option>
             </select>
+            <button class="btn btn-small" @click="crmFlowFilters = { status: '', stage: '', owner: '' }">Clear</button>
             <span class="text-muted" style="margin-left: auto;" x-text="crmFlows.length + ' flows'"></span>
           </div>
           <div x-show="crmFlowsLoading" class="skeleton-stack">

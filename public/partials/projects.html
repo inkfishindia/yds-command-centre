@@ -20,6 +20,7 @@
           <button class="filter-pill filter-pill-mission" :class="{'filter-pill-active': projectsTypeFilter === 'Mission Brief'}" @click="projectsTypeFilter = 'Mission Brief'">Mission Brief</button>
           <button class="filter-pill filter-pill-initiative" :class="{'filter-pill-active': projectsTypeFilter === 'Initiative'}" @click="projectsTypeFilter = 'Initiative'">Initiative</button>
           <button class="filter-pill filter-pill-experiment" :class="{'filter-pill-active': projectsTypeFilter === 'Experiment'}" @click="projectsTypeFilter = 'Experiment'">Experiment</button>
+          <button class="btn btn-small" style="margin-left: auto;" @click="projectsFilter = 'Active'; projectsTypeFilter = ''">Clear</button>
         </div>
         <template x-if="projectsLoading">
           <div class="projects-grid">

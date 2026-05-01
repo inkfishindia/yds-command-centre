@@ -42,6 +42,7 @@
           <button class="filter-pill" :class="{'filter-pill-active': registryTypeFilter === 'backend'}" @click="registryTypeFilter = 'backend'">Backend</button>
           <button class="filter-pill" :class="{'filter-pill-active': registryTypeFilter === 'knowledge-base'}" @click="registryTypeFilter = 'knowledge-base'">Knowledge</button>
           <button class="filter-pill" :class="{'filter-pill-active': registryTypeFilter === 'integration'}" @click="registryTypeFilter = 'integration'">Integration</button>
+          <button class="btn btn-small" style="margin-left: auto;" @click="registryFilter = ''; registryTypeFilter = ''">Clear</button>
         </div>
         <template x-if="registryLoading">
           <div class="registry-grid">

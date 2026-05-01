@@ -39,11 +39,11 @@
     <!-- Stub buttons — non-functional, coming soon -->
     <div class="dc-sheet-stubs">
       <button class="dc-sheet-stub-btn" type="button" disabled aria-label="Voice input — coming soon" title="Coming soon">
-        <i data-lucide="mic" style="width:14px;height:14px" aria-hidden="true"></i>
+        <i data-lucide="mic" class="dc-icon-sm" aria-hidden="true"></i>
         Voice
       </button>
       <button class="dc-sheet-stub-btn" type="button" disabled aria-label="Attach file — coming soon" title="Coming soon">
-        <i data-lucide="paperclip" style="width:14px;height:14px" aria-hidden="true"></i>
+        <i data-lucide="paperclip" class="dc-icon-sm" aria-hidden="true"></i>
         Attach
       </button>
     </div>
@@ -71,7 +71,7 @@
           <span class="dc-spinner" aria-hidden="true"></span>
         </template>
         <template x-if="dropSubmitSuccess">
-          <i data-lucide="check" style="width:16px;height:16px;color:#fff" aria-hidden="true"></i>
+          <i data-lucide="check" style="width:16px;height:16px" aria-hidden="true"></i>
         </template>
         <span x-text="dropSubmitting && !dropSubmitSuccess ? 'Dropping...' : dropSubmitSuccess ? 'Dropped' : 'Drop'"></span>
       </button>
@@ -86,9 +86,9 @@
 
 <!-- §5: Cheatsheet modal -->
 <template x-if="dcCheatsheetOpen">
-  <div class="dc-cheatsheet" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" style="position:fixed">
+  <div class="dc-cheatsheet" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
     <button class="dc-cheatsheet-close" @click="dcCheatsheetOpen = false" aria-label="Close cheatsheet">
-      <i data-lucide="x" style="width:14px;height:14px" aria-hidden="true"></i>
+      <i data-lucide="x" class="dc-icon-sm" aria-hidden="true"></i>
     </button>
 
     <div class="dc-cheatsheet-section">
@@ -138,7 +138,7 @@
   aria-label="Drop a message into Colin's queue"
   title="Drop into queue (⌘K)"
 >
-  <i data-lucide="plus" style="width:24px;height:24px" aria-hidden="true"></i>
+  <i data-lucide="plus" class="dc-fab-icon" aria-hidden="true"></i>
 </button>
 
 <!-- Sticky header — x-init mounts keyboard + scroll-spy; $watch tears down when view changes -->
@@ -150,7 +150,7 @@
   "
 >
   <span class="dc-header-date" x-text="dcTodayLabel()"></span>
-  <div style="display:flex;align-items:center;gap:10px">
+  <div class="dc-header-actions">
     <!-- §4: Legend toggle (mobile) -->
     <template x-if="danColin">
       <button
@@ -161,7 +161,7 @@
         aria-label="Toggle focus area legend"
         title="Focus area colors"
       >
-        <i data-lucide="palette" style="width:12px;height:12px;vertical-align:middle" aria-hidden="true"></i>
+        <i data-lucide="palette" class="dc-icon-xs" aria-hidden="true"></i>
       </button>
     </template>
     <span class="dc-header-count" x-show="danColin">
@@ -251,9 +251,9 @@
 </div>
 
 <!-- Error state -->
-<div x-show="danColinLoadError && !danColin" style="padding:20px;text-align:center">
-  <p style="color:var(--red,#ef4444);font-size:14px" x-text="danColinLoadError"></p>
-  <button class="btn btn-small" style="margin-top:12px" @click="loadDanColin()">Retry</button>
+<div x-show="danColinLoadError && !danColin" class="dc-load-error">
+  <p class="dc-load-error-msg" x-text="danColinLoadError"></p>
+  <button class="btn btn-small dc-load-error-retry" @click="loadDanColin()">Retry</button>
 </div>
 
 <!-- Queue body -->
@@ -276,7 +276,7 @@
         <!-- §6: Empty state -->
         <div x-show="dcWaitingCount() === 0" class="dc-empty">
           <p x-text="dcEmptyHeadline('waiting')"></p>
-          <p style="font-size:13px;color:var(--text-muted)" x-text="dcEmptySubheadline('waiting')"></p>
+          <p class="dc-empty-subheadline" x-text="dcEmptySubheadline('waiting')"></p>
         </div>
 
         <template x-for="row in (danColin?.waiting || [])" :key="row.id">
@@ -353,8 +353,8 @@
                     <span>Saving...</span>
                   </template>
                   <template x-if="dcIsSaved(row.id)">
-                    <span style="display:inline-flex;align-items:center;gap:4px">
-                      <i data-lucide="check" style="width:14px;height:14px;color:var(--green,#22c55e)" aria-hidden="true"></i>
+                    <span class="dc-saved-indicator">
+                      <i data-lucide="check" class="dc-icon-sm dc-icon-saved" aria-hidden="true"></i>
                       Saved
                     </span>
                   </template>
@@ -381,7 +381,7 @@
         <!-- §6: Empty state -->
         <div x-show="dcNowCount() === 0" class="dc-empty">
           <p x-text="dcEmptyHeadline('now')"></p>
-          <p style="font-size:13px;color:var(--text-muted)" x-text="dcEmptySubheadline('now')"></p>
+          <p class="dc-empty-subheadline" x-text="dcEmptySubheadline('now')"></p>
         </div>
 
         <template x-for="row in (danColin?.now || [])" :key="row.id">
@@ -406,7 +406,7 @@
               aria-label="Last updated"
             ></span>
             <p class="dc-row-body" x-text="row.body"></p>
-            <span style="font-size:12px;color:var(--text-muted,#777);margin-top:4px;display:block">Tap to open</span>
+            <span class="dc-tap-hint">Tap to open</span>
           </div>
         </template>
       </div>
@@ -436,7 +436,7 @@
           <!-- §6: Empty state -->
           <div x-show="dcWatchCount() === 0" class="dc-empty">
             <p x-text="dcEmptyHeadline('watch')"></p>
-            <p style="font-size:13px;color:var(--text-muted)" x-text="dcEmptySubheadline('watch')"></p>
+            <p class="dc-empty-subheadline" x-text="dcEmptySubheadline('watch')"></p>
           </div>
 
           <template x-for="row in (danColin?.watch || [])" :key="row.id">
@@ -478,9 +478,9 @@
       <div class="dc-section-rows">
         <!-- §6: Drop empty state with dashed border + inbox icon -->
         <div x-show="dcDropCount() === 0" class="dc-empty dc-empty--drop">
-          <i data-lucide="inbox" style="width:16px;height:16px;color:var(--text-muted)" aria-hidden="true"></i>
-          <p x-text="dcEmptyHeadline('drop')" style="font-size:14px;color:var(--text-secondary)"></p>
-          <p x-text="dcEmptySubheadline('drop')" style="font-size:13px;color:var(--text-muted)"></p>
+          <i data-lucide="inbox" class="dc-icon-md" aria-hidden="true"></i>
+          <p x-text="dcEmptyHeadline('drop')" class="dc-empty-headline"></p>
+          <p x-text="dcEmptySubheadline('drop')" class="dc-empty-subheadline"></p>
         </div>
 
         <template x-for="row in (danColin?.drop || [])" :key="row.id">
@@ -533,7 +533,7 @@
           <!-- §6: Empty state -->
           <div x-show="dcClosedCount() === 0" class="dc-empty">
             <p x-text="dcEmptyHeadline('closed')"></p>
-            <p style="font-size:13px;color:var(--text-muted)" x-text="dcEmptySubheadline('closed')"></p>
+            <p class="dc-empty-subheadline" x-text="dcEmptySubheadline('closed')"></p>
           </div>
 
           <template x-for="row in (danColin?.closed || [])" :key="row.id">

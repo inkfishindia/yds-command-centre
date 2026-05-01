@@ -39,6 +39,7 @@
                 <button class="filter-pill" :class="{'filter-pill-active': decisionDateRange === '3months'}" @click="decisionDateRange = '3months'; expandedDecision = null">Last 3 Months</button>
                 <button class="filter-pill" :class="{'filter-pill-active': decisionDateRange === 'week'}" @click="decisionDateRange = 'week'; expandedDecision = null">This Week</button>
               </div>
+              <button class="btn btn-small" @click="decisionSearch = ''; decisionFocusArea = ''; decisionOwner = ''; decisionDateRange = 'all'; expandedDecision = null">Clear</button>
             </div>
             <template x-if="getFilteredDecisions().length === 0">
               <div class="empty-state">
