@@ -1,6 +1,5 @@
         <div class="view-header-bar">
           <div class="view-header-left">
-            <span class="view-header-emoji">📊</span>
             <div class="view-header-text">
               <h2 class="view-header-title" x-text="getGreeting()"></h2>
               <span class="view-header-subtitle" x-text="getTodayDate()"></span>
@@ -11,8 +10,8 @@
             <span class="view-refresh-label" x-show="lastRefresh" x-text="getDashboardRefreshLabel()"></span>
             <button class="btn btn-small btn-secondary" @click="showCreateCommitment = true">+ Commitment</button>
             <button class="btn btn-small btn-secondary" @click="showCreateDecision = true">+ Decision</button>
-            <button class="btn btn-small btn-icon" @click="loadDashboard()" :class="dashboardLoading && 'btn-spinning'">
-              <span class="refresh-icon">&#x21bb;</span> Refresh
+            <button class="btn btn-small btn-icon" @click="loadDashboard()" :class="dashboardLoading && 'btn-spinning'" aria-label="Refresh dashboard">
+              <i data-lucide="rotate-cw" class="dc-icon-sm" aria-hidden="true"></i> Refresh
             </button>
           </div>
         </div>
@@ -82,10 +81,16 @@
 
               <div class="mktops-area-metrics">
                 <template x-for="metric in getDashboardHeroMetrics()" :key="metric.id">
-                  <button class="mktops-area-metric-card area-card-button" @click="getDashboardMetricAction(metric.id)()">
+                  <button
+                    class="mktops-area-metric-card area-card-button"
+                    :class="'mktops-area-metric-card--' + (metric.tone || 'neutral')"
+                    @click="getDashboardMetricAction(metric.id)()"
+                  >
+                    <i :data-lucide="getDashboardMetricIcon(metric.id)" class="mktops-area-metric-icon" aria-hidden="true"></i>
                     <span class="mktops-area-metric-label" x-text="metric.label"></span>
                     <div class="mktops-area-metric-value" x-text="metric.value"></div>
                     <span class="mktops-area-metric-note" x-text="metric.note"></span>
+                    <i data-lucide="chevron-right" class="mktops-area-metric-chevron" aria-hidden="true"></i>
                   </button>
                 </template>
               </div>

@@ -126,6 +126,8 @@ export function createDashboardModule() {
         this.dashboardLoading = false;
         this.briefLoading = false;
         this._invalidateDashboardCaches();
+        // Re-init Lucide after Alpine re-renders the toned area-metric cards
+        this.$nextTick?.(() => window.lucide?.createIcons?.());
       }
     },
 
@@ -353,30 +355,39 @@ export function createDashboardModule() {
       const metrics = this.getGlobalMetrics() || {};
       const queueCount = (this.actionQueue?.dansQueueCount || 0) + (this.actionQueue?.runnersQueueCount || 0);
       const decisions = (this.dashboard?.recentDecisions || []).length;
+
+      const overdueCount = metrics.overdueCount || 0;
+      const openCommitments = metrics.openCommitments || 0;
+      const overdueRatio = openCommitments > 0 ? overdueCount / openCommitments : 0;
+
       return [
         {
           id: 'open',
           label: 'Open Commitments',
-          value: String(metrics.openCommitments || 0),
-          note: `${metrics.overdueCount || 0} overdue right now`,
+          value: String(openCommitments),
+          note: `${overdueCount} overdue right now`,
+          tone: overdueRatio > 0.5 ? 'critical' : overdueRatio > 0.2 ? 'warning' : overdueCount === 0 ? 'healthy' : 'neutral',
         },
         {
           id: 'queue',
           label: 'Action Queue',
           value: String(queueCount),
           note: `${this.actionQueue?.dansQueueCount || 0} for Dan, ${this.actionQueue?.runnersQueueCount || 0} for runners`,
+          tone: queueCount > 200 ? 'critical' : queueCount > 100 ? 'warning' : queueCount < 30 ? 'healthy' : 'neutral',
         },
         {
           id: 'projects',
           label: 'Active Projects',
           value: String(metrics.activeProjects || 0),
           note: 'Cross-functional work in motion',
+          tone: (metrics.activeProjects || 0) === 0 ? 'critical' : 'healthy',
         },
         {
           id: 'decisions',
           label: 'Recent Decisions',
           value: String(decisions),
           note: `${metrics.decisionsThisMonth || 0} taken this month`,
+          tone: (metrics.decisionsThisMonth || 0) > 0 ? 'healthy' : 'neutral',
         },
       ];
     },
@@ -389,6 +400,18 @@ export function createDashboardModule() {
         decisions: () => this.openNavigationTarget('decisions'),
       };
       return actions[metricId] || (() => {});
+    },
+
+    getDashboardMetricIcon(metricId) {
+      const icons = {
+        commitments: 'check-square',
+        open: 'check-square',
+        actionQueue: 'list-checks',
+        queue: 'list-checks',
+        projects: 'layers',
+        decisions: 'gavel',
+      };
+      return icons[metricId] || 'circle';
     },
 
     getDashboardPriorityCards() {
