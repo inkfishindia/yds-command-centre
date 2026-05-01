@@ -1,6 +1,15 @@
 ---
 name: verify
 description: "Run a verification loop on code changes before committing or deploying. Checks syntax, tests, security patterns, and API consistency. Use after implementing a feature, fixing a bug, or before creating a PR. Trigger with /verify or 'verify this', 'check before commit', 'run checks'."
+triggers:
+  - verify this
+  - verify
+  - check before commit
+  - run checks
+  - before pr
+  - before committing
+  - lint and test
+  - quality gate
 ---
 
 # /verify — Code Verification Loop

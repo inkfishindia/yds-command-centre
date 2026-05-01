@@ -66,9 +66,44 @@
         "matcher": "*",
         "hooks": [
           {
+            "type": "command",
+            "command": "node .claude/hooks/cross-project-session-stop.mjs",
+            "timeout": 5000
+          },
+          {
             "type": "prompt",
             "prompt": "If data/sessions/ exists: update handoff.md (under 150 lines) with: 1) What Was Accomplished — what you built/changed this session, 2) Key Decisions — choices made and why, 3) What To Do Next — pending work, blockers, next steps. Append new rows to decisions.md if any decisions were made (don't overwrite). Skip if data/sessions/ does not exist.",
             "model": "claude-haiku-4-5-20251001"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/cost-tracker.mjs",
+            "timeout": 5000,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/keyword-detector.mjs",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/verify-deliverables.mjs",
+            "timeout": 3000
           }
         ]
       }
@@ -87,11 +122,11 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Write",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "file=\"$CLAUDE_FILE_PATH\"; case \"$file\" in *.env|*.env.*|*credentials*|*secret*) echo 'BLOCKED: Cannot write to sensitive files' >&2; exit 2;; esac"
+            "command": "file=\"$CLAUDE_FILE_PATH\"; mode=\"${CLAUDE_PERMISSION_MODE:-default}\"; case \"$file\" in *.env|*.env.*|*credentials*|*secret*) echo 'BLOCKED: Cannot write to sensitive files' >&2; exit 2;; .claude/agents/*|.claude/hooks/*|.claude/skills/*) if [[ \"$mode\" != \"acceptEdits\" && \"$mode\" != \"bypassPermissions\" ]]; then echo 'BLOCKED: Cannot modify .claude/agents, .claude/hooks, or .claude/skills during a session. Switch to acceptEdits mode to make intentional config changes.' >&2; exit 2; fi;; esac"
           }
         ]
       }

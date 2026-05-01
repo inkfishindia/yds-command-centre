@@ -2,7 +2,7 @@
 
 **Purpose:** Single source of truth for what exists in the app. Read this before building anything. Update this when you change the app.
 
-**Last updated:** 2026-04-25 (Chat offline UX: When `chatAvailable=false`, offline banner displays with "Drop a note for Colin" CTA that opens a bottom-sheet composer. Submits POST `/api/dan-colin/drop` → row lands as Section=📥 Drop, Owner=Colin, Status=Open in Notion DB `00969f07`. Frontend: state fields `chatOfflineComposerOpen`, `chatOfflineBody`, `chatOfflineSubmitting`, `chatOfflineError` + methods `openChatOfflineComposer()`, `closeChatOfflineComposer()`, `submitChatOfflineDrop()` in `src/js/modules/chat.js`; banner + sheet markup in `public/partials/chat.html`; styles in `src/css/core.css`. Also: converted 16 remaining partial views from `<template x-if>` to `<div x-show>` to prevent view leak across navigations.)
+**Last updated:** 2026-05-01 (Sheets service refactored: 759-line god-file split into flat package with 9 siblings + 19-line shim entry. Public API frozen; entry path unchanged. See #80–#81. Also prior: Chat offline UX, 16 partial view template→show conversions.)
 
 ---
 
@@ -11,7 +11,7 @@
 ### Backend shape
 - `server.js` remains the thin Express entrypoint and route registrar.
 - `server/routes/*.js` now behave as controller-thin HTTP layers.
-- Infrastructure access stays in services like `server/services/notion.js`, `server/services/sheets.js`, `server/services/hydration.js`, and `server/services/github.js`.
+- Infrastructure access stays in services like `server/services/notion.js`, `server/services/sheets/` (flat package), `server/services/hydration.js`, and `server/services/github.js`.
 - Domain orchestration now lives in dedicated services:
   - `server/services/dashboard-service.js`
   - `server/services/projects-service.js`
@@ -520,7 +520,9 @@ Source: Google Sheets workbook "YDC - sales report" (`DAILY_SALES_SPREADSHEET_ID
 
 ---
 
-## Sheets Service (`server/services/sheets.js`)
+## Sheets Service (`server/services/sheets/`)
+
+**Structure:** Refactored from single god-file (759 lines) into flat package (9 sibling files). Entry point `server/services/sheets.js` is a 19-line shim that re-exports the public API; callers continue to do `require('../services/sheets')` unchanged. See `server/services/sheets/FILE-MAP.md` for per-file inventory and decision log #80–#81.
 
 ### Key Functions
 | Function | Returns | Cached | Notes |
@@ -761,16 +763,16 @@ Header → Layout → Sidebar Nav → Content → Chat Layout → Messages → C
 | `test/focus-area-detail.test.js` | Route + service module loads, detail enrichment logic (overdue, owner names, date formats, sort), person metrics (capacity, counts) | `server/routes/notion.js`, `server/services/notion.js` |
 | `test/create-commitment.test.js` | Create commitment/decision exports, validation logic, response shape | `server/routes/commitments.js`, `server/routes/decisions.js` |
 | `test/action-queue.test.js` | Queue filtering, severity sorting, Dan vs Runner queue separation | `server/routes/notion.js` |
-| `test/sheets-service.test.js` | Module load, isConfigured(), getPipelineData() graceful degradation, cache | `server/services/sheets.js` |
+| `test/sheets-service.test.js` | Module load, isConfigured(), getPipelineData() graceful degradation, cache | `server/services/sheets/` (via shim) |
 | `test/commitments-write.test.js` | Create commitment POST payload, approval flow, Notion write | `server/routes/commitments.js` |
 | `test/factory-config.test.js` | Factory pattern, route exports | `server/routes/factory.js` |
 | `test/notebooks.test.js` | Route loading, service exports, full parse validation, structure, categories, notebooks array | `server/routes/notebooks.js`, `server/services/notebooks.js` |
 | `test/marketing-ops.test.js` | Route loading, service functions (getCampaigns, getContentCalendar, getSequences, getSessionsLog, getMarketingOpsSummary), 5 endpoints, optional filters | `server/routes/marketing-ops.js`, `server/services/notion.js` |
-| `test/tech-team.test.js` | Route loading, notion service exports (6 functions), GitHub service exports + unconfigured behavior, database registration (4 DBs), PATCH validation (property/value whitelist), sheets cascade export | `server/routes/tech-team.js`, `server/services/notion.js`, `server/services/github.js`, `server/services/sheets.js` |
-| `test/sheets-service.test.js` | Module load, SHEET_REGISTRY (25 sheets), isConfigured(), isSpreadsheetConfigured(), fetchSheet(), appendRow(), updateRow(), getReadWriteClient(), cache behavior | `server/services/sheets.js` |
+| `test/tech-team.test.js` | Route loading, notion service exports (6 functions), GitHub service exports + unconfigured behavior, database registration (4 DBs), PATCH validation (property/value whitelist), sheets cascade export | `server/routes/tech-team.js`, `server/services/notion.js`, `server/services/github.js`, `server/services/sheets/` |
+| `test/sheets-service.test.js` | Module load, SHEET_REGISTRY (25 sheets), isConfigured(), isSpreadsheetConfigured(), fetchSheet(), appendRow(), updateRow(), getReadWriteClient(), cache behavior | `server/services/sheets/` (via shim) |
 | `test/hydration.test.js` | normalizeId() (numeric/alphanumeric handling), hydrateData() (FK resolution), hydrateSheetData() (integration with sheets), HYDRATION_MAP (24 relationships) | `server/services/hydration.js` |
 | `test/bmc.test.js` | Route loading, GET / (all 11 sections parallel), GET /:section (single section), graceful degradation, stats computation, hydration integration | `server/routes/bmc.js`, `server/services/hydration.js` |
-| `test/crm.test.js` | Route loading, 8 endpoints (GET /, /people, /projects, /tasks, /campaigns, /business-units, POST /tasks, PATCH /tasks/:rowIdx), optional filters, hydration integration | `server/routes/crm.js`, `server/services/hydration.js`, `server/services/sheets.js` |
+| `test/crm.test.js` | Route loading, 8 endpoints (GET /, /people, /projects, /tasks, /campaigns, /business-units, POST /tasks, PATCH /tasks/:rowIdx), optional filters, hydration integration | `server/routes/crm.js`, `server/services/hydration.js`, `server/services/sheets/` |
 | `test/marketing-tools.test.js` | 4 tool definitions, approval flags (all No), input schemas, customer_psychology_generator, competitor_analysis, content_strategy_generator, campaign_ideator | `server/tools/marketing-tools.js` |
 | `test/store-tools.test.js` | 2 tool definitions, approval flags (store_expert_query No, store_expert_update Yes), input schemas, path traversal protection | `server/tools/store-tools.js` |
 | `test/system-map.test.js` | Module load, buildSystemMap() export, caching behavior (60s TTL), force cache bust | `server/services/system-map-service.js` |

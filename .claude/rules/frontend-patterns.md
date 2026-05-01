@@ -20,3 +20,6 @@ paths:
 ## SSE Handling
 - Chat responses stream via SSE. The event handler in `app.js` routes by event type: `text` → append to message, `approval` → show approval UI, `error` → display error, `done` → finalize.
 - Do not poll. Do not use fetch for streaming. Use `EventSource` or the existing SSE client pattern.
+
+## External References
+- Alpine.js, ECharts, Chart.js, Preline (port-only) docs live in [`.claude/rules/external-references.md`](external-references.md). Read it before adding a charting lib or copying a Preline snippet.

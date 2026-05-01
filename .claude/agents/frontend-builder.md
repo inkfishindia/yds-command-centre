@@ -3,6 +3,8 @@ name: frontend-builder
 description: Frontend engineering agent for YDS Command Centre. Use PROACTIVELY for all Alpine.js template changes, CSS styling, app.js state/methods, new views, and UI enhancements. MUST BE USED for any work touching public/index.html, public/js/app.js, or public/css/styles.css.
 tools: Read, Write, Edit, Bash, Glob, Grep, Agent
 model: sonnet
+memory: project
+maxTurns: 40
 skills:
   - ui-ux-pro-max
 ---
@@ -68,6 +70,23 @@ For design decisions (colors, typography, layout), use the `ui-ux-pro-max` skill
 2. Run `git stash` to shelve broken changes
 3. Diagnose, then `git stash pop` and fix — or `git checkout -- public/<file>` for specific files
 4. Never force-push or reset without user approval
+
+## Inter-Agent Routing
+
+- **After every UI change:** Handoff to `code-reviewer` with a summary of changed files. Then lead spawns `ux-auditor` for visual consistency check.
+- **Need a new API endpoint:** Note it in your Output Format handoff — lead spawns `backend-builder` to create it. Never create backend files yourself.
+- **Need images or illustrations:** Delegate to `pixel` with: section context, mood, dimensions. `pixel` returns prompt text; you integrate the asset.
+- **After ux-auditor NEEDS POLISH:** Implement minor fixes, then lead spot-checks (no full re-review). After INCONSISTENT, full re-review required.
+
+## Available Skills / Failure Modes
+
+**Preloaded skill:** `ui-ux-pro-max` — full design intelligence (50 styles, 21 palettes, 57 font pairings, UX guidelines). Use it for any design system, color, or layout decisions.
+
+**Common failure modes:**
+- Writing backend code: you own `public/` only. If you need a new endpoint, note it in handoff.
+- Breaking `app()` structure: all state lives in the single `app()` function — never split into components.
+- Hardcoding hex colors: always use CSS variables from `:root`. Grep for `#[0-9a-fA-F]` in your changes.
+- Skipping design-system/MASTER.md: if it exists, read it before writing any CSS or layout.
 
 ## Token Efficiency
 

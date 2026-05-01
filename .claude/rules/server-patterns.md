@@ -21,3 +21,6 @@ paths:
 ## Error Handling
 - Wrap every async handler: `try/catch`, log the error, return `{ error: message }` with appropriate HTTP status.
 - Never let an unhandled promise rejection crash the SSE stream.
+
+## External References
+- Express.js routing docs (and the Alpine/ECharts/Chart.js/Preline references for cross-stack work) live in [`.claude/rules/external-references.md`](external-references.md). When in doubt about routing/middleware/error-handler patterns, read the official doc — translate ESM examples to CommonJS.
