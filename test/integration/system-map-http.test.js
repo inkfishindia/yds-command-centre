@@ -1,9 +1,9 @@
 'use strict';
 
-const { describe, it, before, after } = require('node:test');
+const { describe, it, before: _before, after: _after } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
-const path = require('node:path');
+const _path = require('node:path');
 
 const PORT = 3001;
 const BASE_URL = `http://localhost:${PORT}`;
@@ -61,7 +61,7 @@ function httpGet(url) {
             headers: res.headers,
             body: JSON.parse(data),
           });
-        } catch (e) {
+        } catch {
           resolve({
             status: res.statusCode,
             headers: res.headers,

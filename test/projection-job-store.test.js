@@ -1,6 +1,6 @@
 'use strict';
 
-const { afterEach, describe, it } = require('node:test');
+const { beforeEach, afterEach, describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -22,6 +22,10 @@ function stubModule(modulePath, exports) {
 }
 
 describe('Projection Job Store', () => {
+  beforeEach(async () => {
+    await fs.rm(JOBS_PATH, { force: true });
+  });
+
   afterEach(async () => {
     delete require.cache[DB_PATH];
     delete require.cache[STORE_PATH];

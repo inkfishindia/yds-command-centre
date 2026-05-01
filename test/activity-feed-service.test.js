@@ -7,7 +7,7 @@
  * Pattern mirrors test/dan-colin-service.test.js (node:test built-in runner).
  */
 
-const { describe, it, beforeEach, afterEach } = require('node:test');
+const { describe, it, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 

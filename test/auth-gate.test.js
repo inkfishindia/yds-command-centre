@@ -150,7 +150,7 @@ describe('Auth Gate', () => {
         cookie: 'yds_cc_auth=secret',
       },
     }, {
-      status(code) {
+      status(_code) {
         statusCalled = true;
         return this;
       },

@@ -1,6 +1,6 @@
 'use strict';
 
-const { describe, it, afterEach, before, after } = require('node:test');
+const { describe, it, afterEach, before: _before, after: _after } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -321,7 +321,7 @@ describe('system-map route', () => {
 
     await handler({ query: { force: 'true' } }, {
       json() {},
-      status(c) { return { json() {} }; },
+      status(_c) { return { json() {} }; },
     });
 
     assert.equal(capturedForce, true, 'force=true passed through from query param');
