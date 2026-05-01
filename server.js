@@ -43,6 +43,8 @@ app.use('/api', (req, res, next) => {
     '/marketing-ops',
     '/tech-team',
     '/google-ads',
+    '/factory',
+    '/bmc',
   ];
   const mediumCachePaths = [
     '/skills',
