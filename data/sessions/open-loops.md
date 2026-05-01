@@ -86,7 +86,7 @@ Work started but not completed. SessionStart surfaces these first.
 | 2026-05-01 | Batch D browser smoke test | Hard-refresh `/bmc` (canvas blocks, hero metrics, spotlights, detail panels), `/crm` (detail-panel rows in drilldowns), `/knowledge` + `/system-map` (reg-stat tiles, reg-card grid, reg-link rows), `/marketing-ops` (bmc-canvas/block embedding). NO style regressions vs current state | Pending Dan | 0d |
 | 2026-05-01 | Phase 3 CSS Step 3 — retire styles.css safety-net link | After all Step 2 batches land + green leakage check: remove `<link href="/css/styles.css">` from `public/index.html` and `styles.css` entry from `scripts/build-assets.mjs`. Verify lint green. Decision row alongside | Queued | 0d |
 
-| 2026-05-02 | Push 13 commits to origin/main | Local commits `5f48e60`..`a6942b2`. Vercel auto-deploys on push. Browser smoke for V5 / tone-coded cards / Phase 3 CSS / Google Ads / filters Clear buttons all still pending — Dan to decide: smoke first, or push and smoke prod | Pending Dan | 0d |
+| 2026-05-02 | Push 13 commits to origin/main | Local commits `5f48e60`..`a6942b2` + stop-hook update `46fb590` | Done — pushed 2026-05-02 02:05 (`ae9ed09..46fb590`, 14 commits). Vercel auto-deploy triggered. Browser smoke prod still pending | 0d |
 
 Mark previously open loops as DONE this session:
 - 2026-04-30 row #10 "Master Spec implementation choice" — separate parallel work track, status row noted as Done already
