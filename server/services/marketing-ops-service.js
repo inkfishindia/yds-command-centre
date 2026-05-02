@@ -44,6 +44,13 @@ function normalizeContentItem(item) {
     caption: item['Caption / Copy'] || '',
     visualBrief: item['Visual Brief'] || '',
     notes: item.Notes || item.Hook || '',
+    // Phase B — new MCC fields
+    contentSeries: item['Content Series'] || null,
+    repurposeOpportunities: Array.isArray(item['Repurpose Opportunities']) ? item['Repurpose Opportunities'] : [],
+    seasonalTag: Array.isArray(item['Seasonal Tag']) ? item['Seasonal Tag'] : [],
+    cta: item.CTA || null,
+    trackingUrl: item['Tracking URL'] || null,
+    hashtags: item.Hashtags || '',
   };
 }
 

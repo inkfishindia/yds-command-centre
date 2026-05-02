@@ -29,14 +29,14 @@ async function schedulePost(postId, scheduledFor) {
     throw new Error('Cannot schedule more than 1 year in advance');
   }
   
-  // Update scheduled date in Notion
+  // Update scheduled date in Notion (stored in Publish Date)
   const notion = require('../notion');
   await notion.updatePageProperties(postId, {
-    'Scheduled For': { date: { start: scheduledFor, end: null } },
+    'Publish Date': { date: { start: scheduledFor, end: null } },
   });
-  
-  // Update status to scheduled
-  await drafter.updateStatus(postId, 'scheduled');
+
+  // Update status to Scheduled (Content Calendar vocabulary)
+  await drafter.updateStatus(postId, 'Scheduled');
   
   return {
     id: postId,
@@ -54,11 +54,11 @@ async function unschedulePost(postId) {
   // Clear scheduled date
   const notion = require('../notion');
   await notion.updatePageProperties(postId, {
-    'Scheduled For': { date: null },
+    'Publish Date': { date: null },
   });
-  
-  // Move back to draft
-  await drafter.updateStatus(postId, 'draft');
+
+  // Move back to Drafted (Content Calendar vocabulary)
+  await drafter.updateStatus(postId, 'Drafted');
   
   return {
     id: postId,
@@ -115,7 +115,7 @@ async function reschedulePost(postId, newScheduledFor) {
   // Update the scheduled time
   const notion = require('../notion');
   await notion.updatePageProperties(postId, {
-    'Scheduled For': { date: { start: newScheduledFor, end: null } },
+    'Publish Date': { date: { start: newScheduledFor, end: null } },
   });
   
   return {

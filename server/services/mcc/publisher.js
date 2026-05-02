@@ -60,17 +60,19 @@ async function requestPublishApproval(postId) {
     throw new Error('Post not found');
   }
   
-  if (post.status !== 'scheduled') {
+  // Accept Scheduled or its CC equivalent
+  if (post.status !== 'Scheduled' && post.status !== 'scheduled') {
     throw new Error(`Cannot request approval for post in status: ${post.status}`);
   }
-  
-  // Update status to awaiting-approval
-  await drafter.updateStatus(postId, 'awaiting-approval');
+
+  // Update status to Brand Review (awaiting-approval equivalent)
+  await drafter.updateStatus(postId, 'Brand Review');
   
   return {
     id: postId,
-    status: 'awaiting-approval',
+    status: 'Brand Review',
     platforms: post.platforms,
+    contentType: post.contentType,
     body: post.body,
     mediaUrls: post.mediaUrls,
   };
@@ -88,8 +90,8 @@ async function publish(postId) {
     throw new Error('Post not found');
   }
   
-  // Set to publishing status
-  await drafter.updateStatus(postId, 'publishing');
+  // Set to Brand Review / publishing hold
+  await drafter.updateStatus(postId, 'Brand Review');
   
   const platformPostIds = {};
   const errors = [];
@@ -145,11 +147,11 @@ async function publish(postId) {
     if (someSucceeded) {
       // Partial success - update with what succeeded
       await drafter.setPlatformPostIds(postId, platformPostIds);
-      await drafter.updateStatus(postId, 'published');
+      await drafter.updateStatus(postId, 'Published');
       await drafter.setFailureReason(postId, `Partial: ${errors.join('; ')}`);
     } else {
-      // Complete failure
-      await drafter.updateStatus(postId, 'failed');
+      // Complete failure — Brand Review + Brand Review Notes = reason
+      await drafter.updateStatus(postId, 'Brand Review');
       await drafter.setFailureReason(postId, errors.join('; '));
     }
     
@@ -163,7 +165,7 @@ async function publish(postId) {
   
   // All platforms succeeded
   await drafter.setPlatformPostIds(postId, platformPostIds);
-  await drafter.updateStatus(postId, 'published');
+  await drafter.updateStatus(postId, 'Published');
   
   return {
     id: postId,
@@ -184,7 +186,7 @@ async function publishNow(postId) {
     throw new Error('Post not found');
   }
   
-  if (post.status !== 'scheduled' && post.status !== 'draft') {
+  if (post.status !== 'Scheduled' && post.status !== 'Drafted' && post.status !== 'scheduled' && post.status !== 'draft') {
     throw new Error(`Cannot publish now - post status is: ${post.status}`);
   }
   
@@ -208,9 +210,9 @@ async function runSchedulerTick() {
   
   for (const post of duePosts) {
     try {
-      // For each due post, set to awaiting-approval
+      // For each due post, set to Brand Review (awaiting-approval equivalent)
       // Actual publishing happens on Dan's approval
-      await drafter.updateStatus(post.id, 'awaiting-approval');
+      await drafter.updateStatus(post.id, 'Brand Review');
       results.triggered++;
     } catch (err) {
       results.errors.push({ postId: post.id, error: err.message });

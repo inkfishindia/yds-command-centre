@@ -14,11 +14,11 @@ const { enqueueWrite } = require('../write-queue');
 /**
  * Create a new content calendar item in CONTENT_CALENDAR.
  */
-async function createContentCalendarItem({ name, status, contentType, channels, publishDate, owner, campaignId, notes, contentPillar, hook, audienceSegment, productFocus, caption, visualBrief, igPillar, hookPattern, publishedSlot }) {
+async function createContentCalendarItem({ name, status, contentType, channels, publishDate, owner, campaignId, notes, contentPillar, hook, audienceSegment, productFocus, caption, visualBrief, igPillar, hookPattern, publishedSlot, contentSeries, repurposeOpportunities, seasonalTag, cta, trackingUrl, hashtags }) {
   return enqueueWrite(async () => {
     const notion = getClient();
     const properties = {
-      Name: { title: [{ text: { content: name } }] },
+      Title: { title: [{ text: { content: name } }] },
     };
 
     if (status) {
@@ -89,6 +89,26 @@ async function createContentCalendarItem({ name, status, contentType, channels, 
       properties['Published Slot'] = { select: { name: publishedSlot } };
     }
 
+    // Phase B MCC fields
+    if (contentSeries) {
+      properties['Content Series'] = { select: { name: contentSeries } };
+    }
+    if (Array.isArray(repurposeOpportunities) && repurposeOpportunities.length > 0) {
+      properties['Repurpose Opportunities'] = { multi_select: repurposeOpportunities.map(r => ({ name: r })) };
+    }
+    if (Array.isArray(seasonalTag) && seasonalTag.length > 0) {
+      properties['Seasonal Tag'] = { multi_select: seasonalTag.map(t => ({ name: t })) };
+    }
+    if (cta) {
+      properties['CTA'] = { select: { name: cta } };
+    }
+    if (trackingUrl) {
+      properties['Tracking URL'] = { url: trackingUrl };
+    }
+    if (hashtags) {
+      properties['Hashtags'] = { rich_text: [{ text: { content: hashtags } }] };
+    }
+
     const result = await withRetry(() => notion.pages.create({
       parent: { database_id: DB.CONTENT_CALENDAR },
       properties,
@@ -106,13 +126,13 @@ async function createContentCalendarItem({ name, status, contentType, channels, 
 /**
  * Update properties on an existing content calendar item.
  */
-async function updateContentCalendarItem(pageId, { name, status, contentType, channels, publishDate, notes, owner, contentPillar, hook, audienceSegment, productFocus, caption, visualBrief, igPillar, hookPattern, publishedSlot }) {
+async function updateContentCalendarItem(pageId, { name, status, contentType, channels, publishDate, notes, owner, contentPillar, hook, audienceSegment, productFocus, caption, visualBrief, igPillar, hookPattern, publishedSlot, contentSeries, repurposeOpportunities, seasonalTag, cta, trackingUrl, hashtags }) {
   return enqueueWrite(async () => {
     const notion = getClient();
     const properties = {};
 
     if (name !== undefined) {
-      properties['Name'] = { title: [{ text: { content: name } }] };
+      properties['Title'] = { title: [{ text: { content: name } }] };
     }
 
     if (status !== undefined) {
@@ -174,6 +194,26 @@ async function updateContentCalendarItem(pageId, { name, status, contentType, ch
       properties['Published Slot'] = { select: { name: publishedSlot } };
     }
 
+    // Phase B MCC fields
+    if (contentSeries !== undefined) {
+      properties['Content Series'] = contentSeries ? { select: { name: contentSeries } } : { select: null };
+    }
+    if (repurposeOpportunities !== undefined) {
+      properties['Repurpose Opportunities'] = { multi_select: (repurposeOpportunities || []).map(r => ({ name: r })) };
+    }
+    if (seasonalTag !== undefined) {
+      properties['Seasonal Tag'] = { multi_select: (seasonalTag || []).map(t => ({ name: t })) };
+    }
+    if (cta !== undefined) {
+      properties['CTA'] = cta ? { select: { name: cta } } : { select: null };
+    }
+    if (trackingUrl !== undefined) {
+      properties['Tracking URL'] = trackingUrl ? { url: trackingUrl } : { url: null };
+    }
+    if (hashtags !== undefined) {
+      properties['Hashtags'] = { rich_text: hashtags ? [{ text: { content: hashtags } }] : [] };
+    }
+
     const result = await withRetry(() => notion.pages.update({
       page_id: pageId,
       properties,
@@ -189,7 +229,8 @@ async function updateContentCalendarItem(pageId, { name, status, contentType, ch
 }
 
 /**
- * Update a campaign's Stage or Status property.
+ * Update a campaign property.
+ * Supported: Stage, Status, Type, Spent, Target ROAS, Actual ROAS
  */
 async function updateCampaignProperty(pageId, property, value) {
   return enqueueWrite(async () => {
@@ -200,6 +241,14 @@ async function updateCampaignProperty(pageId, property, value) {
       properties.Stage = { select: { name: value } };
     } else if (property === 'Status') {
       properties.Status = { select: { name: value } };
+    } else if (property === 'Type') {
+      properties.Type = { select: { name: value } };
+    } else if (property === 'Spent') {
+      properties.Spent = { number: Number(value) };
+    } else if (property === 'Target ROAS') {
+      properties['Target ROAS'] = { number: Number(value) };
+    } else if (property === 'Actual ROAS') {
+      properties['Actual ROAS'] = { number: Number(value) };
     } else {
       throw new Error('Unsupported campaign property: ' + property);
     }

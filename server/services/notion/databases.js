@@ -40,6 +40,9 @@ const DB = {
   TEMPLATE_LIBRARY: 'ff498859fead4048b9d6ea250b4ffc19',
   APPROVALS_LOG: '352b4779a93742e59553f9247317ed94',
   WEEKLY_OPS_LOG: '450968bb4a5042d4bab2590d99b3d03d',
+  // Hub B — Marketing Log + Campaign Decisions (added Phase B, Decision #102)
+  MARKETING_LOG: '3ca17008a2994dcfa662300438a9e295',       // Marketing Log — Type/Area/Tags capture stream
+  CAMPAIGN_DECISIONS: '36f79d19dbfe4fddb593f919db15e8b2',  // Campaign Decisions — marketing-scoped decision log
 };
 
 // Known AI Expert Panel page IDs — excluded from people/team queries
@@ -79,6 +82,8 @@ function listDatabases() {
     { id: DB.TEMPLATE_LIBRARY, name: 'Template Library', icon: '🧩', description: 'Reusable carousel/reel/single/story templates by pillar' },
     { id: DB.APPROVALS_LOG, name: 'Approvals Log', icon: '✋', description: 'Append-only Brand Editor decisions log + 2-revision-kill trigger' },
     { id: DB.WEEKLY_OPS_LOG, name: 'Weekly Ops Log', icon: '📅', description: 'Friday IG pulse rollup feeding Decisions DB' },
+    { id: DB.MARKETING_LOG, name: 'Marketing Log', icon: '📋', description: 'Marketing capture stream — observations, ideas, decisions, data points by Area/Type/Tags' },
+    { id: DB.CAMPAIGN_DECISIONS, name: 'Campaign Decisions', icon: '⚖️', description: 'Marketing-specific decision log scoped to campaigns' },
   ];
 }
 

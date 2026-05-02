@@ -147,6 +147,7 @@ app.use('/api/activity-feed', require('./server/routes/activity-feed'));
 app.use('/api/daily-sales', require('./server/routes/daily-sales'));
 app.use('/api/google-ads', require('./server/routes/google-ads'));
 app.use('/api/mcc', require('./server/routes/mcc'));
+app.use('/api/marketing-log', require('./server/routes/marketing-log'));
 
 // Static file serving — Alpine.js frontend from public/
 // Cache JS/CSS for 1 hour (assets are rebuilt on deploy); HTML always revalidates.

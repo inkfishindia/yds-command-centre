@@ -1,5 +1,181 @@
 # Session Handoff — Command Centre
 
+## 2026-05-02 18:00 — Phase B bug suspects verified + fixed; code-reviewer APPROVED; ready to commit
+
+**What Was Accomplished:**
+
+Resumed from 17:30 brief. Verified both gating bug suspects + ran final code-reviewer pass.
+
+**Bug verification (using Notion MCP `notion-fetch` for live schema + direct file reads):**
+- **Bug #1 CONFIRMED** — Content Calendar (data source `a3066b81-c26c-453d-aed2-4588c92ad7c5`, DB id `227f3365feab476e88791f2a4d0a72b9`) title property is named `Title`, not `Name`. Live schema fetch shows `"Title":{"description":"","name":"Title","type":"title"}` — there is no `Name` property. Existing reads in `reads/marketing-ops.js` had a fallback (`Name || Title || name`) but writes did not, making `Name`-keyed writes latent broken bugs.
+- **Bug #2 CONFIRMED** — `server/services/approval.js` exports only `createApproval(toolName, toolInput, toolUseId)`, `resolveApproval`, `getPendingApprovals`. The `requestApproval({onApprove, onReject})` callback API the new `marketing-log.js` POST handler called does not exist; route would have thrown at first request.
+- **Bug #3 (validators)** — All 4 arrays in `routes/marketing-ops.js:64-110` (`VALID_CONTENT_SERIES`, `VALID_REPURPOSE_OPPORTUNITIES`, `VALID_SEASONAL_TAGS`, `VALID_CTAS`) match the Phase A live schema option lists exactly.
+
+**Bug fixes shipped (backend-builder, single tight diff, no scope creep):**
+- `server/services/mcc/drafter.js:81,119` — `Name: { title: [...] }` → `Title: { title: [...] }` in `createDraft` + `updateDraft`
+- `server/services/notion/writes/marketing-ops.js:21,135` — same flip in `createContentCalendarItem` + `updateContentCalendarItem` (these were pre-existing latent bugs the schema check uncovered)
+- `server/routes/marketing-log.js:39-97` — `runWithApproval` helper rewritten to mirror `mcc.js:39-97` exactly: `approval.createApproval(name, input, null)` returning `{id, promise}`, then `await promise`, sending standard SSE events (`approval` → `text` → `done`)
+
+**Code-reviewer final verdict — APPROVED, ready to commit. 8/8 checkpoints PASS:**
+1. No `Name: { title:` in any write path; only `Title: { title:` ✅
+2. `marketing-log.js` POST uses `createApproval` + `await promise` (mcc.js pattern) ✅
+3. Phase B field write types correct: `Content Series`=select, `Repurpose Opportunities`=multi_select, `Seasonal Tag`=multi_select, `CTA`=select, `Tracking URL`=url, `Hashtags`=rich_text ✅
+4. Zero raw `@notionhq/client` imports outside `server/services/notion/` ✅
+5. CommonJS only, no ESM ✅
+6. `databases.js` has 25 entries, `notion-service.test.js` count assertion matches ✅
+7. `marketing-log.js` POST validates area/type/tags[]/priority against allowlists ✅
+8. Cache invalidation hits `mktops_content*` + `mktops_summary` keys ✅
+
+`npm run lint`: clean. `npm test`: 1035/1035 pass.
+
+**One out-of-scope note from reviewer:** `routes/marketing-ops.js` is 461 lines (over 400 hard cap) — split is a separate refactor ticket per file-discipline.md "next change must be a split" rule.
+
+**Key Decisions:** None new. This session executed bug-verification and fix work that was already implicit in #101–#103. No strategy changes.
+
+**What To Do Next — pick one:**
+
+1. **Commit Phase B as-is** (recommended) — single feat commit with bug fixes folded in. Creates clean rollback point before any further work.
+2. **Split `routes/marketing-ops.js` first**, then commit Phase B + split together. Heavier session but ships file-discipline cleanup at the same time.
+3. **Skip both, go straight to frontend-builder** — leave commit + split for end-of-session. Faster to user-visible feature but accumulates work.
+4. **Activity-feed wiring for MCC writes** — deferred backlog item; can be tucked into the same session as frontend.
+
+After Dan's pick:
+- Frontend-builder for new field surfacing (Campaign +4 fields, Content Calendar +6 fields, new `/marketing-log` partial). Endpoint shapes documented in 17:30 entry below — unchanged.
+- PAUSE for Dan to test (per saved memory feedback — don't auto-run ux-auditor)
+- After Dan green-lights: ux-auditor + scribe parallel
+
+---
+
+## 2026-05-02 17:30 — Phase A executed + Phase B backend ~80% done (NOT verified, 2 bug suspects)
+
+**What Was Accomplished:**
+
+**Phase A (Notion schema, complete via MCP `notion-update-data-source`):**
+- Hub B `Campaigns` (cff40f34) +4 fields: `Type`, `Spent` (₹), `Target ROAS`, `Actual ROAS`
+- Hub B `Content Calendar` (a3066b81) +8 fields: `Content Series`, `Repurpose Opportunities`, `Seasonal Tag`, `CTA`, `Tracking URL`, `Hashtags`, `Media URLs`, `Platform Post IDs`
+- Hub B `Marketing Campaigns` (16b0b0) renamed → `Marketing Campaigns (old)`
+- Hub A all 15 DBs (10 page-level + 5 sub-page) renamed with `(A)` suffix
+- All 18 MCP responses verified via payload (not just acknowledged)
+
+**Phase B (backend code, working tree, NOT committed):**
+- Files modified: `server.js`, `routes/marketing-ops.js` (+ now 461 lines, OVER 400 hard cap), `services/marketing-ops-service.js`, `services/mcc/{drafter,publisher,read-model,scheduler}.js`, `services/notion/databases.js` (+MARKETING_LOG, +CAMPAIGN_DECISIONS = 25 DBs), `services/notion/writes/marketing-ops.js`, `test/notion-service.test.js`
+- New files: `routes/marketing-log.js`, `services/marketing-log-service.js`
+- Backend-builder ran twice: first pass shipped 4 validator arrays with WRONG option values; second pass corrected to match Phase A exact Notion schema
+- `npm run lint` clean, `npm test` 1035/1035 pass
+
+**Known incomplete:**
+- Activity-feed wiring on MCC writes — backend-builder couldn't find clean activity-feed-service append API; deferred
+- Code-reviewer dispatched twice, both runs cut off mid-investigation — never delivered final verdict
+- Frontend-builder not dispatched yet
+
+**Key Decisions:** None new (executing #101-#103 from earlier in session).
+
+**What To Do Next — read briefing in this section before doing anything else:**
+
+🚨 **2 BUG SUSPECTS to verify FIRST (gating everything else):**
+
+1. **Title field name mismatch.** [drafter.js:81](server/services/mcc/drafter.js#L81) writes `Name: { title: [...] }`. [writes/marketing-ops.js:21](server/services/notion/writes/marketing-ops.js#L21) (pre-existing) also uses `Name`. But Phase A's MCP fetch of Content Calendar showed title property named `Title`. Either pre-existing writes have been silently broken (improbable — tests pass) OR MCP output was misleading. Verify via `mcp__claude_ai_Notion__notion-fetch collection://a3066b81-c26c-453d-aed2-4588c92ad7c5` and check the actual title property name.
+
+2. **Marketing Log POST approval gate uses non-existent API.** [marketing-log.js:40](server/routes/marketing-log.js#L40) calls `approval.requestApproval({operation, input, onApprove, onReject})`. `approval.js` only exports `createApproval(toolName, toolInput, toolUseId)` returning `{id, promise}`. **`requestApproval` does not exist** — POST will throw at request time. Fix: rewrite `runWithApproval` helper in marketing-log.js to mirror mcc.js pattern (use `createApproval`, `await promise`).
+
+**Then in order:**
+
+3. Resume code-reviewer for full Phase B verdict (use SendMessage to existing agent or fresh — reviewer never finished)
+4. **MANDATORY split** of `routes/marketing-ops.js` (461/400 cap) per file-discipline.md "next change must be a split"
+5. Activity-feed wiring (deferred from this session)
+6. Frontend-builder for new field surfacing (Campaign +4 fields, Content Calendar +6 fields, new `/marketing-log` partial). Endpoint shapes documented in this handoff section.
+7. PAUSE for Dan to test (per saved memory feedback — don't auto-run ux-auditor)
+8. After Dan green-lights: ux-auditor + scribe parallel
+
+**Endpoint shapes for frontend-builder handoff:**
+- `GET /api/marketing-ops/content` per item: `contentSeries, repurposeOpportunities[], seasonalTag[], cta, trackingUrl, hashtags`
+- `POST /api/marketing-ops/content` accepts above (all optional)
+- `GET /api/marketing-ops/campaigns` per campaign: `type, spent, targetRoas, actualRoas`
+- `GET /api/marketing-log` filters: `area, type, tag, status, limit` → `{entries, total}`. Each: `{id, note, area, type, tags[], priority, status, createdTime}`
+- `POST /api/marketing-log` (SSE approval-gated, currently broken per bug #2)
+
+---
+
+## 2026-05-02 16:30 — Path 1 confirmed; full schema comparison + activation blueprint delivered
+
+**What Was Accomplished:** Dan picked Path 1 ("Hub B for everything, copy what you need from Hub A to B and connect, repurpose Content Calendar"). Fetched 3 more schemas via MCP (Hub B Content Calendar, Hub B Campaigns, Hub A YD Marketing Campaigns) for head-to-head comparison.
+
+Verdicts:
+- **Campaigns DB battle (3 candidates):** Hub B `Campaigns` (cff40f34) wins. Already wired, has unique `Stage` workflow + `Owner` select tied to YDS team + `Decisions`/`Focus Area`/`Project` relations. Marketing Campaigns 16b0b0 is paid-media-tracker subset; Hub A `YD Marketing Campaigns` is over-engineered strategic planning. Harvest only 4 fields from 16b0b0: `Type`, `Spent`, `Target ROAS`, `Actual ROAS`. Skip all Hub A bloat (4-bucket budgets, Customer Personas, Risk Factors, Lessons Learned, Weekly Updates — these belong in page body or are premature for solo-CEO use).
+- **Content Calendar battle:** Hub B (a3066b81) wins decisively — already has IG slots, Hook Pattern relation, Brand Review Status, IG Performance link, Template relation, 8-state Status pipeline. Harvest 6 surgical fields from Hub A: `Content Series` (themed days), `Repurpose Opportunities`, `Seasonal Tag` (Diwali/Wedding Season — India-critical), `CTA`, `Tracking URL`, `Hashtags`. Skip Production Cost / Revenue Attribution / Hours / Priority / Next Actions / Performance Metrics text.
+- **MCC repurpose confirmed:** Content Calendar's Status pipeline (`Idea→Briefed→Drafted→In Design→Brand Review→Approved→Scheduled→Published`) maps 1:1 to MCC post lifecycle. Need only 2 net-new fields: `Media URLs` + `Platform Post IDs`. Drop placeholder `MCC_POSTS_DB_ID`; rewire `mcc/drafter.js` + `scheduler.js` + `publisher.js` + `read-model.js` to point at `CONTENT_CALENDAR`. Also wire MCC writes into activity feed.
+
+Delivered Phase A (Notion schema work — 12 fields total: 4 to Campaigns, 6+2 to Content Calendar; migrate then archive Marketing Campaigns 16b0b0; audit then archive Hub A) + Phase B (code wiring — 7 changes across `databases.js`, MCC service files, new `/marketing-log` route + partial, `marketingOps.html` updates).
+
+**Key Decisions:**
+- **#101** — Hub B `Campaigns` (cff40f34) is canonical campaign DB; harvest 4 fields from `Marketing Campaigns` (16b0b0) then archive it
+- **#102** — Hub B `Content Calendar` (a3066b81) is canonical for both content + MCC posts; harvest 6 fields from Hub A YD Content calendar; add 2 MCC-specific fields
+- **#103** — Hub A "Marketing" page (25c247aa...) to be archived after row-count audit confirms no live data; rejected its over-engineered schemas (Customer Personas/Risk Factors/4-bucket budgets) as premature for solo-CEO ops
+
+**What To Do Next:** Awaiting Dan's answers on 3 blocking questions before any work starts:
+1. **Phase A execution** — should I use MCP `notion-update-data-source` to add the 12 fields directly (faster, fires approval gate per write), or is Dan adding them in Notion UI himself?
+2. **Marketing Campaigns (16b0b0) row count** — if 0 rows, just archive; if >0, need migration step
+3. **Hub A audit** — do row-count + last-edited query across the 13 Hub A DBs before archiving the page?
+
+Once answered: execute Phase A first (Notion schema), then Phase B code wiring (start with MCC rewire — biggest user impact, fixes today's broken placeholder).
+
+---
+
+## 2026-05-02 16:35 — Dan approved Phase A; rename-not-archive directive for retired DBs
+
+**What Was Accomplished:** Dan replied "phase a go ahead and add / check n update / dont archive, just add tag in name (A) or (old)". Approves direct MCP execution of schema changes. Modified plan: instead of archiving Hub A "Marketing" page DBs + Hub B `Marketing Campaigns` (16b0b0), rename them with "(old)" or "(A)" suffix to keep history visible without UI confusion. Updated decisions #101 and #103 to reflect rename approach.
+
+**Key Decisions:** **#101 amended** (rename 16b0b0 not archive), **#103 amended** (Hub A renamed not archived). Row-count audit no longer needed since data stays in place.
+
+**What To Do Next:** Execute Phase A via MCP `notion-update-data-source`:
+1. Add 4 fields to Hub B Campaigns (`Type` select, `Spent` rupee, `Target ROAS` number, `Actual ROAS` number)
+2. Add 6 fields to Hub B Content Calendar (`Content Series` select, `Repurpose Opportunities` multi, `Seasonal Tag` multi, `CTA` select, `Tracking URL` url, `Hashtags` text)
+3. Add 2 MCC fields to Content Calendar (`Media URLs` rich_text, `Platform Post IDs` rich_text)
+4. Rename `Marketing Campaigns` → `Marketing Campaigns (old)` after fields added + any rows migrated
+5. Rename Hub A 13 DBs with `(A)` suffix
+6. Then proceed to Phase B code wiring
+
+Each MCC update fires the approval gate; Dan must approve per write.
+
+---
+
+## 2026-05-02 16:10 — Two-hub Notion marketing audit + activation proposal (read-only, no code changes)
+
+**What Was Accomplished:** Dan asked to audit two Notion marketing pages and propose how to wire/activate against the app's marketing surfaces. Fetched both pages + 6 schemas via MCP and cross-referenced against [server/services/notion/databases.js](server/services/notion/databases.js).
+
+Findings:
+- **Hub A — "Marketing"** (`25c247aa0d7b81129cd1f2eb6c31da79`, parent: YD Home → YD management) — 13 DBs, 0% wired, schemas are strategic (10-stage status, ROAS, LTV, CAC, journey scoring, sprint velocity, funnel architecture).
+- **Hub B — "🎯 YDS Marketing Hub"** (`323247aa0d7b81a5b85dce421c959f3b`, parent: YDS Operating System v2) — 13 DBs, ~70% wired (Campaigns, Content Calendar, Sequences, Sessions Log, Marketing Tasks, all 5 IG Playbook DBs from today's session).
+- **3 unwired DBs in Hub B:** `Marketing Campaigns` (16b0b0a6989442abbcffa0c8fd521e6a — ROAS/Spent/Budget tracker, distinct from existing `Campaigns`), `Campaign Decisions` (b8ebba4ec00a47c98e96dfd539c2ad4c), `Marketing Log` (c4ba2059f7e1476c9818a061bd3aab5c — Type/Area/Tags capture stream).
+- **Duplication problem:** 3 campaign systems exist (wired `Campaigns`, unwired `Marketing Campaigns` Hub B, unwired `YD Marketing Campaigns` Hub A) and 2 content calendars (wired Hub B simple, unwired Hub A 30-field rich). Wiring everything as-is creates UI confusion.
+
+Proposed 3 paths; recommended **Path 1**: keep Hub B canonical, harvest Hub A schema upgrades. Concrete first step (P1): add `MARKETING_CAMPAIGNS_FULL`, `CAMPAIGN_DECISIONS`, `MARKETING_LOG` constants + extend marketing-ops or create `/marketing-log` capture view.
+
+**Key Decisions:** None — proposal awaiting Dan's input.
+
+**What To Do Next:** Three blocking questions to Dan before any code:
+1. **Hub A — keep or retire?** Retiring drops P3-P5 from plan.
+2. **`Campaigns` vs `Marketing Campaigns` (16b0b0) — which wins?** Heavy overlap; one must die.
+3. **MCC Posts — new DB or repurpose Content Calendar?** Affects [drafter.js:11](server/services/mcc/drafter.js#L11) placeholder fix.
+
+Once answered: implement P1 (3 new DB constants + Marketing Log capture view), then resolve campaign-DB duplication (Notion-side merge), then either MCC fix.
+
+---
+
+## 2026-05-02 15:55 — MCC create-post save/log path traced (read-only, no code changes)
+
+**What Was Accomplished:** Dan asked where the marketing-content "create post" flow saves and logs. Traced the full path: `POST /api/mcc/posts` → [server/routes/mcc.js:130-154](server/routes/mcc.js#L130-L154) (validate + SSE approval gate) → [server/services/mcc/drafter.js:26-56](server/services/mcc/drafter.js#L26-L56) (`createDraft` builds Notion props with Status=`draft`) → `notion.createPage(MCC_POSTS_DB_ID, ...)`. Single Notion DB write is the entire persistence story. Logging is ephemeral only: `console.log/error` + SSE events (`approval` → `text` → `done`) — no writes to activity-log, activity-feed-service, or decisions.md. Notion page itself acts as the audit trail (created_time + Status field).
+
+**Key Decisions:** None — read-only investigation.
+
+**What To Do Next:** Two pre-existing gaps flagged to Dan (awaiting his call):
+  1. **MCC_POSTS_DB_ID is a literal placeholder** at [drafter.js:11](server/services/mcc/drafter.js#L11) (`process.env.MCC_POSTS_DB_ID || 'REPLACE_WITH_MCC_POSTS_DB_ID'`); not in `.env.example` or `.env`. Calling create-post today will fail with the placeholder string. Same env-var-vs-hardcode pattern as the IG fix from earlier in session — could hardcode the UUID once the MCC Posts DB is provisioned in Notion.
+  2. **No activity-feed wiring for MCC writes.** Other write flows append to activity feed; create/schedule/publish-post do not. Optional enhancement.
+
+Asked Dan: do (a) hardcode MCC Posts DB UUID once created, and/or (b) wire MCC writes into activity feed?
+
+---
+
 ## 2026-05-02 15:45 — Local test instructions delivered (no code changes)
 
 **What Was Accomplished:** Dan asked "can i test it on local?" Provided 2-command local-test sequence (`npm run build && npm run dev` → open `http://localhost:3000` → sidebar Growth → IG Playbook). Documented two expected outcome paths: (a) integration has YDS Marketing Hub access → real data renders + SWPS hero color-codes; (b) no access → amber banner persists. Provided step-by-step access-grant procedure: Notion page `323247aa-0d7b-81a5-b85d-ce421c959f3b` → `…` menu → Connections → add the same integration that owns existing `NOTION_TOKEN` (likely "YD-render" based on prior error log evidence). All 5 child DBs inherit access automatically via the parent-page connection.

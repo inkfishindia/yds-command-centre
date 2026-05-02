@@ -60,12 +60,62 @@ const VALID_PUBLISHED_SLOTS = [
   'Sat 11AM', 'Sat 8:30PM', 'Sun 8:30PM',
 ];
 
+// Validation for Phase B MCC fields
+const VALID_CONTENT_SERIES = [
+  'Quality Monday',
+  'Tutorial Tuesday',
+  'Wisdom Wednesday',
+  'Throwback Thursday',
+  'Feature Friday',
+  'Case Study Spotlight',
+  'Behind the Brand',
+  'Customer Stories',
+];
+
+const VALID_REPURPOSE_OPPORTUNITIES = [
+  'Email Newsletter',
+  'Blog Article',
+  'Video Content',
+  'Carousel Post',
+  'Story Highlights',
+  'Case Study',
+  'Ad Creative',
+  'Presentation Slide',
+];
+
+const VALID_SEASONAL_TAGS = [
+  'New Year',
+  "Valentine's Day",
+  'Holi',
+  'Summer Season',
+  'Monsoon',
+  'Diwali',
+  'Christmas',
+  'Corporate FY End',
+  'Back to School',
+  'Wedding Season',
+];
+
+const VALID_CTAS = [
+  'Visit Website',
+  'Request Quote',
+  'Download Catalog',
+  'Book Consultation',
+  'Contact Sales',
+  'Follow Account',
+  'Share Content',
+  'Watch Video',
+  'Read More',
+  'Shop Now',
+];
+
 // POST /api/marketing-ops/content — create a new content calendar item
 router.post('/content', async (req, res) => {
   const {
     name, status, contentType, channels, publishDate, owner, campaignId, notes,
     contentPillar, hook, audienceSegment, productFocus, caption, visualBrief,
     igPillar, hookPattern, publishedSlot,
+    contentSeries, repurposeOpportunities, seasonalTag, cta, trackingUrl, hashtags,
   } = req.body;
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -129,6 +179,31 @@ router.post('/content', async (req, res) => {
     return res.status(400).json({ error: `Invalid publishedSlot. Allowed: ${VALID_PUBLISHED_SLOTS.join(', ')}` });
   }
 
+  if (contentSeries && !VALID_CONTENT_SERIES.includes(contentSeries)) {
+    return res.status(400).json({ error: `Invalid contentSeries. Allowed: ${VALID_CONTENT_SERIES.join(', ')}` });
+  }
+  if (repurposeOpportunities !== undefined) {
+    if (!Array.isArray(repurposeOpportunities)) {
+      return res.status(400).json({ error: 'repurposeOpportunities must be an array' });
+    }
+    const invalidRO = repurposeOpportunities.filter(r => !VALID_REPURPOSE_OPPORTUNITIES.includes(r));
+    if (invalidRO.length > 0) {
+      return res.status(400).json({ error: `Invalid repurposeOpportunities: ${invalidRO.join(', ')}. Allowed: ${VALID_REPURPOSE_OPPORTUNITIES.join(', ')}` });
+    }
+  }
+  if (seasonalTag !== undefined) {
+    if (!Array.isArray(seasonalTag)) {
+      return res.status(400).json({ error: 'seasonalTag must be an array' });
+    }
+    const invalidST = seasonalTag.filter(t => !VALID_SEASONAL_TAGS.includes(t));
+    if (invalidST.length > 0) {
+      return res.status(400).json({ error: `Invalid seasonalTag: ${invalidST.join(', ')}. Allowed: ${VALID_SEASONAL_TAGS.join(', ')}` });
+    }
+  }
+  if (cta && !VALID_CTAS.includes(cta)) {
+    return res.status(400).json({ error: `Invalid cta. Allowed: ${VALID_CTAS.join(', ')}` });
+  }
+
   try {
     const result = await marketingOpsService.createContent({
       name: name.trim(),
@@ -148,6 +223,12 @@ router.post('/content', async (req, res) => {
       igPillar: igPillar || null,
       hookPattern: hookPattern || null,
       publishedSlot: publishedSlot || null,
+      contentSeries: contentSeries || null,
+      repurposeOpportunities: repurposeOpportunities || null,
+      seasonalTag: seasonalTag || null,
+      cta: cta || null,
+      trackingUrl: trackingUrl || null,
+      hashtags: hashtags || null,
     });
     res.status(201).json(result);
   } catch (err) {
@@ -167,6 +248,7 @@ router.patch('/content/:id', async (req, res) => {
     name, status, contentType, channels, publishDate, notes, owner,
     contentPillar, hook, audienceSegment, productFocus, caption, visualBrief,
     igPillar, hookPattern, publishedSlot,
+    contentSeries, repurposeOpportunities, seasonalTag, cta, trackingUrl, hashtags,
   } = req.body;
 
   if (Object.keys(req.body).length === 0) {
@@ -226,11 +308,37 @@ router.patch('/content/:id', async (req, res) => {
     return res.status(400).json({ error: `Invalid publishedSlot. Allowed: ${VALID_PUBLISHED_SLOTS.join(', ')}` });
   }
 
+  if (contentSeries !== undefined && contentSeries !== null && !VALID_CONTENT_SERIES.includes(contentSeries)) {
+    return res.status(400).json({ error: `Invalid contentSeries. Allowed: ${VALID_CONTENT_SERIES.join(', ')}` });
+  }
+  if (repurposeOpportunities !== undefined) {
+    if (!Array.isArray(repurposeOpportunities)) {
+      return res.status(400).json({ error: 'repurposeOpportunities must be an array' });
+    }
+    const invalidRO = repurposeOpportunities.filter(r => !VALID_REPURPOSE_OPPORTUNITIES.includes(r));
+    if (invalidRO.length > 0) {
+      return res.status(400).json({ error: `Invalid repurposeOpportunities: ${invalidRO.join(', ')}. Allowed: ${VALID_REPURPOSE_OPPORTUNITIES.join(', ')}` });
+    }
+  }
+  if (seasonalTag !== undefined) {
+    if (!Array.isArray(seasonalTag)) {
+      return res.status(400).json({ error: 'seasonalTag must be an array' });
+    }
+    const invalidST = seasonalTag.filter(t => !VALID_SEASONAL_TAGS.includes(t));
+    if (invalidST.length > 0) {
+      return res.status(400).json({ error: `Invalid seasonalTag: ${invalidST.join(', ')}. Allowed: ${VALID_SEASONAL_TAGS.join(', ')}` });
+    }
+  }
+  if (cta !== undefined && cta !== null && !VALID_CTAS.includes(cta)) {
+    return res.status(400).json({ error: `Invalid cta. Allowed: ${VALID_CTAS.join(', ')}` });
+  }
+
   try {
     const result = await marketingOpsService.updateContent(pageId, {
       name, status, contentType, channels, publishDate, notes, owner,
       contentPillar, hook, audienceSegment, productFocus, caption, visualBrief,
       igPillar, hookPattern, publishedSlot,
+      contentSeries, repurposeOpportunities, seasonalTag, cta, trackingUrl, hashtags,
     });
     res.json(result);
   } catch (err) {
@@ -297,17 +405,24 @@ router.patch('/campaigns/:id', async (req, res) => {
     return res.status(400).json({ error: 'property and value are required' });
   }
 
-  const allowed = {
+  const selectAllowed = {
     Stage: ['Briefing', 'In Progress', 'Review', 'Live', 'Complete'],
     Status: ['On Track', 'At Risk', 'Blocked', 'Needs Dan'],
+    Type: ['Awareness', 'Conversion', 'Retention', 'Product Launch', 'Seasonal', 'Evergreen'],
   };
+  const numberFields = ['Spent', 'Target ROAS', 'Actual ROAS'];
 
-  if (!allowed[property]) {
-    return res.status(400).json({ error: 'Invalid property. Allowed: Stage, Status' });
+  const allAllowed = [...Object.keys(selectAllowed), ...numberFields];
+  if (!allAllowed.includes(property)) {
+    return res.status(400).json({ error: `Invalid property. Allowed: ${allAllowed.join(', ')}` });
   }
 
-  if (!allowed[property].includes(value)) {
-    return res.status(400).json({ error: `Invalid value for ${property}. Allowed: ${allowed[property].join(', ')}` });
+  if (selectAllowed[property] && !selectAllowed[property].includes(value)) {
+    return res.status(400).json({ error: `Invalid value for ${property}. Allowed: ${selectAllowed[property].join(', ')}` });
+  }
+
+  if (numberFields.includes(property) && (value === undefined || value === null || isNaN(Number(value)))) {
+    return res.status(400).json({ error: `${property} must be a number` });
   }
 
   try {
