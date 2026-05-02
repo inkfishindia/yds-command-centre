@@ -1,5 +1,32 @@
 # Session Handoff — Command Centre
 
+## 2026-05-03 05:10 — Marketing bundle commit + push shipped (3a0856a); A1 dispatch awaiting Dan confirm
+
+**What Was Accomplished (continuation of 04:50 session):**
+
+Dan said "go." Executed steps 2-5 of the 7-step plan.
+
+1. **§1 .env doc rows landed via Dan's manual edit** — file showed unstaged changes after my Edit was permission-blocked. 7 DB ID rows + 6-line documentation header. Staged + included in commit.
+
+2. **Code-reviewer dispatched twice — both truncated** at checkpoint 4. Pivoted to **manual 8-checkpoint review** (full evidence in chat log). Verdict: APPROVED-WITH-NITS. Only nit is pre-existing over-cap files (marketing-ops.js 1205, marketingOps.html 1974) already in open-loops as "next change must split first." All 8 checkpoints PASS-or-NIT.
+
+3. **Commit `3a0856a` shipped + pushed to origin/main:**
+   - 43 files changed, +3985 / -1422
+   - Includes: activity-feed Path A, routes/marketing-ops split (7 leaves + FILE-MAP), morning briefing UI (215 lines + 11 helpers), CSS split (6 leaves + FILE-MAP), marketing-log frontend (NEW partial+module+css), .env.example §1 doc rows, MARKETING-APP-SPEC.md (NEW), MARKETING-ALIGNMENT.md (NEW), TECH-WIRE-UP.md (NEW), NOTION-SETUP § 1.1 + § 4.1-4.5 updates, EA-BRIEFING + README updates, AGENT_PRIMER regen
+   - Bundles `12a79e2` (Phase B server) since that hadn't been pushed yet — Vercel deploy now has both commits in one rollout
+
+4. **Tests + lint pre-commit:** 1045/1045 pass, lint clean.
+
+**Key Decisions:** None new this round (all decisions from prior sub-sessions stand).
+
+**What To Do Next:**
+
+1. **[DAN]** Verify live `/marketing-ops` on https://yds-command-centre.vercel.app once Vercel deploy lands (~2-3 min). Confirm: 3-card Tier 1 strip + 3 morning sections render + console clean + marketing-log view at `/marketing-log` accessible. Per saved feedback memory, NOT auto-running ux-auditor — Dan visual test is the gate.
+2. **[DAN]** Green-light A1 automation dispatch (TECH-WIRE-UP §4 / NOTION-SETUP § 4.1). A1 = CC.Status→Published creates IG Performance row. ~2h foreground via backend-builder → code-reviewer → tester. Pre-flight: row-level YD-render integration smoke test (currently unverified per 04:30 open-loop — could break A1 first dispatch).
+3. **Code-reviewer agent reliability** — 3rd consecutive truncation incident. Pattern: agent burns budget on test stderr investigation despite explicit "do not run npm test" guard. Open-loop should track for next session decision: (a) accept manual fallback as the norm, (b) split reviewer dispatches into single-checkpoint micro-runs, (c) escalate to Anthropic agent-spec issue.
+
+---
+
 ## 2026-05-03 04:50 — Marketing spec saved + TECH-WIRE-UP §2 verified; §1 blocked on .env permissions
 
 **What Was Accomplished (continuation of 04:30 session):**
