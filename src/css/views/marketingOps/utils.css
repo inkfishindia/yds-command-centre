@@ -1,0 +1,192 @@
+/* ============================================================
+   marketingOps/utils.css
+   Owns: inline-style migration utility classes, task board,
+         task card, misc helpers.
+   DO NOT add: kanban board rules, UTM builder, base view rules.
+   ============================================================ */
+
+/* === Inline-style migration === */
+
+/* empty-state with vertical spacing (3 uses: campaigns, calendar) */
+.mktops-empty-spaced {
+  margin: 1.5rem 0;
+}
+
+/* AI tools section: bmc-block inner padding (4 uses) */
+.mktops-bmc-block-body {
+  padding: 0.75rem;
+}
+
+/* AI tools form inputs — non-final (6 uses) */
+.mktops-ai-input {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+/* AI tools form inputs — final in group (4 uses) */
+.mktops-ai-input-last {
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+/* Skeleton loading column layout (3 uses: tasks, competitors, ci-detail) */
+.mktops-skeleton-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 0;
+}
+
+/* Cursor pointer on filter selects (3 uses) */
+.mktops-select-pointer {
+  cursor: pointer;
+}
+
+/* Cursor pointer on clickable cards (2 uses: data-card, ci-card) */
+.mktops-card-pointer {
+  cursor: pointer;
+}
+
+/* === Task Board === */
+
+.mktops-tasks-summary {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.mktops-task-stat {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1.25rem;
+  min-width: 90px;
+  text-align: center;
+}
+
+.mktops-task-stat--alert {
+  border-color: var(--red);
+  background: var(--red-dim);
+}
+
+.mktops-task-stat-number {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.mktops-task-stat--alert .mktops-task-stat-number {
+  color: var(--red);
+}
+
+.mktops-task-stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.mktops-tasks-board {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.mktops-tasks-board .kanban-column {
+  min-width: 200px;
+  flex: 0 0 200px;
+}
+
+.mktops-task-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.5rem;
+  cursor: default;
+}
+
+.mktops-task-card--blocked {
+  border-left: 3px solid var(--amber);
+}
+
+.mktops-task-card--done {
+  opacity: 0.6;
+}
+
+.mktops-task-card-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.mktops-task-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.task-priority-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.task-priority-badge[data-priority="urgent"] {
+  background: var(--red-dim);
+  color: var(--red);
+}
+
+.task-priority-badge[data-priority="high"] {
+  background: var(--amber-dim);
+  color: var(--amber);
+}
+
+.task-priority-badge[data-priority="medium"] {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.task-priority-badge[data-priority="low"] {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+
+.task-channel-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.task-overdue {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.task-assignee {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.kanban-due {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.kanban-card-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+  word-break: break-word;
+}

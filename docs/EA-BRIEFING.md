@@ -65,28 +65,37 @@
 
 ## 4. Where the data lives
 
-### Notion databases (primary source of truth — 19 DBs)
+### Notion databases (primary source of truth)
+
+**Canonical map** — for the full marketing-system map (all 14 marketing DBs, IDs, schemas, automations) see [marketing/NOTION-SETUP.md](./marketing/NOTION-SETUP.md). For the deprecation list of zombie DBs that must NOT be wired, see [MARKETING-ALIGNMENT.md](./MARKETING-ALIGNMENT.md) § 3.
+
 | Database | Holds |
 |---|---|
 | Focus Areas | Strategic theme tracking |
 | Projects | Mission briefs, initiatives |
-| Commitments | Tasks with owner + due date |
+| **Commitments** | **All tasks (incl. marketing)** — filter by Focus Area = D2C Marketing & Content for marketing-only view |
 | People | Team roster + assignment routing |
-| Decisions | Decision log |
+| Decisions | Decision log (all domains incl. marketing) |
 | Platforms | Systems inventory |
-| Audiences | Marketing segments |
+| Audiences | Customer segment definitions |
 | Campaigns | Marketing campaigns |
-| Content Calendar | Content pipeline + status |
-| Sequences | Email/automation sequences |
+| Content Calendar | Cross-channel content pipeline + status |
+| Sequences | Email/WhatsApp lifecycle sequences |
 | Sessions Log | Session history + analytics |
 | Sprint Board (Tech) | Tech sprint items + bugs |
 | Spec Library | Tech spec pipeline |
 | Tech Decision Log | Engineering decisions |
 | Sprint Archive | Velocity history |
 | AI Team | AI agent roster |
-| Marketing Tasks | Marketing action items |
 | Tech Backlog | Tech backlog |
-| MCC Posts | Social content drafts (newest) |
+| MCC Posts | Social content drafts (Phase 1 backend — pre-publish) |
+| IG Performance ✨ | Per-published-post measurement (post-publish) — north-star: SWPS |
+| Hook Pattern Log ✨ | IG hook pattern catalog |
+| Template Library ✨ | Reusable carousel/reel/single/story templates |
+| Approvals Log ✨ | Brand Editor approval decisions |
+| Weekly Ops Log ✨ | Friday IG pulse rollup |
+
+✨ = added 2026-05-02. ~~Marketing Tasks~~ → **archived 2026-05-03**, all rows migrated to Commitments. Do not point engineers at Marketing Tasks; it's locked.
 
 ### Google Sheets feeds (13)
 Strategy · Execution · App Logging · BMC · CRM Config · CRM Flows · Ops Inventory · Ops Sales · Ops Products · Ops Warehouse · Competitor Intel · Daily Sales · Google Ads
@@ -120,7 +129,8 @@ Strategy · Execution · App Logging · BMC · CRM Config · CRM Flows · Ops In
 | "What did we decide about X?" | Decisions | Notion: Decisions |
 | "How's project Y tracking?" | Projects (or Registry) | Notion: Projects |
 | "Who's overloaded?" | Team | Notion: People + Commitments |
-| "What's in the marketing pipeline?" | Marketing Ops | Notion: Campaigns + Marketing Tasks |
+| "What's in the marketing pipeline?" | Marketing Ops | Notion: Campaigns + Content Calendar (+ Commitments filtered by Focus Area = D2C Marketing & Content) |
+| "How's IG doing?" | (new screen, when wired) | Notion: IG Performance + Weekly Ops Log |
 | "How are leads moving?" | CRM | Sheets: CRM Flows |
 | "What's the ad spend doing?" | Google Ads | Sheets: Google Ads |
 | "How were yesterday's sales?" | Daily Sales | Sheets: Daily Sales |

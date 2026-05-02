@@ -53,12 +53,14 @@ function daysAgoISO(n) {
 
 /**
  * Build a fake notion service.
- * decisionsRows  — rows returned when Decisions DB is queried
- * commitmentsRows — rows returned when Commitments DB is queried
+ * decisionsRows        — rows returned when Decisions DB is queried
+ * commitmentsRows      — rows returned when Commitments DB is queried
+ * contentCalendarRows  — rows returned when Content Calendar DB is queried
  */
-function buildFakeNotion({ decisionsRows = [], commitmentsRows = [] } = {}) {
-  const DECISIONS_DB    = '3c8a9b22ba924f20bfdcab4cc7a46478';
-  const COMMITMENTS_DB  = '0b50073e544942aab1099fc559b390fb';
+function buildFakeNotion({ decisionsRows = [], commitmentsRows = [], contentCalendarRows = [] } = {}) {
+  const DECISIONS_DB        = '3c8a9b22ba924f20bfdcab4cc7a46478';
+  const COMMITMENTS_DB      = '0b50073e544942aab1099fc559b390fb';
+  const CONTENT_CALENDAR_DB = '227f3365feab476e88791f2a4d0a72b9';
 
   return {
     queryDatabase: async (dbId) => {
@@ -67,6 +69,9 @@ function buildFakeNotion({ decisionsRows = [], commitmentsRows = [] } = {}) {
       }
       if (dbId === COMMITMENTS_DB) {
         return { results: commitmentsRows, hasMore: false, nextCursor: null };
+      }
+      if (dbId === CONTENT_CALENDAR_DB) {
+        return { results: contentCalendarRows, hasMore: false, nextCursor: null };
       }
       return { results: [], hasMore: false, nextCursor: null };
     },
@@ -126,6 +131,24 @@ function makeQueueItem(overrides = {}) {
     focusAreaNames: [],
     createdAt: daysAgoISO(5),
     updatedAt: daysAgoISO(1),
+    ...overrides,
+  };
+}
+
+// Minimal Content Calendar row (simplified by notion service)
+function makeContentCalendarRow(overrides = {}) {
+  return {
+    id: 'cc-' + Math.random().toString(36).slice(2, 8),
+    url: 'https://www.notion.so/Untitled-content',
+    'Title': 'Test Content',
+    'Status': 'Drafted',
+    'Owner': 'Dan',
+    'Pillar (IG)': 'Permission',
+    'Hook Pattern': [],
+    'Format': 'Reel',
+    'Brand Review Status': null,
+    created: daysAgoISO(2),
+    updated: daysAgoISO(1),
     ...overrides,
   };
 }
@@ -379,5 +402,179 @@ describe('activity-feed-service: getActivityFeed()', () => {
     assert.equal(item.title, 'Shape Decision');
     assert.equal(item.owner, 'Dan');
     assert.equal(item.type, 'decision');
+  });
+
+  // ── Content Calendar (4th source) ────────────────────────────────────────────
+
+  it('content calendar row in window appears in merged feed', async () => {
+    stubModule(NOTION_PATH, buildFakeNotion({
+      contentCalendarRows: [makeContentCalendarRow()],
+    }));
+    stubModule(DAN_COLIN_PATH, buildFakeDanColin([]));
+
+    const { getActivityFeed, _clearCache } = require(SERVICE_PATH);
+    _clearCache();
+    const feed = await getActivityFeed({ days: 14 });
+
+    const ccItems = feed.items.filter(i => i.type.startsWith('mcc:'));
+    assert.equal(ccItems.length, 1, 'one content calendar item in feed');
+  });
+
+  it('mccTypeFromStatus: Drafted maps to mcc:draft', async () => {
+    stubModule(NOTION_PATH, buildFakeNotion({
+      contentCalendarRows: [makeContentCalendarRow({ 'Status': 'Drafted', updated: daysAgoISO(1) })],
+    }));
+    stubModule(DAN_COLIN_PATH, buildFakeDanColin([]));
+
+    const { getActivityFeed, _clearCache } = require(SERVICE_PATH);
+    _clearCache();
+    const feed = await getActivityFeed({ days: 14 });
+
+    const item = feed.items.find(i => i.type.startsWith('mcc:'));
+    assert.equal(item.type, 'mcc:draft', 'Drafted → mcc:draft');
+  });
+
+  it('mccTypeFromStatus: In Design maps to mcc:draft', async () => {
+    stubModule(NOTION_PATH, buildFakeNotion({
+      contentCalendarRows: [makeContentCalendarRow({ 'Status': 'In Design', updated: daysAgoISO(1) })],
+    }));
+    stubModule(DAN_COLIN_PATH, buildFakeDanColin([]));
+
+    const { getActivityFeed, _clearCache } = require(SERVICE_PATH);
+    _clearCache();
+    const feed = await getActivityFeed({ days: 14 });
+
+    const item = feed.items.find(i => i.type.startsWith('mcc:'));
+    assert.equal(item.type, 'mcc:draft', 'In Design → mcc:draft');
+  });
+
+  it('mccTypeFromStatus: Brand Review maps to mcc:approval-pending', async () => {
+    stubModule(NOTION_PATH, buildFakeNotion({
+      contentCalendarRows: [makeContentCalendarRow({ 'Status': 'Brand Review', updated: daysAgoISO(1) })],
+    }));
+    stubModule(DAN_COLIN_PATH, buildFakeDanColin([]));
+
+    const { getActivityFeed, _clearCache } = require(SERVICE_PATH);
+    _clearCache();
+    const feed = await getActivityFeed({ days: 14 });
+
+    const item = feed.items.find(i => i.type.startsWith('mcc:'));
+    assert.equal(item.type, 'mcc:approval-pending', 'Brand Review → mcc:approval-pending');
+  });
+
+  it('mccTypeFromStatus: Approved maps to mcc:scheduled', async () => {
+    stubModule(NOTION_PATH, buildFakeNotion({
+      contentCalendarRows: [makeContentCalendarRow({ 'Status': 'Approved', updated: daysAgoISO(1) })],
+    }));
+    stubModule(DAN_COLIN_PATH, buildFakeDanColin([]));
+
+    const { getActivityFeed, _clearCache } = require(SERVICE_PATH);
+    _clearCache();
+    const feed = await getActivityFeed({ days: 14 });
+
+    const item = feed.items.find(i => i.type.startsWith('mcc:'));
+    assert.equal(item.type, 'mcc:scheduled', 'Approved → mcc:scheduled');
+  });
+
+  it('mccTypeFromStatus: Published maps to mcc:published', async () => {
+    stubModule(NOTION_PATH, buildFakeNotion({
+      contentCalendarRows: [makeContentCalendarRow({ 'Status': 'Published', updated: daysAgoISO(1) })],
+    }));
+    stubModule(DAN_COLIN_PATH, buildFakeDanColin([]));
+
+    const { getActivityFeed, _clearCache } = require(SERVICE_PATH);
+    _clearCache();
+    const feed = await getActivityFeed({ days: 14 });
+
+    const item = feed.items.find(i => i.type.startsWith('mcc:'));
+    assert.equal(item.type, 'mcc:published', 'Published → mcc:published');
+  });
+
+  it('mccTypeFromStatus: unknown status maps to mcc:edit (fallback)', async () => {
+    stubModule(NOTION_PATH, buildFakeNotion({
+      contentCalendarRows: [makeContentCalendarRow({ 'Status': 'Idea', updated: daysAgoISO(1) })],
+    }));
+    stubModule(DAN_COLIN_PATH, buildFakeDanColin([]));
+
+    const { getActivityFeed, _clearCache } = require(SERVICE_PATH);
+    _clearCache();
+    const feed = await getActivityFeed({ days: 14 });
+
+    const item = feed.items.find(i => i.type.startsWith('mcc:'));
+    assert.equal(item.type, 'mcc:edit', 'Idea (unknown) → mcc:edit fallback');
+  });
+
+  it('content calendar item has correct shape: title, who, link, meta, when', async () => {
+    const row = makeContentCalendarRow({
+      id: 'cc-shape-test',
+      url: 'https://www.notion.so/Test-Post',
+      'Title': 'Product Launch Reel',
+      'Status': 'Scheduled',
+      'Owner': 'Dan',
+      'Pillar (IG)': 'Craft',
+      'Hook Pattern': ['hook-id-1'],
+      'Format': 'Reel',
+      'Brand Review Status': 'Approved',
+      updated: daysAgoISO(2),
+    });
+    stubModule(NOTION_PATH, buildFakeNotion({ contentCalendarRows: [row] }));
+    stubModule(DAN_COLIN_PATH, buildFakeDanColin([]));
+
+    const { getActivityFeed, _clearCache } = require(SERVICE_PATH);
+    _clearCache();
+    const feed = await getActivityFeed({ days: 14 });
+
+    const item = feed.items.find(i => i.id === 'cc-shape-test');
+    assert.ok(item, 'item found by id');
+    assert.equal(item.type, 'mcc:scheduled',                      'type correct');
+    assert.equal(item.title, 'Product Launch Reel',               'title from Title field');
+    assert.equal(item.who, 'Dan',                                 'who from Owner field');
+    assert.equal(item.link, 'https://www.notion.so/Test-Post',    'link from url field');
+    assert.ok(item.meta,                                          'meta present');
+    assert.equal(item.meta.pillar, 'Craft',                       'meta.pillar');
+    assert.deepEqual(item.meta.hookPattern, ['hook-id-1'],        'meta.hookPattern');
+    assert.equal(item.meta.format, 'Reel',                        'meta.format');
+    assert.equal(item.meta.brandReviewStatus, 'Approved',         'meta.brandReviewStatus');
+    assert.ok(item.when,                                          'when (ISO timestamp) present');
+  });
+
+  it('content calendar item outside window is excluded', async () => {
+    stubModule(NOTION_PATH, buildFakeNotion({
+      contentCalendarRows: [
+        makeContentCalendarRow({ updated: daysAgoISO(30) }), // outside 14-day window
+        makeContentCalendarRow({ updated: daysAgoISO(5) }),  // inside window
+      ],
+    }));
+    stubModule(DAN_COLIN_PATH, buildFakeDanColin([]));
+
+    const { getActivityFeed, _clearCache } = require(SERVICE_PATH);
+    _clearCache();
+    const feed = await getActivityFeed({ days: 14 });
+
+    const ccItems = feed.items.filter(i => i.type.startsWith('mcc:'));
+    assert.equal(ccItems.length, 1, 'only the recent content calendar item included');
+  });
+
+  it('graceful degradation: content source throws, other sources still returned', async () => {
+    const CONTENT_CALENDAR_DB = '227f3365feab476e88791f2a4d0a72b9';
+    const fakeNotion = {
+      queryDatabase: async (dbId) => {
+        if (dbId === CONTENT_CALENDAR_DB) throw new Error('Content Calendar timeout');
+        const DECISIONS_DB = '3c8a9b22ba924f20bfdcab4cc7a46478';
+        if (dbId === DECISIONS_DB) return { results: [makeDecisionRow()], hasMore: false, nextCursor: null };
+        return { results: [], hasMore: false, nextCursor: null };
+      },
+    };
+    stubModule(NOTION_PATH, fakeNotion);
+    stubModule(DAN_COLIN_PATH, buildFakeDanColin([]));
+
+    const { getActivityFeed, _clearCache } = require(SERVICE_PATH);
+    _clearCache();
+    const feed = await getActivityFeed({ days: 14 });
+
+    assert.equal(feed.meta.sources.content, false,    'content source marked failed');
+    assert.equal(feed.meta.sources.decisions, true,   'decisions source still ok');
+    assert.equal(feed.meta.sources.commitments, true, 'commitments source still ok');
+    assert.ok(feed.items.some(i => i.type === 'decision'), 'decision items still present');
   });
 });

@@ -1,0 +1,239 @@
+/* ============================================================
+   marketingOps/utm.css
+   Owns: UTM Builder section — header, form, preview, presets.
+   DO NOT add: kanban rules, detail panel, morning briefing rules.
+   ============================================================ */
+
+.utm-builder-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.utm-builder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.utm-builder-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.utm-builder-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.utm-builder-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.utm-builder-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.utm-builder-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.utm-builder-form {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.utm-builder-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.utm-builder-field--full {
+  grid-column: 1 / -1;
+}
+
+.utm-builder-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+}
+
+.utm-required {
+  color: var(--red);
+  margin-left: 2px;
+}
+
+.utm-optional {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-left: 6px;
+}
+
+.utm-input {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  transition: border-color var(--transition-fast);
+}
+
+.utm-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.utm-builder-preview {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+
+.utm-preview-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.utm-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.utm-preview-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+}
+
+.utm-builder-presets {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.utm-presets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.utm-presets-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.utm-preset-save-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.utm-preset-name-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+}
+
+.utm-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.utm-preset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: background var(--transition-fast);
+}
+
+.utm-preset-row:hover {
+  background: var(--bg-hover);
+}
+
+.utm-preset-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.utm-preset-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.utm-preset-meta {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.utm-preset-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.mini-action-btn--danger {
+  color: var(--red);
+}
+
+.mini-action-btn--danger:hover {
+  background: var(--red-a15);
+}
+
+@media (max-width: 768px) {
+  .utm-builder-form {
+    grid-template-columns: 1fr;
+  }
+}

@@ -3,10 +3,13 @@
 /**
  * Activity Feed Service
  *
- * Merges three data sources into a single time-ordered activity stream:
+ * Merges four data sources into a single time-ordered activity stream:
  *   1. Decisions      — Notion Decisions DB, filtered by Date ≥ N days ago
  *   2. Commitments    — Notion Commitments DB, filtered by last_edited_time ≥ N days ago
  *   3. Dan ↔ Colin    — Closed/Resolved items from dan-colin-service.getQueue()
+ *   4. Content Calendar — Notion Content Calendar DB, filtered by last_edited_time ≥ N days ago
+ *                         Type derived from Status: mcc:draft / mcc:approval-pending /
+ *                         mcc:scheduled / mcc:published / mcc:edit (fallback).
  *
  * Graceful degradation: if any source throws, that source is excluded and
  * meta.sources.<key> is set to false. The feed is returned with the remaining sources.
@@ -14,10 +17,13 @@
 
 const notion = require('./notion');
 const danColinService = require('./dan-colin-service');
+const { DB } = require('./notion/databases');
 
 // Decisions and Commitments DB IDs (from notion-hub.md / notion.js constants)
 const DECISIONS_DB_ID    = '3c8a9b22ba924f20bfdcab4cc7a46478';
 const COMMITMENTS_DB_ID  = '0b50073e544942aab1099fc559b390fb';
+// Content Calendar DB ID — sourced from notion/databases.js, not duplicated here
+const CONTENT_CALENDAR_DB_ID = DB.CONTENT_CALENDAR;
 
 // ── In-process cache, keyed by days value ────────────────────────────────────
 const _cache = new Map();     // key: days (number) → { data, time }
@@ -172,6 +178,96 @@ async function loadQueueItems(days) {
     }));
 }
 
+/**
+ * Derive an MCC activity type from a Content Calendar Status value.
+ * Decision #104 mapping:
+ *   Drafted | In Design              → mcc:draft
+ *   Brand Review                    → mcc:approval-pending
+ *   Approved | Scheduled            → mcc:scheduled
+ *   Published                       → mcc:published
+ *   anything else (including null)  → mcc:edit
+ */
+function mccTypeFromStatus(status) {
+  if (!status) return 'mcc:edit';
+  const s = status.trim();
+  if (s === 'Drafted' || s === 'In Design')  return 'mcc:draft';
+  if (s === 'Brand Review')                  return 'mcc:approval-pending';
+  if (s === 'Approved' || s === 'Scheduled') return 'mcc:scheduled';
+  if (s === 'Published')                     return 'mcc:published';
+  return 'mcc:edit';
+}
+
+/**
+ * Load Content Calendar items edited within the last N days.
+ * Mirrors the loadCommitments pattern: filter by last_edited_time, paginate,
+ * map to activity item shape.
+ *
+ * Each item gets:
+ *   type  — derived from Status via mccTypeFromStatus()
+ *   when  — full ISO timestamp (row.updated from simplify())
+ *   link  — Notion page URL (row.url from simplify())
+ *   who   — Owner field if set, else null
+ *   meta  — { pillar, hookPattern, format, brandReviewStatus } if fields are present
+ *
+ * Returns an array of activity items.
+ */
+async function loadContentCalendar(days) {
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const sinceStr = since.toISOString().split('T')[0];
+
+  const items = [];
+  let cursor;
+  do {
+    const resp = await notion.queryDatabase(CONTENT_CALENDAR_DB_ID, {
+      filter: {
+        timestamp: 'last_edited_time',
+        last_edited_time: { on_or_after: sinceStr },
+      },
+      sorts: [{ timestamp: 'last_edited_time', direction: 'descending' }],
+      pageSize: 100,
+      startCursor: cursor,
+    });
+    for (const row of resp.results) {
+      const dateStr = row.updated
+        ? row.updated.split('T')[0]
+        : null;
+      if (!dateStr) continue;
+      if (dateStr < sinceStr) continue;
+
+      const status = row['Status'] || null;
+
+      // Hook Pattern is a relation — simplify() returns an array of IDs or names.
+      // Expose the raw array; consumers can resolve IDs if needed.
+      const hookPatternRaw = Array.isArray(row['Hook Pattern']) ? row['Hook Pattern'] : null;
+
+      const meta = {
+        pillar:            row['Pillar (IG)'] || null,
+        hookPattern:       hookPatternRaw,
+        format:            row['Format'] || row['Content Type'] || null,
+        brandReviewStatus: row['Brand Review Status'] || null,
+      };
+
+      items.push({
+        id:        row.id,
+        type:      mccTypeFromStatus(status),
+        when:      row.updated || null,  // full ISO timestamp
+        date:      dateStr,
+        title:     row['Title'] || 'Untitled content',
+        who:       row['Owner'] || null,
+        link:      row.url || null,
+        pageId:    row.id,
+        focusArea: null, // Content Calendar has no Focus Area relation
+        status,
+        meta,
+      });
+    }
+    cursor = resp.hasMore ? resp.nextCursor : null;
+  } while (cursor);
+
+  return items;
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 /**
@@ -179,14 +275,16 @@ async function loadQueueItems(days) {
  *
  * Returns:
  * {
- *   items: [ { id, type, date, title, summary, owner, pageId, focusArea, status } ],
+ *   items: [ { id, type, date, title, summary?, owner?, who?, link?, pageId, focusArea, status, meta?, when? } ],
  *   meta: {
- *     counts: { decision: N, commitment: N, queue: N },
+ *     counts: { decision: N, commitment: N, queue: N, content: N },
  *     days,
- *     sources: { decisions: true, commitments: true, queue: true }
+ *     sources: { decisions: true, commitments: true, queue: true, content: true }
  *   },
  *   timestamp: ISO string
  * }
+ * Content Calendar items have type mcc:draft | mcc:approval-pending | mcc:scheduled |
+ * mcc:published | mcc:edit and carry who/link/meta/when instead of owner/summary.
  */
 async function getActivityFeed(opts = {}) {
   const parsed = parseInt(opts.days, 10);
@@ -195,9 +293,9 @@ async function getActivityFeed(opts = {}) {
   const cached = getCached(days);
   if (cached) return cached;
 
-  const sources = { decisions: true, commitments: true, queue: true };
+  const sources = { decisions: true, commitments: true, queue: true, content: true };
 
-  const [decisionsResult, commitmentsResult, queueResult] = await Promise.all([
+  const [decisionsResult, commitmentsResult, queueResult, contentResult] = await Promise.all([
     loadDecisions(days).catch(err => {
       console.error('[activity-feed] decisions source failed:', err.message || err);
       sources.decisions = false;
@@ -213,9 +311,14 @@ async function getActivityFeed(opts = {}) {
       sources.queue = false;
       return [];
     }),
+    loadContentCalendar(days).catch(err => {
+      console.error('[activity-feed] content source failed:', err.message || err);
+      sources.content = false;
+      return [];
+    }),
   ]);
 
-  const allItems = [...decisionsResult, ...commitmentsResult, ...queueResult];
+  const allItems = [...decisionsResult, ...commitmentsResult, ...queueResult, ...contentResult];
 
   // Sort by date descending — null dates go to the end
   allItems.sort((a, b) => {
@@ -229,9 +332,10 @@ async function getActivityFeed(opts = {}) {
     items: allItems,
     meta: {
       counts: {
-        decision: decisionsResult.length,
+        decision:   decisionsResult.length,
         commitment: commitmentsResult.length,
-        queue: queueResult.length,
+        queue:      queueResult.length,
+        content:    contentResult.length,
       },
       days,
       sources,

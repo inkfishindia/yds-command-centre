@@ -1,0 +1,310 @@
+/* ============================================================
+   marketingOps/morning.css
+   Owns: morning briefing — Tier 1 metrics strip, today's content
+         section, campaign status board, yesterday's pulse section,
+         Notion deep-link button.
+   DO NOT add: kanban board rules, UTM builder rules, base rules.
+   ============================================================ */
+
+/* === Tier 1 Metrics Strip === */
+
+.mktops-t1-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.mktops-t1-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mktops-t1-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.mktops-t1-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.mktops-t1-value--green { color: var(--green); }
+.mktops-t1-value--amber { color: var(--amber); }
+.mktops-t1-value--red   { color: var(--red); }
+.mktops-t1-value--muted { color: var(--text-muted); font-size: 1rem; font-weight: 400; }
+
+.mktops-t1-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.mktops-t1-pending {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 0.5rem 0;
+}
+
+/* === Morning Sections === */
+
+.mktops-morning-section {
+  margin-bottom: 1.5rem;
+}
+
+.mktops-morning-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.mktops-morning-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mktops-morning-section-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+
+.mktops-morning-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-style: italic;
+  padding: 0.75rem 0;
+}
+
+/* === Today's Content Table === */
+
+.mktops-today-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.mktops-today-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 0 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.mktops-today-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.mktops-today-table tr:last-child td {
+  border-bottom: none;
+}
+
+.mktops-today-table tr:hover td {
+  background: var(--bg-hover);
+}
+
+.mktops-today-title-cell {
+  font-weight: 500;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* === Campaign Morning Board === */
+
+.mktops-morning-campaign-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mktops-morning-campaign-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.mktops-morning-campaign-row--blocked {
+  border-left: 3px solid var(--red);
+}
+
+.mktops-morning-campaign-row--needs-dan {
+  border-left: 3px solid var(--purple);
+}
+
+.mktops-morning-campaign-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mktops-morning-campaign-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.mktops-days-to-launch {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.mktops-days-to-launch--urgent {
+  color: var(--red);
+  font-weight: 600;
+}
+
+/* === Yesterday's Pulse === */
+
+.mktops-pulse-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mktops-pulse-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.mktops-pulse-title {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mktops-pulse-metrics {
+  display: flex;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.mktops-pulse-metric {
+  text-align: center;
+  min-width: 48px;
+}
+
+.mktops-pulse-metric-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mktops-pulse-metric-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mktops-pulse-pending {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.mktops-pulse-swps-avg {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  margin-top: 0.5rem;
+}
+
+/* === Notion Deep-Link Button === */
+
+.notion-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 11px;
+  flex-shrink: 0;
+  transition: background 120ms, border-color 120ms, color 120ms;
+}
+
+.notion-link-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+.notion-link-btn:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .mktops-t1-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mktops-t1-strip > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  .mktops-today-table th:nth-child(n+4),
+  .mktops-today-table td:nth-child(n+4) {
+    display: none;
+  }
+
+  .mktops-pulse-metrics {
+    gap: 0.5rem;
+  }
+}

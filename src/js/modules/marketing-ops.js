@@ -15,6 +15,10 @@ export function createMarketingOpsModule() {
     mktopsJourneyFilter: '',
     mktopsActionLoading: null,
 
+    // Morning briefing data (MARKETING-ALIGNMENT § 4.1 + § 4.2)
+    mktopsMorningThisWeek: null,
+    mktopsMorningAdCandidates: null,
+
     // Marketing AI Tools inputs
     mktopsAiInputs: { segment: '', context: '', competitor: '', focus: '', topic: '', audience: '', goal: '', product: '', budget: '' },
 
@@ -119,9 +123,11 @@ export function createMarketingOpsModule() {
       const signal = this.beginRequest('marketingOps');
       this.mktopsLoading = true;
       try {
-        const [summaryRes, taskSummaryRes] = await Promise.all([
+        const [summaryRes, taskSummaryRes, igThisWeekRes, igAdCandidatesRes] = await Promise.all([
           fetchReadModel('marketing-ops', { signal }),
           fetch('/api/marketing-ops/tasks/summary').catch(() => null),
+          fetch('/api/marketing-ops/ig/performance/this-week').catch(() => null),
+          fetch('/api/marketing-ops/ig/performance/ad-candidates').catch(() => null),
         ]);
         if (summaryRes.response.ok && summaryRes.payload) {
           this.mktops = summaryRes.payload.data;
@@ -131,6 +137,12 @@ export function createMarketingOpsModule() {
         }
         if (taskSummaryRes && taskSummaryRes.ok) {
           this.mktopsTasksSummary = await taskSummaryRes.json();
+        }
+        if (igThisWeekRes && igThisWeekRes.ok) {
+          this.mktopsMorningThisWeek = await igThisWeekRes.json();
+        }
+        if (igAdCandidatesRes && igAdCandidatesRes.ok) {
+          this.mktopsMorningAdCandidates = await igAdCandidatesRes.json();
         }
       } catch (err) {
         if (this.isAbortError(err)) return;
@@ -1080,6 +1092,114 @@ export function createMarketingOpsModule() {
       } catch {
         this.utm.presets = [];
       }
+    },
+
+    // ── Morning briefing (MARKETING-ALIGNMENT § 4.1 + § 4.2) ─────
+    getMorningTodayContent() {
+      const content = Array.isArray(this.mktops?.content) ? this.mktops.content : [];
+      const today = new Date().toISOString().slice(0, 10);
+      return content
+        .filter(item => {
+          const pub = (item.publishDate || '').slice(0, 10);
+          return pub === today || (item.Status || '') === 'Scheduled';
+        })
+        .sort((a, b) => (a.publishDate || '').localeCompare(b.publishDate || ''));
+    },
+
+    getMorningActiveCampaigns() {
+      const campaigns = Array.isArray(this.mktops?.campaigns) ? this.mktops.campaigns : [];
+      const active = campaigns.filter(c => {
+        const stage = c.Stage || '';
+        const status = c.Status || '';
+        return stage !== 'Complete' && status !== 'Paused';
+      });
+      return active.sort((a, b) => {
+        const pa = String(a.Priority || 'P9');
+        const pb = String(b.Priority || 'P9');
+        if (pa !== pb) return pa.localeCompare(pb);
+        const la = String(a['Target Launch'] || '').slice(0, 10);
+        const lb = String(b['Target Launch'] || '').slice(0, 10);
+        return la.localeCompare(lb);
+      });
+    },
+
+    getMorningDaysToLaunch(c) {
+      const launch = c?.['Target Launch'] || '';
+      if (!launch) return null;
+      const target = new Date(launch);
+      if (Number.isNaN(target.getTime())) return null;
+      const ms = target.getTime() - Date.now();
+      return Math.ceil(ms / (1000 * 60 * 60 * 24));
+    },
+
+    getMorningLaunchLabel(c) {
+      const days = this.getMorningDaysToLaunch(c);
+      if (days === null) return '—';
+      if (days === 0) return 'launches today';
+      if (days < 0) return `${Math.abs(days)}d overdue`;
+      return `T-${days}`;
+    },
+
+    getMorningYesterdayPosts() {
+      const rows = this.mktopsMorningThisWeek?.rows || [];
+      const today = new Date();
+      const dow = today.getDay();
+      const days = [];
+      const range = dow === 1 ? [1, 2, 3] : [1];
+      range.forEach(offset => {
+        const d = new Date(today);
+        d.setDate(today.getDate() - offset);
+        days.push(d.toISOString().slice(0, 10));
+      });
+      return rows.filter(r => days.includes((r.publishDate || '').slice(0, 10)));
+    },
+
+    getMorningYesterdayPulseLabel() {
+      const dow = new Date().getDay();
+      const count = this.getMorningYesterdayPosts().length;
+      const noun = count === 1 ? 'post' : 'posts';
+      if (dow === 1) return `${count} weekend ${noun}`;
+      return `${count} ${noun}`;
+    },
+
+    getMorningSwps() {
+      const avg = this.mktopsMorningThisWeek?.summary?.avgSWPS;
+      return (avg === null || avg === undefined) ? null : Number(avg);
+    },
+
+    getMorningSwpsTone() {
+      const swps = this.getMorningSwps();
+      if (swps === null) return 'mktops-t1-value--muted';
+      if (swps >= 0.035) return 'mktops-t1-value--healthy';
+      if (swps >= 0.025) return 'mktops-t1-value--warning';
+      return 'mktops-t1-value--critical';
+    },
+
+    getMorningSwpsNote() {
+      const swps = this.getMorningSwps();
+      if (swps === null) return 'no posts measured this week';
+      const deltaPp = ((swps - 0.035) * 100).toFixed(1);
+      const sign = Number(deltaPp) >= 0 ? '+' : '';
+      return `target 3.5%, ${sign}${deltaPp}pp`;
+    },
+
+    getMorningHookGraduations() {
+      const rows = this.mktopsMorningAdCandidates?.rows || [];
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 7);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      return rows.filter(r => (r.publishDate || '').slice(0, 10) >= cutoffStr).length;
+    },
+
+    getMorning7dSwps() {
+      const rows = this.mktopsMorningThisWeek?.rows || [];
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 7);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      const window = rows.filter(r => (r.publishDate || '').slice(0, 10) >= cutoffStr);
+      if (window.length === 0) return null;
+      const sum = window.reduce((acc, r) => acc + (Number(r.swps) || 0), 0);
+      return sum / window.length;
     },
   };
 }

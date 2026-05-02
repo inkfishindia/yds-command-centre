@@ -1,0 +1,63 @@
+/* ============================================================
+   marketingOps/detail.css
+   Owns: detail panel commitment list, key-metrics callout.
+   DO NOT add: UTM builder rules, kanban rules, base view rules.
+   ============================================================ */
+
+/* ===== Feature: Campaign Commitments in Detail Panel ===== */
+
+.detail-commitments {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.detail-commitments h4 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 0 0 0.75rem;
+}
+.commitment-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  margin-bottom: 0.4rem;
+  font-size: 12px;
+}
+.commitment-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commitment-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.commitment-due {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.commitment-overdue {
+  border-left: 3px solid var(--red);
+}
+.commitment-blocked {
+  background: rgba(245, 158, 11, 0.06);
+  border-color: var(--amber);
+}
+
+/* ===== Feature: Key Metrics Callout ===== */
+
+.mktops-metrics {
+  border: 1px solid var(--border);
+}

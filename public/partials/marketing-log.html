@@ -1,0 +1,198 @@
+<!-- Marketing Log view partial — /marketing-log -->
+
+<!-- Header bar -->
+<div class="view-header-bar">
+  <div class="view-header-left">
+    <span class="view-header-emoji" aria-hidden="true">📋</span>
+    <div class="view-header-text">
+      <h2 class="view-header-title">Marketing Log</h2>
+      <span class="view-header-subtitle"
+        x-text="mktLogTotal > 0 ? mktLogTotal + ' entries' : (mktLogLoading ? 'Loading…' : 'No entries')">
+      </span>
+    </div>
+  </div>
+  <div class="view-header-actions">
+    <span class="view-refresh-label"
+      x-show="mktLogLastRefresh"
+      x-text="mktLogLastRefresh ? 'Updated ' + new Date(mktLogLastRefresh).toLocaleTimeString() : ''"
+      x-cloak>
+    </span>
+    <button class="btn btn-small" @click="openMktLogAdd()" aria-label="Add log entry">
+      + Add
+    </button>
+    <button class="btn btn-small btn-icon" @click="refreshMarketingLog()" :disabled="mktLogLoading" title="Refresh">
+      <span class="refresh-icon">&#x21bb;</span> Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Error banner -->
+<template x-if="mktLogError">
+  <div class="mktlog-error-banner" role="alert">
+    <span x-text="mktLogError"></span>
+    <button class="btn btn-small" @click="refreshMarketingLog()">Retry</button>
+  </div>
+</template>
+
+<!-- Filters -->
+<div class="mktlog-filters">
+  <select x-model="mktLogFilters.area" @change="loadMarketingLog()" aria-label="Filter by area">
+    <option value="">All Areas</option>
+    <template x-for="a in _mktLogAreas" :key="a">
+      <option :value="a" x-text="a"></option>
+    </template>
+  </select>
+  <select x-model="mktLogFilters.type" @change="loadMarketingLog()" aria-label="Filter by type">
+    <option value="">All Types</option>
+    <template x-for="t in _mktLogTypes" :key="t">
+      <option :value="t" x-text="t"></option>
+    </template>
+  </select>
+  <select x-model="mktLogFilters.status" @change="loadMarketingLog()" aria-label="Filter by status">
+    <option value="">All Statuses</option>
+    <template x-for="s in _mktLogStatuses" :key="s">
+      <option :value="s" x-text="s"></option>
+    </template>
+  </select>
+  <select x-model="mktLogFilters.tag" @change="loadMarketingLog()" aria-label="Filter by tag">
+    <option value="">All Tags</option>
+    <template x-for="tg in _mktLogTags" :key="tg">
+      <option :value="tg" x-text="tg"></option>
+    </template>
+  </select>
+</div>
+
+<!-- Loading skeletons -->
+<template x-if="mktLogLoading && mktLogEntries.length === 0">
+  <div class="skeleton-stack">
+    <div class="loading-skeleton skeleton-card"></div>
+    <div class="loading-skeleton skeleton-card"></div>
+    <div class="loading-skeleton skeleton-card"></div>
+    <div class="loading-skeleton skeleton-card"></div>
+    <div class="loading-skeleton skeleton-card"></div>
+  </div>
+</template>
+
+<!-- Empty state -->
+<template x-if="!mktLogLoading && !mktLogError && mktLogEntries.length === 0">
+  <div class="mktlog-empty" role="status">
+    <p>No log entries found.</p>
+    <button class="btn btn-small" @click="openMktLogAdd()">Add first entry</button>
+  </div>
+</template>
+
+<!-- Entry list -->
+<template x-if="mktLogEntries.length > 0">
+  <div class="mktlog-list">
+    <template x-for="entry in mktLogEntries" :key="entry.id">
+      <div class="mktlog-entry">
+        <div class="mktlog-entry-header">
+          <span class="badge" :data-priority="entry.priority?.toLowerCase()" x-text="entry.priority"></span>
+          <span class="badge" x-show="entry.type" x-text="entry.type" data-status="info"></span>
+          <span class="badge" x-show="entry.area" x-text="entry.area"></span>
+          <span class="mktlog-date text-muted" x-text="formatMktLogDate(entry.createdTime)"></span>
+        </div>
+        <p class="mktlog-note" x-text="entry.note"></p>
+        <div class="mktlog-tags" x-show="entry.tags && entry.tags.length">
+          <template x-for="tag in (entry.tags || [])" :key="tag">
+            <span class="mktlog-tag" x-text="tag"></span>
+          </template>
+        </div>
+        <div class="mktlog-status-row" x-show="entry.status && entry.status !== 'Logged'">
+          <span class="badge" :data-status="entry.status?.toLowerCase()" x-text="entry.status"></span>
+        </div>
+      </div>
+    </template>
+  </div>
+</template>
+
+<!-- Add entry modal -->
+<template x-if="mktLogAddOpen">
+  <div class="modal-overlay" @click.self="closeMktLogAdd()" role="dialog" aria-modal="true" aria-label="Add marketing log entry">
+    <div class="modal-panel mktlog-modal">
+      <div class="modal-header">
+        <h3>Add Marketing Log Entry</h3>
+        <button class="modal-close-btn" @click="closeMktLogAdd()" aria-label="Close">&times;</button>
+      </div>
+
+      <!-- Note -->
+      <div class="content-form-group">
+        <label for="mktlog-note">Note <span class="form-required">*</span></label>
+        <textarea id="mktlog-note"
+          placeholder="What did you observe, decide, or want to track?"
+          x-model="mktLogForm.note"
+          rows="3"
+          :disabled="mktLogSaving">
+        </textarea>
+      </div>
+
+      <div class="content-form-row">
+        <!-- Area -->
+        <div class="content-form-group">
+          <label for="mktlog-area">Area</label>
+          <select id="mktlog-area" x-model="mktLogForm.area" :disabled="mktLogSaving">
+            <option value="">— None —</option>
+            <template x-for="a in _mktLogAreas" :key="a">
+              <option :value="a" x-text="a"></option>
+            </template>
+          </select>
+        </div>
+
+        <!-- Type -->
+        <div class="content-form-group">
+          <label for="mktlog-type">Type</label>
+          <select id="mktlog-type" x-model="mktLogForm.type" :disabled="mktLogSaving">
+            <option value="">— None —</option>
+            <template x-for="t in _mktLogTypes" :key="t">
+              <option :value="t" x-text="t"></option>
+            </template>
+          </select>
+        </div>
+      </div>
+
+      <!-- Priority -->
+      <div class="content-form-group">
+        <label for="mktlog-priority">Priority</label>
+        <select id="mktlog-priority" x-model="mktLogForm.priority" :disabled="mktLogSaving">
+          <template x-for="p in _mktLogPriorities" :key="p">
+            <option :value="p" x-text="p"></option>
+          </template>
+        </select>
+      </div>
+
+      <!-- Tags -->
+      <div class="content-form-group">
+        <label>Tags</label>
+        <div class="mktlog-tag-picker">
+          <template x-for="tag in _mktLogTags" :key="tag">
+            <button type="button"
+              class="mktlog-tag-option"
+              :class="mktLogForm.tags.includes(tag) && 'mktlog-tag-selected'"
+              @click="mktLogTagToggle(tag)"
+              :disabled="mktLogSaving"
+              x-text="tag">
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <!-- Approval pending -->
+      <div class="mktlog-approval-notice" x-show="mktLogPendingApproval" role="status">
+        Waiting for your approval in the approval panel&hellip;
+      </div>
+
+      <!-- Error -->
+      <p class="form-error" x-show="mktLogSaveError" x-text="mktLogSaveError"></p>
+
+      <!-- Actions -->
+      <div class="modal-actions">
+        <button class="btn btn-secondary" @click="closeMktLogAdd()" :disabled="mktLogSaving">Cancel</button>
+        <button class="btn btn-primary"
+          @click="saveMktLogEntry()"
+          :disabled="mktLogSaving || !mktLogForm.note.trim()"
+          x-text="mktLogSaving ? (mktLogPendingApproval ? 'Awaiting approval…' : 'Saving…') : 'Log Entry'">
+        </button>
+      </div>
+    </div>
+  </div>
+</template>

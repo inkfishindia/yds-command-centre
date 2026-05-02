@@ -44,6 +44,29 @@ Everything below is written so you can copy-paste IDs and property names verbati
 
 **Parent page** for all new DBs: `YDS Marketing Hub` = `323247aa-0d7b-81a5-b85d-ce421c959f3b`. Notion integration must have access to this page (which propagates).
 
+### 1.1 Do Not Wire — Deprecated DBs (all archived 2026-05-03)
+
+These DBs exist in Notion but must NOT be wired to the dashboard or read-model crawler. **All renamed `[ARCHIVED]` in title** as of 2026-05-03 — title prefix is the in-Notion deprecation signal.
+
+| DB | ID | Status | Replace with |
+|---|---|---|---|
+| `[ARCHIVED] Marketing Campaigns (old)` | `2e213a71-33a1-423c-a4ed-686c0cf7a04d` | ✅ Archived | Canonical `Campaigns` (`cff40f34…`) |
+| `[ARCHIVED] Campaign Decisions` | `36f79d19-dbfe-4fdd-b593-f919db15e8b2` | ✅ Archived | `Decisions` (`158108d0…`) — filter by Domain |
+| `[ARCHIVED] Marketing Log` | `3ca17008-a299-4dcf-a662-300438a9e295` | ✅ Archived (0 rows) | `Sessions Log` (`b1d04b58…`) |
+| `[ARCHIVED] Marketing Tasks` | `b44daab1-c281-4e88-8ea4-6e9371370c28` | ✅ Archived (6 rows migrated to Commitments YDS-262 → YDS-267) | `Commitments` filtered by Focus Area = D2C Marketing & Content |
+| `[ARCHIVED] Campaigns (Hub A)` | `25c247aa-0d7b-81de-9a09-000bd2154509` | ✅ Archived (Hub A child) | `Campaigns` (`cff40f34…`) |
+| `[ARCHIVED] Marketing Sprints (A)` | `25c247aa-0d7b-8118-ab5f-000b231de3ad` | ✅ Archived (Hub A child) | (none — sprints in Commitments + Sessions Log) |
+| `[ARCHIVED] YD Marketing Campaigns (A)` | `25c247aa-0d7b-813c-8765-000bfa63286f` | ✅ Archived (Hub A child) | `Campaigns` |
+| `[ARCHIVED] Campaigns & Series (A)` | `34e3a22a-1577-43bd-9fab-32145d99b5d9` | ✅ Archived | `Campaigns` |
+| `[ARCHIVED] Marketing Tracker` | `db0ca2ff-ae2d-4037-b73b-b3c39ab2d68f` | ✅ Archived (0 rows; was tech dashboard prototype) | Capabilities split: content → Content Calendar, approvals → Approvals Log, tasks → Commitments |
+| `[ARCHIVED] Marketing Operations Hub (Aug 2025)` (page) | `25c247aa-0d7b-811c-bc15-c1835457425b` | ✅ Archived (Hub A parent page renamed) | `YDS Marketing Hub` (`323247aa…`) |
+
+**Crawler filter (one rule excludes all of the above):** scope Notion crawler to parent chain `307247aa-0d7b-8102-bfa0-f8a18d8809d9` (YDS Operating System v2). Hub A and YD Home tree are siblings in the workspace, not children of OS v2 — this filter excludes them wholesale.
+
+**Belt-and-braces filter:** also exclude any DB whose title starts with `[ARCHIVED]`.
+
+> **Note (2026-05-03):** This crawler-filter rule applies to *any future* workspace-discovery code. The current command-centre code path does not crawl Notion — it only queries DBs whose IDs are explicitly hardcoded in [`server/services/notion/databases.js`](../../server/services/notion/databases.js)'s `DB` object. That hardcoded list is the de-facto filter and already excludes all 10 entries above. No filter wire-up is needed today; the rule above is preserved here as the contract for any future crawler.
+
 ---
 
 ## 2. Cross-DB Relation Graph

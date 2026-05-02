@@ -36,6 +36,196 @@
 
       <template x-if="mktops">
         <div>
+
+          <!-- ═══════════════════════════════════════════════════════
+               MORNING BRIEFING — Tier 1 strip + 3 morning views
+               MARKETING-ALIGNMENT § 4.1 + § 4.2
+               ═══════════════════════════════════════════════════════ -->
+
+          <!-- Tier 1 Metrics Strip (§ 4.2) -->
+          <div class="mktops-t1-strip">
+            <!-- Weekly SWPS -->
+            <div class="mktops-t1-card">
+              <span class="mktops-t1-label">Weekly SWPS</span>
+              <div
+                class="mktops-t1-value"
+                :class="getMorningSwps() === null ? 'mktops-t1-value--muted' : getMorningSwpsTone()"
+                x-text="getMorningSwps() === null ? '—' : (getMorningSwps() * 100).toFixed(1) + '%'"
+              ></div>
+              <span class="mktops-t1-note" x-text="getMorningSwpsNote()"></span>
+            </div>
+            <!-- Hook Graduation Count -->
+            <div class="mktops-t1-card">
+              <span class="mktops-t1-label">Hook Graduations</span>
+              <div class="mktops-t1-value" x-text="getMorningHookGraduations()"></div>
+              <span class="mktops-t1-note">ad candidates this week</span>
+            </div>
+            <!-- Email captures from IG bio — data not yet wired -->
+            <div class="mktops-t1-card">
+              <span class="mktops-t1-label">Email Captures (IG bio)</span>
+              <div class="mktops-t1-value mktops-t1-value--muted">—</div>
+              <span class="mktops-t1-note mktops-t1-pending">Wiring pending — GA4 &rarr; email source not yet connected</span>
+            </div>
+          </div>
+
+          <!-- Section 1: Today's content shipping (§ 4.1 #1) -->
+          <div class="mktops-morning-section">
+            <div class="mktops-morning-section-header">
+              <span class="mktops-morning-section-title">Today's content shipping</span>
+              <span class="mktops-morning-section-count" x-text="getMorningTodayContent().length + ' items'"></span>
+            </div>
+            <template x-if="getMorningTodayContent().length === 0">
+              <p class="mktops-morning-empty">Nothing shipping today — you're ahead of schedule.</p>
+            </template>
+            <template x-if="getMorningTodayContent().length > 0">
+              <div class="table-wrap">
+                <table class="mktops-today-table">
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Channel</th>
+                      <th>Owner</th>
+                      <th>Review Status</th>
+                      <th>Last edit</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="item in getMorningTodayContent()" :key="item.id">
+                      <tr>
+                        <td class="mktops-today-title-cell" x-text="item.Name || item.name"></td>
+                        <td><span class="badge" x-text="item.Platform || item.platform || '—'"></span></td>
+                        <td x-text="item.ownerName || item.Owner || '—'"></td>
+                        <td>
+                          <span
+                            class="badge"
+                            :data-status="(item.brandReviewStatus || item['Brand Review Status'] || '').toLowerCase().replace(/\s+/g, '-')"
+                            x-text="item.brandReviewStatus || item['Brand Review Status'] || '—'"
+                          ></span>
+                        </td>
+                        <td x-text="formatMorningRelTime(item.lastEditedTime || item['Last Edited'])"></td>
+                        <td>
+                          <a
+                            x-show="item.id"
+                            :href="'https://notion.so/' + (item.id || '').replace(/-/g, '')"
+                            target="_blank"
+                            rel="noopener"
+                            class="notion-link-btn"
+                            title="Open in Notion"
+                            aria-label="Open in Notion"
+                            @click.stop
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                          </a>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+          </div>
+
+          <!-- Section 2: Campaign status board (§ 4.1 #2) -->
+          <div class="mktops-morning-section">
+            <div class="mktops-morning-section-header">
+              <span class="mktops-morning-section-title">Campaign status</span>
+              <span class="mktops-morning-section-count" x-text="getMorningActiveCampaigns().length + ' active'"></span>
+            </div>
+            <template x-if="getMorningActiveCampaigns().length === 0">
+              <p class="mktops-morning-empty">No active campaigns.</p>
+            </template>
+            <div class="mktops-morning-campaign-list">
+              <template x-for="c in getMorningActiveCampaigns()" :key="c.id">
+                <div
+                  class="mktops-morning-campaign-row"
+                  :class="c.Status === 'Blocked' ? 'mktops-morning-campaign-row--blocked' : c.Status === 'Needs Dan' ? 'mktops-morning-campaign-row--needs-dan' : ''"
+                >
+                  <span class="mktops-morning-campaign-name" x-text="c.Name"></span>
+                  <div class="mktops-morning-campaign-meta">
+                    <span
+                      class="badge"
+                      :data-status="(c.Status || '').toLowerCase().replace(/\s+/g, '-')"
+                      x-text="c.Status || '—'"
+                    ></span>
+                    <span class="badge" x-show="c.Stage" x-text="c.Stage"></span>
+                    <span
+                      class="mktops-days-to-launch"
+                      :class="getMorningDaysToLaunch(c) <= 3 && getMorningDaysToLaunch(c) >= 0 ? 'mktops-days-to-launch--urgent' : ''"
+                      x-show="c['Target Launch']"
+                      x-text="getMorningLaunchLabel(c)"
+                    ></span>
+                    <span class="text-muted" x-show="c['Blocked By']" x-text="'Blocked: ' + c['Blocked By']" style="font-size:11px"></span>
+                    <a
+                      x-show="c.id"
+                      :href="'https://notion.so/' + (c.id || '').replace(/-/g, '')"
+                      target="_blank"
+                      rel="noopener"
+                      class="notion-link-btn"
+                      title="Open in Notion"
+                      aria-label="Open campaign in Notion"
+                      @click.stop
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    </a>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Section 3: Yesterday's pulse (§ 4.1 #3) -->
+          <div class="mktops-morning-section">
+            <div class="mktops-morning-section-header">
+              <span class="mktops-morning-section-title">Yesterday's pulse</span>
+              <span class="mktops-morning-section-count" x-text="getMorningYesterdayPulseLabel()"></span>
+            </div>
+            <!-- 7-day SWPS rolling avg -->
+            <div class="mktops-pulse-swps-avg" x-show="getMorning7dSwps() !== null">
+              7-day rolling SWPS avg: <strong x-text="getMorning7dSwps() !== null ? (getMorning7dSwps() * 100).toFixed(1) + '%' : '—'"></strong>
+            </div>
+            <template x-if="getMorningYesterdayPosts().length === 0">
+              <p class="mktops-morning-empty">No IG posts from yesterday — check back Monday morning for the weekend rollup.</p>
+            </template>
+            <div class="mktops-pulse-list">
+              <template x-for="post in getMorningYesterdayPosts()" :key="post.id">
+                <div class="mktops-pulse-row">
+                  <span class="mktops-pulse-title" x-text="post.Post || post.title || '—'"></span>
+                  <div class="mktops-pulse-metrics" x-show="post.Reach || post.Saves || post.Shares">
+                    <div class="mktops-pulse-metric">
+                      <div class="mktops-pulse-metric-val" x-text="post.Reach || '—'"></div>
+                      <div class="mktops-pulse-metric-label">Reach</div>
+                    </div>
+                    <div class="mktops-pulse-metric">
+                      <div class="mktops-pulse-metric-val" x-text="post.Saves || '—'"></div>
+                      <div class="mktops-pulse-metric-label">Saves</div>
+                    </div>
+                    <div class="mktops-pulse-metric">
+                      <div class="mktops-pulse-metric-val" x-text="post.Shares || '—'"></div>
+                      <div class="mktops-pulse-metric-label">Shares</div>
+                    </div>
+                  </div>
+                  <span class="mktops-pulse-pending" x-show="!post.Reach && !post.Saves && !post.Shares">data pending</span>
+                  <a
+                    x-show="post.id"
+                    :href="'https://notion.so/' + (post.id || '').replace(/-/g, '')"
+                    target="_blank"
+                    rel="noopener"
+                    class="notion-link-btn"
+                    title="Open in Notion"
+                    aria-label="Open post in Notion"
+                    @click.stop
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  </a>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Divider before existing detailed sections -->
+          <hr style="border:none;border-top:1px solid var(--border);margin:1.5rem 0">
+
           <div class="mktops-overview-shell">
             <section class="mktops-hero" :class="'mktops-hero--' + getMarketingAreaStatus().tone">
               <div class="mktops-hero-copy">
@@ -46,7 +236,6 @@
               <div class="mktops-hero-status">
                 <span class="mktops-hero-status-label">Status</span>
                 <span class="mktops-hero-status-value" x-text="getMarketingAreaStatus().label"></span>
-                <button class="overview-link-btn" @click="openMarketingSection('tasks')">Open Tasks</button>
               </div>
             </section>
 
@@ -242,6 +431,18 @@
                       <div class="kanban-card-footer">
                         <span class="text-muted" x-show="c['Target Launch']" x-text="formatMktDate(c['Target Launch'])"></span>
                         <span class="text-muted" x-show="c.Budget" x-text="'₹' + c.Budget"></span>
+                        <a
+                          x-show="c.id"
+                          :href="'https://notion.so/' + (c.id || '').replace(/-/g, '')"
+                          target="_blank"
+                          rel="noopener"
+                          class="notion-link-btn"
+                          title="Comment in Notion"
+                          aria-label="Open in Notion"
+                          @click.stop
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        </a>
                       </div>
                       <!-- Inline actions (hover) -->
                       <div class="kanban-card-actions">
@@ -289,6 +490,18 @@
                       <div class="kanban-card-footer">
                         <span class="text-muted" x-show="c['Publish Date']" x-text="formatMktDate(c['Publish Date'])"></span>
                         <span class="text-muted" x-show="c.campaignName" x-text="c.campaignName"></span>
+                        <a
+                          x-show="c.id"
+                          :href="'https://notion.so/' + (c.id || '').replace(/-/g, '')"
+                          target="_blank"
+                          rel="noopener"
+                          class="notion-link-btn"
+                          title="Comment in Notion"
+                          aria-label="Open in Notion"
+                          @click.stop
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        </a>
                       </div>
                     </div>
                   </template>

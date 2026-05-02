@@ -1,8 +1,10 @@
 # Marketing — docs index
 
+> **Tech wiring up the dashboard?** Start at [../TECH-WIRE-UP.md](../TECH-WIRE-UP.md) — single entry-point doc with priority-ordered punch list and pointers into the other docs.
+
 This folder is the marketing layer of Command Centre. Two things live here:
 
-1. **Notion system map** ([NOTION-SETUP.md](./NOTION-SETUP.md)) — every marketing DB, ID, schema, formula, relation, and automation needed to wire the marketing layer. **Start here** if you're wiring something Notion-related.
+1. **Notion system map** ([NOTION-SETUP.md](./NOTION-SETUP.md)) — every marketing DB, ID, schema, formula, relation, and automation needed to wire the marketing layer. Canonical reference for any Notion-related wiring.
 
 2. **MCC (Marketing Content Center)** in [mcc/](./mcc/) — the social-posting backend (Instagram + LinkedIn). Already wired in Phase 1. Self-contained code path with its own DB and env var.
 
