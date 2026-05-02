@@ -1,0 +1,24 @@
+/* ===========================================================
+ * overview.css — view styles for /overview
+ * Public exports (used by overview-partial-view container):
+ *   .overview-skeleton-kpi    — KPI skeleton card (loading state)
+ *   .overview-skeleton-section — full-width skeleton section
+ *   .overview-skeleton-half   — half-width skeleton section
+ * DO NOT add: dynamic widths/heights, page-wide chrome
+ *   (chrome lives in core.css; overview-* classes already in
+ *    core.css and marketingOps.css stay where they are)
+ * =========================================================== */
+
+.overview-skeleton-kpi {
+  min-width: 180px;
+  height: 100px;
+  flex-shrink: 0;
+}
+
+.overview-skeleton-section {
+  height: 220px;
+}
+
+.overview-skeleton-half {
+  height: 180px;
+}

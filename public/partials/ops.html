@@ -43,7 +43,7 @@
       </div>
 
       <!-- Tabs -->
-      <div class="mktops-tabs" style="margin-bottom: 1.25rem;">
+      <div class="mktops-tabs ops-mb-125">
         <button class="filter-pill" :class="opsSection === 'overview' && 'filter-pill-active'" @click="opsSwitchSection('overview')" aria-label="Overview">Overview</button>
         <button class="filter-pill" :class="opsSection === 'stock' && 'filter-pill-active'" @click="opsSwitchSection('stock')" aria-label="Stock Health">
           Stock Health
@@ -78,7 +78,7 @@
           </div>
           <template x-if="!opsLoading || ops">
             <div>
-              <div class="mktops-overview-shell" style="margin-bottom:1.5rem;">
+              <div class="mktops-overview-shell ops-mb-15">
                 <section class="mktops-hero" :class="'mktops-hero--' + getOpsAreaStatus().tone">
                   <div class="mktops-hero-copy">
                     <div class="mktops-hero-kicker">Area Dashboard</div>
@@ -192,7 +192,7 @@
               </div>
 
               <!-- KPI Cards -->
-              <div class="data-card-grid" style="margin-bottom: 1.5rem;">
+              <div class="data-card-grid ops-mb-15">
                 <button class="data-card accent data-card-button" @click="applyOpsSavedView('products')">
                   <span class="data-card-label">Total Variants</span>
                   <span class="data-card-value" x-text="ops?.stockHealth?.totalVariants ? formatNumber(ops.stockHealth.totalVariants) : '—'"></span>
@@ -221,7 +221,7 @@
 
               <!-- Stacked Bar: Stock Status Distribution -->
               <template x-if="ops?.stockHealth?.byStatus">
-                <div style="margin-bottom: 1.5rem;">
+                <div class="ops-mb-15">
                   <div class="ops-section-label">Stock Distribution</div>
                   <div class="ops-stacked-bar" role="img" aria-label="Stock status distribution bar">
                     <template x-for="seg in opsStockBarSegments()" :key="seg.name">
@@ -244,15 +244,15 @@
               </template>
 
               <!-- Two columns: Alerts + Pending POs -->
-              <div class="ops-two-col" style="margin-bottom: 1.5rem;">
+              <div class="ops-two-col ops-mb-15">
 
                 <!-- Stock Alerts -->
-                <div class="data-card" style="padding: 0; overflow: hidden;">
-                  <div style="padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid var(--border);">
+                <div class="data-card ops-card-flush">
+                  <div class="ops-card-header">
                     <span class="data-card-label">Stock Alerts</span>
                   </div>
-                  <div style="overflow-x: auto;">
-                    <table class="data-table" style="font-size: 12px;">
+                  <div class="ops-scroll-x">
+                    <table class="data-table ops-table-sm">
                       <thead>
                         <tr>
                           <th>Product</th>
@@ -268,7 +268,7 @@
                       <tbody>
                         <template x-for="(row, idx) in (ops?.alerts || []).slice(0, 20)" :key="idx">
                           <tr>
-                            <td x-text="row.product || '—'" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></td>
+                            <td x-text="row.product || '—'" class="cell-truncate"></td>
                             <td x-text="row.color || '—'"></td>
                             <td x-text="row.size || '—'"></td>
                             <td x-text="row.totalStock ?? '—'"></td>
@@ -287,7 +287,7 @@
                           </tr>
                         </template>
                         <tr x-show="!ops?.alerts?.length">
-                          <td colspan="8" style="text-align: center; color: var(--text-muted);">No alerts</td>
+                          <td colspan="8" class="ops-empty-cell">No alerts</td>
                         </tr>
                       </tbody>
                     </table>
@@ -295,12 +295,12 @@
                 </div>
 
                 <!-- Pending Purchase Orders -->
-                <div class="data-card" style="padding: 0; overflow: hidden;">
-                  <div style="padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid var(--border);">
+                <div class="data-card ops-card-flush">
+                  <div class="ops-card-header">
                     <span class="data-card-label">Pending Purchase Orders</span>
                   </div>
-                  <div style="overflow-x: auto;">
-                    <table class="data-table" style="font-size: 12px;">
+                  <div class="ops-scroll-x">
+                    <table class="data-table ops-table-sm">
                       <thead>
                         <tr>
                           <th>Product</th>
@@ -313,7 +313,7 @@
                       <tbody>
                         <template x-for="(po, idx) in (ops?.pendingPOs?.items || []).slice(0, 20)" :key="idx">
                           <tr>
-                            <td x-text="po.Product || '—'" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></td>
+                            <td x-text="po.Product || '—'" class="cell-truncate"></td>
                             <td x-text="po['Option 1 Value'] || '—'"></td>
                             <td x-text="po['Option 2 Value'] || '—'"></td>
                             <td x-text="po.Reorder_Qty ?? '—'"></td>
@@ -323,7 +323,7 @@
                           </tr>
                         </template>
                         <tr x-show="!ops?.pendingPOs?.items?.length">
-                          <td colspan="5" style="text-align: center; color: var(--text-muted);">No pending POs</td>
+                          <td colspan="5" class="ops-empty-cell">No pending POs</td>
                         </tr>
                       </tbody>
                     </table>
@@ -337,7 +337,7 @@
 
                 <!-- Product Tiers -->
                 <div class="data-card">
-                  <span class="data-card-label" style="margin-bottom: 0.75rem; display: block;">Product Tiers</span>
+                  <span class="data-card-label ops-card-label-block">Product Tiers</span>
                   <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
                     <template x-for="tier in (ops?.products?.byTier || [])" :key="tier.name">
                       <span class="badge" :data-status="opsTierColor(tier.name)">
@@ -349,9 +349,9 @@
 
                 <!-- Vendors -->
                 <div class="data-card">
-                  <span class="data-card-label" style="margin-bottom: 0.75rem; display: block;">Vendors</span>
-                  <div style="overflow-x: auto;">
-                    <table class="data-table" style="font-size: 12px;">
+                  <span class="data-card-label ops-card-label-block">Vendors</span>
+                  <div class="ops-scroll-x">
+                    <table class="data-table ops-table-sm">
                       <thead>
                         <tr>
                           <th>Vendor</th>
@@ -374,7 +374,7 @@
                           </tr>
                         </template>
                         <tr x-show="!ops?.vendors?.length">
-                          <td colspan="3" style="text-align: center; color: var(--text-muted);">No vendors</td>
+                          <td colspan="3" class="ops-empty-cell">No vendors</td>
                         </tr>
                       </tbody>
                     </table>
@@ -392,7 +392,7 @@
       <template x-if="opsSection === 'stock'">
         <div>
           <!-- Filters -->
-          <div class="mktops-filters" style="margin-bottom: 1rem;">
+          <div class="mktops-filters ops-mb-10">
             <input
               class="filter-input"
               type="search"
@@ -427,7 +427,7 @@
           <template x-if="!opsStockLoading">
             <div>
               <div class="ops-row-count" x-text="`${opsStockTotal.toLocaleString()} variants`"></div>
-              <div style="overflow-x: auto;">
+              <div class="ops-scroll-x">
                 <table class="data-table">
                   <thead>
                     <tr>
@@ -447,8 +447,8 @@
                   <tbody>
                     <template x-for="(row, idx) in opsStock" :key="idx">
                       <tr>
-                        <td x-text="row.Product || '—'" style="max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></td>
-                        <td x-text="row.Variant_SKU || row.Product_Code || '—'" style="font-family: var(--font-mono, monospace); font-size: 11px;"></td>
+                        <td x-text="row.Product || '—'" class="cell-truncate ops-cell-truncate-160"></td>
+                        <td x-text="row.Variant_SKU || row.Product_Code || '—'" class="ops-mono-sm"></td>
                         <td x-text="row['Option 1 Value'] || '—'"></td>
                         <td x-text="row['Option 2 Value'] || '—'"></td>
                         <td x-text="row['Total Stock'] ?? '—'"></td>
@@ -470,7 +470,7 @@
                       </tr>
                     </template>
                     <tr x-show="!opsStock.length && !opsStockLoading">
-                      <td colspan="11" style="text-align: center; color: var(--text-muted);">No results</td>
+                      <td colspan="11" class="ops-empty-cell">No results</td>
                     </tr>
                   </tbody>
                 </table>
@@ -490,7 +490,7 @@
             <div>
 
               <!-- KPI Row -->
-              <div class="data-card-grid" style="margin-bottom: 1.5rem;">
+              <div class="data-card-grid ops-mb-15">
                 <div class="data-card accent">
                   <span class="data-card-label">Total Orders</span>
                   <span class="data-card-value" x-text="formatNumber(opsSales.totalOrders)"></span>
@@ -506,13 +506,13 @@
               </div>
 
               <!-- By Channel + Top Cities -->
-              <div class="ops-two-col" style="margin-bottom: 1.5rem;">
-                <div class="data-card" style="padding: 0; overflow: hidden;">
-                  <div style="padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid var(--border);">
+              <div class="ops-two-col ops-mb-15">
+                <div class="data-card ops-card-flush">
+                  <div class="ops-card-header">
                     <span class="data-card-label">By Channel</span>
                   </div>
-                  <div style="overflow-x: auto;">
-                    <table class="data-table" style="font-size: 12px;">
+                  <div class="ops-scroll-x">
+                    <table class="data-table ops-table-sm">
                       <thead>
                         <tr>
                           <th>Channel</th>
@@ -524,7 +524,7 @@
                       <tbody>
                         <template x-for="(ch, idx) in (opsSales.byChannel || [])" :key="idx">
                           <tr>
-                            <td x-text="ch.name || '—'" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></td>
+                            <td x-text="ch.name || '—'" class="cell-truncate"></td>
                             <td x-text="formatNumber(ch.orders)"></td>
                             <td x-text="formatNumber(ch.qty)"></td>
                             <td x-text="formatCurrency(ch.revenue)"></td>
@@ -535,12 +535,12 @@
                   </div>
                 </div>
 
-                <div class="data-card" style="padding: 0; overflow: hidden;">
-                  <div style="padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid var(--border);">
+                <div class="data-card ops-card-flush">
+                  <div class="ops-card-header">
                     <span class="data-card-label">Top Cities</span>
                   </div>
-                  <div style="overflow-x: auto;">
-                    <table class="data-table" style="font-size: 12px;">
+                  <div class="ops-scroll-x">
+                    <table class="data-table ops-table-sm">
                       <thead>
                         <tr>
                           <th>City</th>
@@ -561,11 +561,11 @@
               </div>
 
               <!-- Top Products -->
-              <div class="data-card" style="padding: 0; overflow: hidden; margin-bottom: 1.5rem;">
-                <div style="padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid var(--border);">
+              <div class="data-card ops-card-flush ops-mb-15">
+                <div class="ops-card-header">
                   <span class="data-card-label">Top Products by Quantity</span>
                 </div>
-                <div style="overflow-x: auto;">
+                <div class="ops-scroll-x">
                   <table class="data-table">
                     <thead>
                       <tr>
@@ -590,12 +590,12 @@
               </div>
 
               <!-- Recent Orders -->
-              <div class="data-card" style="padding: 0; overflow: hidden;">
-                <div style="padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid var(--border);">
+              <div class="data-card ops-card-flush">
+                <div class="ops-card-header">
                   <span class="data-card-label">Recent Orders</span>
                 </div>
-                <div style="overflow-x: auto;">
-                  <table class="data-table" style="font-size: 12px;">
+                <div class="ops-scroll-x">
+                  <table class="data-table ops-table-sm">
                     <thead>
                       <tr>
                         <th>Order #</th>
@@ -610,10 +610,10 @@
                     <tbody>
                       <template x-for="(o, idx) in (opsSales.recentOrders || []).slice(0, 20)" :key="idx">
                         <tr>
-                          <td x-text="o.orderNum || '—'" style="font-family: var(--font-mono, monospace); font-size: 11px;"></td>
+                          <td x-text="o.orderNum || '—'" class="ops-mono-sm"></td>
                           <td x-text="o.date || '—'"></td>
                           <td x-text="o.customer || '—'"></td>
-                          <td x-text="o.product || '—'" style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></td>
+                          <td x-text="o.product || '—'" class="cell-truncate"></td>
                           <td x-text="o.qty ?? '—'"></td>
                           <td x-text="formatCurrency(o.amount)"></td>
                           <td>
@@ -635,7 +635,7 @@
       <template x-if="opsSection === 'products'">
         <div>
           <!-- Filters -->
-          <div class="mktops-filters" style="margin-bottom: 1rem;">
+          <div class="mktops-filters ops-mb-10">
             <input
               class="filter-input"
               type="search"
@@ -667,7 +667,7 @@
           <template x-if="!opsProductsLoading">
             <div>
               <div class="ops-row-count" x-text="`${opsProductsTotal} products`"></div>
-              <div style="overflow-x: auto;">
+              <div class="ops-scroll-x">
                 <table class="data-table">
                   <thead>
                     <tr>
@@ -685,7 +685,7 @@
                     <template x-for="(p, idx) in opsProducts" :key="idx">
                       <tr>
                         <td x-text="p.Product_Name || '—'"></td>
-                        <td x-text="p.Product_Code || '—'" style="font-family: var(--font-mono, monospace); font-size: 11px;"></td>
+                        <td x-text="p.Product_Code || '—'" class="ops-mono-sm"></td>
                         <td x-text="p.Vendor || '—'"></td>
                         <td>
                           <span class="badge" :data-status="opsTierColor(p['Template Product Tier Classification'])" x-text="p['Template Product Tier Classification'] ? 'T' + p['Template Product Tier Classification'] : '—'"></span>
@@ -705,7 +705,7 @@
                       </tr>
                     </template>
                     <tr x-show="!opsProducts.length && !opsProductsLoading">
-                      <td colspan="8" style="text-align: center; color: var(--text-muted);">No products</td>
+                      <td colspan="8" class="ops-empty-cell">No products</td>
                     </tr>
                   </tbody>
                 </table>
@@ -724,7 +724,7 @@
           <template x-if="!opsPOsLoading">
             <div>
               <div class="ops-row-count" x-text="`${opsPOsTotal} purchase orders`"></div>
-              <div style="overflow-x: auto;">
+              <div class="ops-scroll-x">
                 <table class="data-table">
                   <thead>
                     <tr>
@@ -741,7 +741,7 @@
                   <tbody>
                     <template x-for="(po, idx) in opsPOs" :key="idx">
                       <tr>
-                        <td x-text="po.Product || '—'" style="max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></td>
+                        <td x-text="po.Product || '—'" class="cell-truncate" style="max-width: 160px;"></td>
                         <td x-text="po['Option 1 Value'] || '—'"></td>
                         <td x-text="po['Option 2 Value'] || '—'"></td>
                         <td>
@@ -760,7 +760,7 @@
                       </tr>
                     </template>
                     <tr x-show="!opsPOs.length && !opsPOsLoading">
-                      <td colspan="8" style="text-align: center; color: var(--text-muted);">No purchase orders</td>
+                      <td colspan="8" class="ops-empty-cell">No purchase orders</td>
                     </tr>
                   </tbody>
                 </table>

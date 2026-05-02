@@ -321,6 +321,11 @@ body {
   padding: 0.75rem 0;
   gap: 0.25rem;
   flex-shrink: 0;
+  /* Without overflow-y, nav items get clipped on short viewports
+     (5 groups + 26 buttons + footer can exceed 100dvh when expanded). */
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
 .nav-btn {
@@ -2497,6 +2502,8 @@ tr:hover .table-link { color: var(--accent); }
 }
 
 /* === Utility Classes === */
+.cell-truncate { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flex-row-tight { display: flex; gap: 4px; align-items: center; }
 .sidebar-section-gap { margin-top: 1.5rem; }
 .skeleton-gap { margin-top: 1rem; }
 .skeleton-gap-sm { margin-top: 0.75rem; }
@@ -10533,6 +10540,12 @@ textarea:focus-visible {
 }
 
 /* ─── Area Metric Cards — base + tone modifiers (shared, dashboard + ops views) ─── */
+
+.mktops-area-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
 
 .mktops-area-metric-card {
   background: var(--bg-card);

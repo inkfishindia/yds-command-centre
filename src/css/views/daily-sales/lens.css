@@ -1,0 +1,493 @@
+/* ============================================================
+   lens.css — daily-sales lens strip, stat cards, realized badge, tooltips
+   Owns: .ds-lens-*, .ds-realized-*, .ds-stat-*, .ds-delta-*,
+         .ds-acceptance-badge, .ds-acceptance--*, .ds-stat-card__*,
+         .ds-tooltip-backdrop, related @media overrides and @keyframes.
+   DO NOT add: filter strip, trend, mix, geo, orders, concerns, dq rules.
+   ============================================================ */
+
+/* ── Realized badge ── */
+.ds-realized-badge-wrap {
+  padding: 0 16px 4px;
+  flex-shrink: 0;
+}
+
+.ds-realized-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-realized-badge:hover {
+  color: var(--text-primary);
+}
+
+.ds-realized-badge:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.ds-realized-badge__count {
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-realized-badge__arrow {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  transition: transform 200ms ease;
+  flex-shrink: 0;
+}
+
+.ds-realized-badge__arrow.ds-realized-badge--expanded {
+  transform: rotate(180deg);
+}
+
+.ds-realized-badge__breakdown {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-top: 8px;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 200ms ease, opacity 200ms ease;
+}
+
+.ds-realized-badge__breakdown.ds-realized-badge--expanded {
+  max-height: 280px;
+  opacity: 1;
+}
+
+.ds-realized-badge__breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-realized-badge__breakdown-row:last-child {
+  border-bottom: none;
+}
+
+.ds-realized-badge__breakdown-status {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.ds-realized-badge__breakdown-stats {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.ds-realized-badge__breakdown-count {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-realized-badge__breakdown-pct {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 50px;
+  text-align: right;
+}
+
+/* ── Stat card ── */
+.ds-stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ds-stat-label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.ds-stat-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.ds-stat-delta {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.ds-delta-arrow {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.ds-delta-up   { color: var(--green); }
+.ds-delta-down { color: var(--red); }
+.ds-delta-neutral { color: var(--text-secondary); }
+
+/* .ds-stat-secondary removed — referenced nonexistent --text-tertiary token and had no HTML usage */
+
+/* ── Today card dual-metric structure (v3) ── */
+.ds-stat-card--dual {
+  gap: 6px;
+}
+
+.ds-stat-metric-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ds-stat-metric-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.ds-stat-metric-label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.ds-stat-metric-group--secondary {
+  opacity: 0.7;
+}
+
+.ds-stat-metric-group--secondary .ds-stat-metric-value {
+  font-size: 18px;
+}
+
+/* "vs yesterday" suffix — token-based, no inline style */
+.ds-stat-delta-suffix {
+  color: var(--text-secondary);
+  margin-left: 2px;
+}
+
+/* ── v5 Lens Segment Control ─────────────────────────────── */
+
+.ds-lens-strip {
+  position: sticky;
+  top: 100px; /* below freshness banner (top:60 + ~40 height) */
+  z-index: 10; /* sticky-header tier */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.ds-lens-strip__custom-label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  margin-left: 4px;
+}
+
+.ds-lens-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  min-height: 36px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+  user-select: none;
+}
+
+.ds-lens-pill:hover {
+  color: var(--text-primary);
+  border-color: var(--border-light);
+  background: var(--bg-hover);
+}
+
+.ds-lens-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ds-lens-pill--active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.ds-lens-pill:disabled,
+.ds-lens-pill[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── v5 Stat-Card Info Icon + Tooltip ───────────────────── */
+
+.ds-stat-card--with-info {
+  position: relative;
+  padding-right: 36px; /* reserve space for info icon */
+}
+
+.ds-stat-card__info-icon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 150ms ease, background 150ms ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.ds-stat-card__info-icon:hover {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.ds-stat-card__info-icon:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ds-stat-card__tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  padding: 12px 14px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  z-index: 200; /* popover tier — above sticky-header tier (z=10) */
+  min-width: 280px;
+  max-width: 360px;
+  pointer-events: auto;
+  animation: ds-fadeIn 150ms ease-out;
+}
+
+.ds-stat-card__tooltip-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-stat-card__tooltip-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-stat-card__tooltip-row:last-child {
+  border-bottom: none;
+}
+
+.ds-stat-card__tooltip-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.ds-stat-card__tooltip-value {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.ds-stat-card__tooltip-value--mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes ds-fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── v5 Acceptance badge ── */
+
+.ds-acceptance-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ds-acceptance--accepted {
+  background: var(--green-dim);
+  color: var(--green);
+}
+
+.ds-acceptance--awaiting {
+  background: var(--amber-dim);
+  color: var(--amber);
+}
+
+.ds-acceptance--rejected {
+  background: var(--red-dim);
+  color: var(--red);
+}
+
+.ds-acceptance--unknown {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+
+/* ── Desktop (≥768px) ── */
+@media (min-width: 768px) {
+  .ds-stat-value {
+    font-size: 24px;
+  }
+
+  /* Harmonize Today dual-metric values to the same desktop scale as MTD/YTD */
+  .ds-stat-metric-value {
+    font-size: 24px;
+  }
+}
+
+/* ── v5 Mobile Adjustments ───────────────────────────────── */
+
+@media (max-width: 640px) {
+  .ds-lens-strip {
+    padding: 6px 12px;
+    gap: 6px;
+    top: 90px;
+  }
+
+  .ds-lens-pill {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-height: 44px; /* touch target */
+  }
+
+  .ds-stat-card__info-icon {
+    width: 24px;
+    height: 24px;
+    top: 10px;
+    right: 10px;
+  }
+
+  /* Mobile bottom-sheet tooltip */
+  .ds-stat-card__tooltip {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0;
+    padding: 20px 16px 32px;
+    animation: ds-slideUpFromBottom 200ms ease-out;
+    max-height: 70vh;
+    overflow-y: auto;
+    z-index: 200;
+  }
+
+  .ds-stat-card__tooltip::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  .ds-realized-badge-wrap {
+    padding: 0 12px 4px;
+  }
+}
+
+/* Reduced motion: kill tooltip animations */
+@media (prefers-reduced-motion: reduce) {
+  .ds-stat-card__tooltip {
+    animation: none;
+  }
+  .ds-lens-pill {
+    transition: none;
+  }
+  .ds-realized-badge__arrow,
+  .ds-realized-badge__breakdown {
+    transition: none !important;
+  }
+}

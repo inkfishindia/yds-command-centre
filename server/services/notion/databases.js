@@ -32,6 +32,14 @@ const DB = {
   AI_TEAM: '17f15cb3920948fb9721a776bbbcc6ea',
   MARKETING_TASKS: '1fa22f26f31842439dba9788e08ca413',
   TECH_BACKLOG: '4bb401d876dd4068851784c5cdb06363',
+  // IG playbook v1 DBs (created 2026-05-02) — hardcoded for parity with existing DBs.
+  // See docs/marketing/NOTION-SETUP.md §1 for the source-of-truth registry.
+  // Supersedes Decision #98 (env-var gating); env override no longer supported here.
+  IG_PERFORMANCE: '5959753fb4ff4b7a9d16c4e1ec46a811',
+  HOOK_PATTERN_LOG: '3a32a0aea45b4537b73e76015c8ec9e0',
+  TEMPLATE_LIBRARY: 'ff498859fead4048b9d6ea250b4ffc19',
+  APPROVALS_LOG: '352b4779a93742e59553f9247317ed94',
+  WEEKLY_OPS_LOG: '450968bb4a5042d4bab2590d99b3d03d',
 };
 
 // Known AI Expert Panel page IDs — excluded from people/team queries
@@ -66,6 +74,11 @@ function listDatabases() {
     { id: DB.AI_TEAM, name: 'AI Team', icon: '🤖', description: 'AI agent roster — function, status, tools, and scope' },
     { id: DB.MARKETING_TASKS, name: 'Marketing Tasks', icon: '✅', description: 'Marketing action items with assignments and deadlines' },
     { id: DB.TECH_BACKLOG, name: 'Tech Backlog', icon: '🛠️', description: 'Technical backlog items waiting to be pulled into sprints' },
+    { id: DB.IG_PERFORMANCE, name: 'IG Performance', icon: '📈', description: 'IG north-star measurement — SWPS, ad candidates, hit-target gating' },
+    { id: DB.HOOK_PATTERN_LOG, name: 'Hook Pattern Log', icon: '🪝', description: 'Catalog of IG hook patterns with status' },
+    { id: DB.TEMPLATE_LIBRARY, name: 'Template Library', icon: '🧩', description: 'Reusable carousel/reel/single/story templates by pillar' },
+    { id: DB.APPROVALS_LOG, name: 'Approvals Log', icon: '✋', description: 'Append-only Brand Editor decisions log + 2-revision-kill trigger' },
+    { id: DB.WEEKLY_OPS_LOG, name: 'Weekly Ops Log', icon: '📅', description: 'Friday IG pulse rollup feeding Decisions DB' },
   ];
 }
 

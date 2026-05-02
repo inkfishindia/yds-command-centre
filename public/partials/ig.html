@@ -1,0 +1,346 @@
+<!-- IG Playbook view partial — /ig -->
+
+<!-- Header bar -->
+<div class="view-header-bar">
+  <div class="view-header-left">
+    <span class="view-header-emoji" aria-hidden="true">📸</span>
+    <div class="view-header-text">
+      <h2 class="view-header-title">IG Playbook</h2>
+      <span class="view-header-subtitle"
+        x-text="igThisWeek ? (igThisWeek.summary.postCount + ' posts this week · SWPS ' + formatSwps(igThisWeek.summary.avgSWPS)) : 'Loading…'">
+      </span>
+    </div>
+  </div>
+  <div class="view-header-actions">
+    <span class="view-refresh-label"
+      x-show="igLastRefresh"
+      x-text="igLastRefresh ? 'Updated ' + new Date(igLastRefresh).toLocaleTimeString() : ''"
+      x-cloak>
+    </span>
+    <button class="btn btn-small btn-icon" @click="refreshIg()" :disabled="igLoading" title="Refresh">
+      <span class="refresh-icon">&#x21bb;</span> Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Error banner -->
+<template x-if="igError">
+  <div class="ig-error-banner" role="alert">
+    <span x-text="igError"></span>
+    <button class="btn btn-small" @click="refreshIg()">Retry</button>
+  </div>
+</template>
+
+<!-- Env-empty banner (shown after loading completes and all fetches returned empty) -->
+<template x-if="!igLoading && !igError && igIsEnvEmpty()">
+  <div class="ig-env-banner" role="status">
+    <strong>IG endpoints returning empty.</strong>
+    Check that <code>IG_PERFORMANCE_DB_ID</code>, <code>HOOK_PATTERN_LOG_DB_ID</code>,
+    <code>TEMPLATE_LIBRARY_DB_ID</code>, <code>APPROVALS_LOG_DB_ID</code>, and
+    <code>WEEKLY_OPS_LOG_DB_ID</code> are set in <code>.env</code> and that the Notion
+    integration has access to the YDS Marketing Hub page.
+    See <a href="https://github.com/inkfishindia/yds-command-centre/blob/main/docs/marketing/NOTION-SETUP.md" target="_blank" rel="noopener">NOTION-SETUP.md §7</a> for the 8-step checklist.
+  </div>
+</template>
+
+<!-- Loading skeletons -->
+<template x-if="igLoading && !igThisWeek">
+  <div class="skeleton-stack">
+    <div class="loading-skeleton skeleton-stat-card"></div>
+    <div class="loading-skeleton skeleton-card"></div>
+    <div class="loading-skeleton skeleton-card"></div>
+  </div>
+</template>
+
+<!-- Main content — shown once first batch loaded or loading finished -->
+<template x-if="!igLoading || igThisWeek">
+  <div class="ig-view">
+
+    <!-- ── Row 1: SWPS hero + kill-rule alerts ───────────────── -->
+    <div class="ig-top-row">
+
+      <!-- SWPS Hero card -->
+      <div class="ig-hero-card"
+        :class="igThisWeek ? 'ig-tone-' + swpsTone(igThisWeek.summary.avgSWPS) : ''">
+        <div class="ig-hero-label">This Week — SWPS</div>
+        <div class="ig-hero-swps"
+          :class="igThisWeek ? 'ig-tone-' + swpsTone(igThisWeek.summary.avgSWPS) : 'ig-tone-neutral'"
+          x-text="igThisWeek ? formatSwps(igThisWeek.summary.avgSWPS) : '—'">
+        </div>
+        <div class="ig-hero-sub" x-show="igThisWeek">
+          <div class="ig-hero-stat">
+            <span class="ig-hero-stat-value" x-text="igThisWeek?.summary?.postCount ?? '—'"></span>
+            <span class="ig-hero-stat-label">Posts</span>
+          </div>
+          <div class="ig-hero-stat">
+            <span class="ig-hero-stat-value" x-text="igThisWeek?.summary?.hitTargetCount ?? '—'"></span>
+            <span class="ig-hero-stat-label">Hit Target</span>
+          </div>
+        </div>
+        <div class="ig-hero-target">Target: 3.5% — green if &ge;3.5%, amber 2–3.5%, red &lt;2%</div>
+      </div>
+
+      <!-- Kill-rule alert (only if triggers exist) -->
+      <template x-if="igKillRuleTriggers && igKillRuleTriggers.killRuleTriggerCount > 0">
+        <div class="ig-kill-banner" role="alert">
+          <div class="ig-kill-banner-header">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+            <span x-text="igKillRuleTriggers.killRuleTriggerCount + ' kill-rule trigger' + (igKillRuleTriggers.killRuleTriggerCount > 1 ? 's' : '') + ' — kill or rescue decision needed'"></span>
+          </div>
+          <div class="ig-kill-list">
+            <template x-for="row in (igKillRuleTriggers.rows || [])" :key="row.id">
+              <div class="ig-kill-row">
+                <span class="ig-kill-row-item" x-text="row.item || 'Untitled'"></span>
+                <span class="ig-kill-row-reason" x-show="row.reason" x-text="row.reason"></span>
+                <span class="ig-kill-row-date" x-text="formatIgDate(row.decidedAt)"></span>
+                <a class="ig-kill-notion-link" x-show="row.url" :href="row.url" target="_blank" rel="noopener" aria-label="Open in Notion">Notion &rarr;</a>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <!-- No kill-rule triggers placeholder -->
+      <template x-if="!igKillRuleTriggers || igKillRuleTriggers.killRuleTriggerCount === 0">
+        <div class="ig-hero-card">
+          <div class="ig-hero-label">Kill-Rule Triggers</div>
+          <div style="font-size:1.5rem;font-weight:600;color:var(--green);">Clear</div>
+          <div class="ig-hero-target">No posts at revision round 2 — all clear.</div>
+        </div>
+      </template>
+
+    </div><!-- /ig-top-row -->
+
+    <!-- ── Ad candidates ─────────────────────────────────────── -->
+    <div class="ig-section">
+      <div class="ig-section-header">
+        <span class="ig-section-title">Ad Candidates Ready</span>
+        <span class="ig-section-count"
+          x-text="igAdCandidates ? igAdCandidates.rows.length + ' posts' : ''">
+        </span>
+      </div>
+
+      <template x-if="igAdCandidates && igAdCandidates.rows.length > 0">
+        <div class="ig-ad-grid">
+          <template x-for="post in igAdCandidates.rows" :key="post.id">
+            <div class="ig-ad-card">
+              <div class="ig-ad-card-title" x-text="post.post || 'Untitled'"></div>
+              <div class="ig-ad-card-meta">
+                <span class="ig-pillar-badge" :class="igPillarClass(post.pillar)" x-text="post.pillar || '—'"></span>
+                <span class="ig-ad-card-swps" x-text="formatSwps(post.swps)"></span>
+                <span class="ig-ad-card-date" x-text="formatIgDate(post.publishedDate)"></span>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted)" x-show="post.hookPattern" x-text="post.hookPattern"></div>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <template x-if="igAdCandidates && igAdCandidates.rows.length === 0">
+        <div class="ig-empty">No ad candidates flagged yet — Emily flags on Friday.</div>
+      </template>
+
+      <template x-if="!igAdCandidates && igLoading">
+        <div class="loading-skeleton skeleton-card"></div>
+      </template>
+    </div>
+
+    <!-- ── Weekly Ops Log latest ─────────────────────────────── -->
+    <div class="ig-section">
+      <div class="ig-section-header">
+        <span class="ig-section-title">Weekly Ops Log</span>
+        <span class="ig-section-count" x-show="igWeeklyOpsLatest?.row" x-text="igWeeklyOpsLatest?.row?.weekOf || ''"></span>
+      </div>
+
+      <template x-if="igWeeklyOpsLatest && igWeeklyOpsLatest.row">
+        <div class="ig-weekly-card">
+          <div class="ig-weekly-header">
+            <span class="ig-weekly-week" x-text="igWeeklyOpsLatest.row.weekOf || 'Week of —'"></span>
+            <div class="ig-weekly-meta">
+              <div class="ig-weekly-stat">
+                <span class="ig-weekly-stat-val" x-text="igWeeklyOpsLatest.row.postsShipped ?? '—'"></span>
+                <span class="ig-weekly-stat-lbl">Posts</span>
+              </div>
+              <div class="ig-weekly-stat">
+                <span class="ig-weekly-stat-val" x-text="formatSwps(igWeeklyOpsLatest.row.weeklySwps)"></span>
+                <span class="ig-weekly-stat-lbl">SWPS</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ig-weekly-body">
+            <div class="ig-weekly-field" x-show="igWeeklyOpsLatest.row.pillarBalance">
+              <strong>Pillar balance:</strong>
+              <span x-text="igWeeklyOpsLatest.row.pillarBalance"></span>
+            </div>
+            <div class="ig-weekly-field" x-show="igWeeklyOpsLatest.row.insight">
+              <strong>Insight:</strong>
+              <span x-text="igWeeklyOpsLatest.row.insight"></span>
+            </div>
+
+            <!-- Question for Dan — surface prominently -->
+            <template x-if="igWeeklyOpsLatest.row.questionForDan">
+              <div class="ig-weekly-question">
+                <div class="ig-weekly-question-label">Question for Dan</div>
+                <span x-text="igWeeklyOpsLatest.row.questionForDan"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <template x-if="!igWeeklyOpsLatest || !igWeeklyOpsLatest.row">
+        <div class="ig-empty">No weekly ops log entry yet — Emily logs on Fridays.</div>
+      </template>
+    </div>
+
+    <!-- ── This week's posts table ───────────────────────────── -->
+    <div class="ig-section">
+      <div class="ig-section-header">
+        <span class="ig-section-title">This Week's Posts</span>
+        <span class="ig-section-count"
+          x-text="igThisWeek ? igThisWeek.rows.length + ' posts' : ''">
+        </span>
+      </div>
+
+      <template x-if="igThisWeek && igThisWeek.rows.length > 0">
+        <div class="ig-post-table-wrap">
+          <table class="ig-post-table">
+            <thead>
+              <tr>
+                <th>Post</th>
+                <th>Pillar</th>
+                <th>Hook</th>
+                <th>Slot</th>
+                <th>Reach</th>
+                <th>Saves</th>
+                <th>Shares</th>
+                <th>SWPS</th>
+                <th>Target</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="post in igThisWeek.rows" :key="post.id">
+                <tr>
+                  <td>
+                    <a class="ig-post-cell-title"
+                      style="color:var(--text-primary);text-decoration:none;display:block;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                      :href="post.url || '#'"
+                      :target="post.url ? '_blank' : '_self'"
+                      rel="noopener"
+                      :title="post.post"
+                      x-text="post.post || 'Untitled'">
+                    </a>
+                  </td>
+                  <td>
+                    <span class="ig-pillar-badge" :class="igPillarClass(post.pillar)" x-text="post.pillar || '—'"></span>
+                  </td>
+                  <td class="ig-post-cell-muted" x-text="post.hookPattern || '—'"></td>
+                  <td class="ig-post-cell-muted" x-text="post.publishedSlot || '—'"></td>
+                  <td class="ig-post-cell-mono" x-text="post.reach != null ? post.reach.toLocaleString() : '—'"></td>
+                  <td class="ig-post-cell-mono" x-text="post.saves != null ? post.saves.toLocaleString() : '—'"></td>
+                  <td class="ig-post-cell-mono" x-text="post.shares != null ? post.shares.toLocaleString() : '—'"></td>
+                  <td>
+                    <span class="ig-post-cell-mono"
+                      :class="'ig-tone-' + swpsTone(post.swps)"
+                      style="font-weight:600;"
+                      x-text="formatSwps(post.swps)">
+                    </span>
+                  </td>
+                  <td>
+                    <span
+                      :class="post.hitTarget === true ? 'ig-hit-yes' : post.hitTarget === false ? 'ig-hit-no' : 'ig-hit-none'"
+                      x-text="igHitTargetLabel(post.hitTarget)">
+                    </span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </template>
+
+      <template x-if="igThisWeek && igThisWeek.rows.length === 0">
+        <div class="ig-empty">No posts published this week yet.</div>
+      </template>
+
+      <template x-if="!igThisWeek && igLoading">
+        <div class="loading-skeleton skeleton-card"></div>
+      </template>
+    </div>
+
+    <!-- ── Hook Pattern Catalog (expandable) ─────────────────── -->
+    <div class="ig-catalog">
+      <button class="ig-catalog-toggle" @click="igHooksExpanded = !igHooksExpanded" :aria-expanded="igHooksExpanded">
+        <span>Hook Pattern Catalog</span>
+        <span class="ig-catalog-toggle-right">
+          <span x-text="igHooks ? igHooks.rows.length + ' active' : ''"></span>
+          <svg class="ig-catalog-chevron" :class="igHooksExpanded && 'open'" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+          </svg>
+        </span>
+      </button>
+
+      <div class="ig-catalog-body" x-show="igHooksExpanded" x-transition.duration.150ms>
+        <template x-if="igHooks && igHooks.rows.length > 0">
+          <div class="ig-catalog-grid">
+            <template x-for="hook in igHooks.rows" :key="hook.id">
+              <div class="ig-hook-card">
+                <div class="ig-hook-card-name" x-text="hook.patternName || 'Unnamed'"></div>
+                <div class="ig-hook-card-type" x-text="hook.patternType || ''"></div>
+                <div class="ig-hook-card-desc" x-show="hook.description" x-text="hook.description"></div>
+                <div class="ig-hook-card-example" x-show="hook.exampleHook" x-text="hook.exampleHook"></div>
+              </div>
+            </template>
+          </div>
+        </template>
+        <template x-if="!igHooks || igHooks.rows.length === 0">
+          <div class="ig-empty">No active hook patterns yet.</div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ── Template Library (expandable) ─────────────────────── -->
+    <div class="ig-catalog">
+      <button class="ig-catalog-toggle" @click="igTemplatesExpanded = !igTemplatesExpanded" :aria-expanded="igTemplatesExpanded">
+        <span>Template Library</span>
+        <span class="ig-catalog-toggle-right">
+          <span x-text="igTemplates ? igTemplates.rows.length + ' active' : ''"></span>
+          <svg class="ig-catalog-chevron" :class="igTemplatesExpanded && 'open'" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+          </svg>
+        </span>
+      </button>
+
+      <div class="ig-catalog-body" x-show="igTemplatesExpanded" x-transition.duration.150ms>
+        <template x-if="igTemplates && igTemplates.rows.length > 0">
+          <div class="ig-catalog-grid">
+            <template x-for="tmpl in igTemplates.rows" :key="tmpl.id">
+              <div class="ig-template-card">
+                <div class="ig-template-card-name" x-text="tmpl.templateName || 'Unnamed'"></div>
+                <div class="ig-template-card-meta">
+                  <span class="ig-template-card-type" x-text="tmpl.templateType || ''"></span>
+                  <span class="ig-pillar-badge" :class="igPillarClass(tmpl.pillar)" x-text="tmpl.pillar || ''" x-show="tmpl.pillar"></span>
+                  <span class="ig-template-card-frames" x-show="tmpl.frameCount" x-text="tmpl.frameCount + ' frames'"></span>
+                </div>
+                <a class="ig-template-card-link"
+                  x-show="tmpl.assetLink"
+                  :href="tmpl.assetLink"
+                  target="_blank"
+                  rel="noopener">
+                  Open asset &rarr;
+                </a>
+              </div>
+            </template>
+          </div>
+        </template>
+        <template x-if="!igTemplates || igTemplates.rows.length === 0">
+          <div class="ig-empty">No active templates yet.</div>
+        </template>
+      </div>
+    </div>
+
+  </div><!-- /ig-view -->
+</template>

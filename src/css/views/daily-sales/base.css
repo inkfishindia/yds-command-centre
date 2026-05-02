@@ -1,0 +1,412 @@
+/* ============================================================
+   base.css — daily-sales view foundation
+   Owns: .daily-sales-view, .ds-page-*, .ds-refresh-*, .ds-freshness-*,
+         .ds-content, .ds-notice, .ds-period-*, .ds-hero-strip, .ds-mtd-strip,
+         .ds-ytd-strip (layout only — channel cards are in mtd-channel.css),
+         .ds-section-*, .ds-loading, .skeleton-*, .ds-empty*, .ds-error*,
+         .ds-footer*, global @media breakpoints and reduced-motion overrides.
+   DO NOT add: filter, lens, trend, mix, geo, orders, concerns, dq rules.
+   ============================================================ */
+
+/* ── View layout ── */
+.daily-sales-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bg-primary, #0a0a0a);
+}
+
+/* ── Page header ── */
+.ds-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 8px;
+  flex-shrink: 0;
+}
+
+.ds-page-title {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.ds-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ds-refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.ds-refresh-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+.ds-refresh-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ds-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── v4 Freshness banner ── */
+/* Sticky-header tier (z=10): freshness, lens, filter-strip share z-index 10
+   and stack vertically via top values (60 / 100 / 140). Popovers escape via z=200. */
+.ds-freshness-banner {
+  position: sticky;
+  top: 60px; /* below page header */
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  line-height: 1.4;
+}
+
+.ds-freshness-banner__primary {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ds-freshness-banner__secondary {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ds-freshness-banner--unavailable .ds-freshness-banner__primary {
+  color: var(--text-secondary);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ds-freshness-banner {
+    border-bottom-color: var(--border);
+  }
+}
+
+@media (max-width: 640px) {
+  .ds-freshness-banner {
+    gap: 4px;
+    padding: 8px 12px;
+  }
+
+  .ds-freshness-banner__primary {
+    font-size: 13px;
+  }
+
+  .ds-freshness-banner__secondary {
+    font-size: 11px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+}
+
+/* ── Inner content scroll area ── */
+.ds-content {
+  flex: 1;
+  padding: 0 16px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── Notice banner (month/ytd tab unavailable) ── */
+.ds-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--amber-dim);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.ds-notice svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--amber);
+}
+
+/* ── Period label above each strip ── */
+.ds-period-label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+/* "in progress" inline qualifier — muted, normal weight, lowercase override */
+.ds-period-label-in-progress {
+  text-transform: none;
+  font-weight: 400;
+  letter-spacing: 0;
+  opacity: 0.7;
+}
+
+/* ── Stat strips (Today / Yesterday) ── */
+.ds-hero-strip {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+/* ── Section header ── */
+.ds-section-label {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+/* ── Loading skeleton ── */
+.ds-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.skeleton-stat-card {
+  height: 80px;
+  border-radius: var(--radius);
+}
+
+.skeleton-chart {
+  height: 280px;
+  border-radius: var(--radius);
+}
+
+.skeleton-row {
+  height: 40px;
+  border-radius: var(--radius);
+}
+
+/* ── Empty / Error states ── */
+.ds-empty,
+.ds-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.ds-empty-icon,
+.ds-error-icon {
+  color: var(--text-secondary);
+}
+
+.ds-empty-title,
+.ds-error-message {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.ds-empty-text {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-width: 320px;
+}
+
+.ds-empty-action,
+.ds-error-actions button {
+  padding: 7px 16px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.ds-empty-action:hover,
+.ds-error-actions button:hover {
+  background: var(--border);
+}
+
+.ds-empty-action:focus-visible,
+.ds-error-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Data Freshness Footer ── */
+.ds-footer {
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.ds-footer-timestamp,
+.ds-footer-source {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* ── v5 Freshness Banner Modifiers ───────────────────────── */
+
+.ds-freshness-banner--error {
+  background: var(--red-dim);
+  border-bottom-color: var(--red);
+}
+
+.ds-freshness-banner--error .ds-freshness-banner__primary {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.ds-freshness-banner--error .ds-freshness-banner__secondary {
+  color: var(--text-secondary);
+}
+
+.ds-freshness-banner--stale {
+  background: var(--amber-dim);
+  border-bottom-color: var(--amber);
+}
+
+.ds-freshness-banner--stale .ds-freshness-banner__primary {
+  color: var(--amber);
+  font-weight: 600;
+}
+
+.ds-freshness-banner--stale .ds-freshness-banner__secondary {
+  color: var(--text-secondary);
+}
+
+/* ── Tablet (≥480px) ── */
+@media (min-width: 480px) {
+  .ds-geo-col-count { display: table-cell; }
+}
+
+/* ── Desktop (≥768px) ── */
+@media (min-width: 768px) {
+  .ds-content {
+    padding: 0 24px 40px;
+    gap: 28px;
+  }
+
+  .ds-hero-strip {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .ds-geo-col-count { display: table-cell; }
+}
+
+/* ── Wide screen (≥1200px): more breathing room in stat strips ── */
+@media (min-width: 1200px) {
+  .ds-hero-strip {
+    gap: 16px;
+  }
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Tooltip backdrop (mobile) */
+.ds-tooltip-backdrop {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .ds-tooltip-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 199;
+  }
+}
+
+/* ── Status badges (used by orders/today panels — color tokens live with .ds-status family) ── */
+.ds-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+
+.ds-status-delivered  { background: var(--green-dim);  color: var(--green);  border-color: var(--green-a15); }
+.ds-status-shipped    { background: var(--accent-dim); color: var(--accent); border-color: var(--blue-a15); }
+.ds-status-processing { background: var(--amber-dim);  color: var(--amber);  border-color: var(--amber-a15); }
+.ds-status-cancelled  { background: var(--red-dim);    color: var(--red);    border-color: var(--red-a15); }
+.ds-status-returned   { background: var(--purple-dim); color: var(--purple); border-color: var(--purple-a20); }
+
+/* ── Focus states ── */
+.ds-refresh-btn:focus-visible,
+.ds-empty-action:focus-visible,
+.ds-error-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

@@ -26,6 +26,11 @@
 | AI Team | 17f15cb3920948fb9721a776bbbcc6ea | 1c3600b0-b9cb-45f5-8687-fc41cbe30301 | AI agent roster & capabilities |
 | Marketing Tasks | 1fa22f26f31842439dba9788e08ca413 | b44daab1-c281-4e88-8ea4-6e9371370c28 | Marketing action items & assignments |
 | Tech Backlog | 4bb401d876dd4068851784c5cdb06363 | e5a12af5-9f92-4a9e-ac7c-aac006f5ef6c | Tech backlog items |
+| IG Performance | 21476f909d334661b2f69ec825162ba6 | 5959753f-b4ff-4b7a-9d16-c4e1ec46a811 | IG north-star measurement (SWPS, ad candidates, hit-target gating) |
+| Hook Pattern Log | 3d71c78ef5664312bc70d7d72a3cd5a1 | 3a32a0ae-a45b-4537-b73e-76015c8ec9e0 | Catalog of IG hook patterns w/ Active/Testing/Retired status |
+| Template Library | 10996869d1e249fdb01d16085f908015 | ff498859-fead-4048-b9d6-ea250b4ffc19 | Reusable carousel/reel/single/story templates by pillar |
+| Approvals Log | e305be59e4484d5e899fd4aeb636a7d9 | 352b4779-a937-42e5-9553-f9247317ed94 | Append-only Brand Editor decisions log + 2-revision-kill trigger |
+| Weekly Ops Log | 24e5ae2db9f64f38b11ac7beee4f0357 | 450968bb-4a50-42d4-bab2-590d99b3d03d | Friday IG pulse rollup feeding Decisions DB |
 
 **Future Databases** (IDs TBD — Nirmal to create)
 - Agent Registry — AI agent configuration and capabilities
@@ -362,6 +367,105 @@ Database ID: `9ba8330aa3c044d195b27eb450e278f2`
 | Last Edited | last_edited_time | Auto |
 
 **Views:** Default table, Task Board (by Status), By Due Date (calendar)
+
+### IG Performance
+**DB ID:** `5959753fb4ff4b7a9d16c4e1ec46a811` | **Verified:** 2026-05-02 via Notion MCP
+**Env var:** `IG_PERFORMANCE_DB_ID` | **Source spec:** [docs/marketing/NOTION-SETUP.md §4.1](../../docs/marketing/NOTION-SETUP.md)
+**Purpose:** One row per published IG feed post. North-star measurement DB per IG Playbook §3.4.
+
+| Property | Type | Options / Notes |
+|---|---|---|
+| Post | title | Format: `YYYY-MM-DD — [pillar] — [hook first 5 words]` |
+| Content Calendar | relation | → Content Calendar (a3066b81). Load-bearing — all rollups depend on it |
+| Pillar | rollup | From CC.`Pillar (IG)` (show_original) — auto |
+| Hook Pattern | rollup | From CC.`Hook Pattern` (show_original) — auto |
+| Format | rollup | From CC.`Content Type` (show_original) — auto |
+| Published Date | date | IST |
+| Published Slot | select | 11 slots: Mon 1PM/8:30PM, Tue 1PM/8:30PM, Wed 1PM/8:30PM, Fri 1PM/8:30PM, Sat 11AM/8:30PM, Sun 8:30PM |
+| Reach | number | Manual entry from Meta Business Suite |
+| Saves | number | Manual |
+| Shares | number | Manual |
+| Likes | number | Manual (Tier 3, light) |
+| Comments | number | Manual (Tier 3, light) |
+| Profile Visits Attributed | number | Manual (Tier 3) |
+| Link Clicks | number | Manual |
+| SWPS | formula | `if(Reach == 0, 0, (Saves + 2*Shares) / Reach)` — display as Percent in UI |
+| Hit Target | formula | Inlined SWPS calc, returns true if SWPS >= 0.035. Inlined because Notion 2.0 errors on cross-formula prop refs |
+| Week Of | formula | `formatDate(Published Date, "YYYY-MM-DD")` — flat date; ISO-WW not supported |
+| Ad Candidate | checkbox | Emily flags Friday if Hit Target=true and hook is ad-compatible |
+| Graduated to Ads | checkbox | Kasim ticks when hook ships to a live ad group |
+| Learning Note | text | Optional — one line from Jessica when post is an outlier |
+| Entered By | person | Default Corey |
+| Entered On | last_edited_time | Auto, for pulse latency checks |
+
+### Hook Pattern Log
+**DB ID:** `3a32a0aea45b4537b73e76015c8ec9e0` | **Verified:** 2026-05-02 via Notion MCP
+**Env var:** `HOOK_PATTERN_LOG_DB_ID` | **Source spec:** [docs/marketing/NOTION-SETUP.md §4.2](../../docs/marketing/NOTION-SETUP.md)
+
+| Property | Type | Options / Notes |
+|---|---|---|
+| Pattern Name | title | e.g., `Permission` |
+| Pattern Type | select | Foundational, Variant, Experimental |
+| Description | text | What it is, when it works |
+| Example Hook | text | Best-in-class instance |
+| Reverse Pattern | text | What this pattern is NOT (the boundary) |
+| Status | select | Active, Testing, Retired |
+| Posts Using | relation | → Content Calendar (back-rel: `Hook Pattern Ref`) |
+| Notes | text | |
+
+### Template Library
+**DB ID:** `ff498859fead4048b9d6ea250b4ffc19` | **Verified:** 2026-05-02 via Notion MCP
+**Env var:** `TEMPLATE_LIBRARY_DB_ID` | **Source spec:** [docs/marketing/NOTION-SETUP.md §4.3](../../docs/marketing/NOTION-SETUP.md)
+
+| Property | Type | Options / Notes |
+|---|---|---|
+| Template Name | title | |
+| Template Type | select | Carousel, Reel, Single, Story |
+| Pillar (IG) | select | Permission, Napkin, In-the-Wild, Craft, Educational |
+| Status | select | Active, WIP, Retired |
+| Frame Count | number | for carousels |
+| Asset Link | url | Figma/Canva |
+| Brand-Code Notes | text | Brand codes in use |
+| Last Used | date | |
+| Posts Using | relation | → Content Calendar (back-rel: `Template`) |
+| Notes | text | |
+
+### Approvals Log
+**DB ID:** `352b4779a93742e59553f9247317ed94` | **Verified:** 2026-05-02 via Notion MCP
+**Env var:** `APPROVALS_LOG_DB_ID` | **Source spec:** [docs/marketing/NOTION-SETUP.md §4.4](../../docs/marketing/NOTION-SETUP.md)
+
+| Property | Type | Options / Notes |
+|---|---|---|
+| Item | title | e.g., `2026-04-13 Permission carousel #1` |
+| Content Calendar | relation | → Content Calendar (back-rel: `Approvals`) |
+| Reviewer | select | Brand Editor, Jessica (self), Dan |
+| Verdict | select | Approved, Revision, Killed |
+| Reason | text | |
+| Litmus check | checkbox | Pune 23-yr-old screenshot test passed |
+| Banned-words check | checkbox | No banned terms or `YDS` |
+| No-fake-UGC check | checkbox | In-the-Wild posts pass honesty test |
+| Decided At | date (datetime) | |
+| Revision Round | number | 1 or 2; Revision at round 2 triggers two-revision-kill rule |
+
+### Weekly Ops Log
+**DB ID:** `450968bb4a5042d4bab2590d99b3d03d` | **Verified:** 2026-05-02 via Notion MCP
+**Env var:** `WEEKLY_OPS_LOG_DB_ID` | **Source spec:** [docs/marketing/NOTION-SETUP.md §4.5](../../docs/marketing/NOTION-SETUP.md)
+
+| Property | Type | Options / Notes |
+|---|---|---|
+| Week Of | title | Format: `YYYY-WW` |
+| Week Start Date | date | Monday of the week |
+| Posts Shipped | number | |
+| Pillar Balance | text | Format: `P:2 N:1 W:1 C:1 E:1` |
+| Weekly SWPS | number (percent) | Rolled up from IG Performance — manually entered v1, automated v2 |
+| Hook Graduation Count | number | |
+| Email Captures (IG bio) | number | |
+| Pipeline Health | text | "5/6 on time, 1 slip" |
+| Insight | text | Emily's 1-sentence observation |
+| Question for Dan | text | |
+| Status | select | Draft, Sent, Manual fallback |
+| Sent At | date | |
+| Decisions Triggered | relation | → Decisions DB (back-rel: `Weekly Ops Log`) |
 
 ### Sequence Properties
 | Property | Type | Values |

@@ -129,6 +129,7 @@ app.use('/api/sheets', require('./server/routes/sheets'));
 app.use('/api/registry', require('./server/routes/registry'));
 app.use('/api/notebooks', require('./server/routes/notebooks'));
 app.use('/api/marketing-ops', require('./server/routes/marketing-ops'));
+app.use('/api/marketing-ops/ig', require('./server/routes/marketing-ig'));
 app.use('/api/tech-team', require('./server/routes/tech-team'));
 app.use('/api/ai-team', require('./server/routes/ai-team'));
 app.use('/api/bmc', require('./server/routes/bmc'));
@@ -145,6 +146,7 @@ app.use('/api/dan-colin', require('./server/routes/dan-colin'));
 app.use('/api/activity-feed', require('./server/routes/activity-feed'));
 app.use('/api/daily-sales', require('./server/routes/daily-sales'));
 app.use('/api/google-ads', require('./server/routes/google-ads'));
+app.use('/api/mcc', require('./server/routes/mcc'));
 
 // Static file serving — Alpine.js frontend from public/
 // Cache JS/CSS for 1 hour (assets are rebuilt on deploy); HTML always revalidates.
@@ -172,6 +174,13 @@ app.use(express.static(path.join(__dirname, 'public'), {
 
 app.get(['/ceo', '/ceo/*'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'ceo', 'index.html'));
+});
+
+// Unknown /api/* paths must not fall through to the SPA shell.
+// Without this, missing endpoints return 200 HTML, which masks bugs from clients
+// expecting JSON and breaks smoke tests.
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `Unknown API endpoint: ${req.method} ${req.originalUrl}` });
 });
 
 app.get('*', (req, res) => {

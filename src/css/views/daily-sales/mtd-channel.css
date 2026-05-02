@@ -1,0 +1,232 @@
+/* ============================================================
+   mtd-channel.css — MTD by channel grid, weekly bar chart, CG pills
+   Owns: .ds-mtd-channel-*, .ds-weekly-bar*, .ds-cg-pill*,
+         related @media overrides.
+   DO NOT add: stat strips (base.css), lens pills, trend, mix, geo, orders,
+               concerns, dq rules.
+   ============================================================ */
+
+/* ── v5 MTD by Channel grid (Panel 3) ── */
+
+.ds-mtd-channel-section {
+  margin-bottom: 4px;
+}
+
+.ds-mtd-channel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .ds-mtd-channel-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.ds-mtd-channel-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  min-height: 44px;
+}
+
+.ds-mtd-channel-card:hover {
+  background: var(--bg-hover);
+}
+
+.ds-mtd-channel-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ds-mtd-channel-card--active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* D2C — accent/blue */
+.ds-mtd-channel-card--d2c.ds-mtd-channel-card--active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* Corporate — purple */
+.ds-mtd-channel-card--corporate.ds-mtd-channel-card--active {
+  border-color: var(--purple);
+  background: var(--purple-dim);
+}
+
+/* DS — teal */
+.ds-mtd-channel-card--ds.ds-mtd-channel-card--active {
+  border-color: var(--teal);
+  background: var(--teal-dim);
+}
+
+/* Stores — amber */
+.ds-mtd-channel-card--stores.ds-mtd-channel-card--active {
+  border-color: var(--amber);
+  background: var(--amber-dim);
+}
+
+.ds-mtd-channel-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ds-mtd-channel-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.ds-mtd-channel-revenue {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+}
+
+.ds-mtd-channel-orders {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ds-mtd-channel-aov {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── v5 Weekly Trend SVG bar chart ── */
+
+.ds-weekly-bar {
+  fill: var(--text-muted);
+  opacity: 0.65;
+  cursor: crosshair;
+  transition: opacity var(--transition-fast);
+}
+
+.ds-weekly-bar:hover {
+  opacity: 1;
+}
+
+.ds-weekly-bar--current {
+  fill: var(--accent);
+  cursor: crosshair;
+  transition: opacity var(--transition-fast);
+}
+
+.ds-weekly-bar--current:hover {
+  opacity: 0.85;
+}
+
+/* ── v5 Channel Group pill ── */
+
+.ds-cg-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* D2C — blue accent family */
+.ds-cg-pill--d2c {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* Corporate — purple */
+.ds-cg-pill--corporate {
+  background: var(--purple-dim);
+  color: var(--purple);
+}
+
+/* Partner – DS — teal */
+.ds-cg-pill--ds {
+  background: var(--teal-dim);
+  color: var(--teal);
+}
+
+/* Partner – Stores — amber */
+.ds-cg-pill--stores {
+  background: var(--amber-dim);
+  color: var(--amber);
+}
+
+.ds-cg-pill--other {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+/* ── v5 Mobile adjustments ── */
+
+@media (max-width: 640px) {
+  .ds-mtd-channel-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ── MTD / YTD stat strips (layout grid) ── */
+.ds-mtd-strip,
+.ds-ytd-strip {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+/* YTD strip: subtle frame to signal "year-in-a-glance" headline */
+.ds-ytd-strip {
+  background: var(--bg-primary);
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+/* ── Desktop (≥768px) ── */
+@media (min-width: 768px) {
+  .ds-mtd-strip,
+  .ds-ytd-strip {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+}
+
+/* ── Wide screen (≥1200px): more breathing room ── */
+@media (min-width: 1200px) {
+  .ds-mtd-strip,
+  .ds-ytd-strip {
+    gap: 16px;
+  }
+}
+
+/* ── Compound rule: .ds-channel-pill + .ds-tag-method share styling.
+      .ds-tag-method belongs to the tag/* family (base.css) but is kept
+      here as a single rule to preserve the compound selector intact
+      (no-rule-edits refactor contract). See FILE-MAP.md. ── */
+.ds-channel-pill,
+.ds-tag-method {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  margin-left: 4px; /* baked-in spacing — removes need for inline style="margin-left:4px" */
+}

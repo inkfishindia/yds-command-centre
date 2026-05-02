@@ -73,10 +73,12 @@ async function getContentForMonth(month) {
 }
 
 async function createContent(data) {
+  // data may include igPillar, hookPattern, publishedSlot — passed through to Notion write
   return notionService.createContentCalendarItem(data);
 }
 
 async function updateContent(pageId, data) {
+  // data may include igPillar, hookPattern, publishedSlot — passed through to Notion write
   return notionService.updateContentCalendarItem(pageId, data);
 }
 

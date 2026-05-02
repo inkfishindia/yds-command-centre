@@ -53,6 +53,13 @@ const {
 } = require('./reads/tech-team');
 const { getAITeam } = require('./reads/ai-team');
 const { getMarketingTasks, getTechBacklog } = require('./reads/tasks');
+const {
+  getIgPerformance,
+  getHookPatternLog,
+  getTemplateLibrary,
+  getApprovalsLog,
+  getWeeklyOpsLog,
+} = require('./reads/marketing-ig');
 
 // Domain writes
 const {
@@ -150,6 +157,13 @@ module.exports = {
   getAITeam,
   getMarketingTasks,
   getTechBacklog,
+
+  // Domain reads — IG playbook (Phase B)
+  getIgPerformance,
+  getHookPatternLog,
+  getTemplateLibrary,
+  getApprovalsLog,
+  getWeeklyOpsLog,
 
   // Domain writes
   createCommitment,

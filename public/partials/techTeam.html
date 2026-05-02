@@ -211,7 +211,7 @@
           <div class="tech-widget">
             <h3>Blocked</h3>
             <template x-if="getSprintItemsByStatus('Blocked').length === 0">
-              <div style="font-size:13px;color:var(--text-muted)">No blocked items</div>
+              <div class="tech-empty-text">No blocked items</div>
             </template>
             <ul class="tech-widget-list">
               <template x-for="item in getSprintItemsByStatus('Blocked').slice(0, 5)" :key="item.id">
@@ -227,7 +227,7 @@
           <div class="tech-widget">
             <h3>Critical Bugs</h3>
             <template x-if="getTechBugs().filter(b => b.Priority && (b.Priority.startsWith('P0') || b.Priority.startsWith('P1')) && b.Status !== 'Done').length === 0">
-              <div style="font-size:13px;color:var(--text-muted)">No critical bugs</div>
+              <div class="tech-empty-text">No critical bugs</div>
             </template>
             <ul class="tech-widget-list">
               <template x-for="bug in getTechBugs().filter(b => b.Priority && (b.Priority.startsWith('P0') || b.Priority.startsWith('P1')) && b.Status !== 'Done').slice(0, 5)" :key="bug.id">
@@ -244,7 +244,7 @@
           <div class="tech-widget">
             <h3>Waiting on Dan</h3>
             <template x-if="!(techTeam?.stats?.waitingOnDan?.length > 0)">
-              <div style="font-size:13px;color:var(--text-muted)">Nothing waiting</div>
+              <div class="tech-empty-text">Nothing waiting</div>
             </template>
             <ul class="tech-widget-list">
               <template x-for="item in (techTeam?.stats?.waitingOnDan || []).slice(0, 5)" :key="item.id || item.Name">
@@ -267,7 +267,7 @@
           <div class="tech-widget">
             <h3>Recent Decisions</h3>
             <template x-if="!(techTeam?.stats?.recentDecisions?.length > 0)">
-              <div style="font-size:13px;color:var(--text-muted)">No recent decisions</div>
+              <div class="tech-empty-text">No recent decisions</div>
             </template>
             <ul class="tech-widget-list">
               <template x-for="d in (techTeam?.stats?.recentDecisions || []).slice(0, 5)" :key="d.id || d.Decision">
@@ -439,7 +439,7 @@
                   <div class="kanban-title" x-text="spec.Name"></div>
                   <div class="kanban-meta">
                     <span class="tech-system-tag" x-text="spec.System" x-show="spec.System"></span>
-                    <span x-text="spec.Author" x-show="spec.Author" style="font-size:12px;color:var(--text-secondary)"></span>
+                    <span x-text="spec.Author" x-show="spec.Author" class="tech-meta-text"></span>
                   </div>
                 </div>
               </template>
@@ -639,7 +639,7 @@
                     <div class="tech-strategy-node-name" x-text="item.name"></div>
                     <div class="tech-strategy-node-meta">
                       <span class="status-badge small" :class="{'success': item.status === 'On Track' || item.status === 'Complete', 'warning': item.status === 'At Risk', 'danger': item.status === 'Off Track', 'neutral': !item.status}" x-text="item.status" x-show="item.status"></span>
-                      <span x-text="item.owner" x-show="item.owner" style="font-size:12px;color:var(--text-secondary)"></span>
+                      <span x-text="item.owner" x-show="item.owner" class="tech-meta-text"></span>
                     </div>
                     <div class="tech-strategy-node-desc" x-text="item.description" x-show="item.description"></div>
                   </div>

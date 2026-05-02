@@ -51,11 +51,21 @@ router.get('/content', async (req, res) => {
   }
 });
 
+// Validation constants for IG-specific Content Calendar fields (NOTION-SETUP.md §3.1)
+const VALID_IG_PILLARS = ['Permission', 'Napkin', 'In-the-Wild', 'Craft', 'Educational'];
+const VALID_HOOK_PATTERNS = ['Permission', 'Reframe', 'Anti-claim', 'Tribe-name', 'Question'];
+const VALID_PUBLISHED_SLOTS = [
+  'Mon 1PM', 'Mon 8:30PM', 'Tue 1PM', 'Tue 8:30PM',
+  'Wed 1PM', 'Wed 8:30PM', 'Fri 1PM', 'Fri 8:30PM',
+  'Sat 11AM', 'Sat 8:30PM', 'Sun 8:30PM',
+];
+
 // POST /api/marketing-ops/content — create a new content calendar item
 router.post('/content', async (req, res) => {
   const {
     name, status, contentType, channels, publishDate, owner, campaignId, notes,
     contentPillar, hook, audienceSegment, productFocus, caption, visualBrief,
+    igPillar, hookPattern, publishedSlot,
   } = req.body;
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -109,6 +119,16 @@ router.post('/content', async (req, res) => {
     return res.status(400).json({ error: 'productFocus must be an array' });
   }
 
+  if (igPillar && !VALID_IG_PILLARS.includes(igPillar)) {
+    return res.status(400).json({ error: `Invalid igPillar. Allowed: ${VALID_IG_PILLARS.join(', ')}` });
+  }
+  if (hookPattern && !VALID_HOOK_PATTERNS.includes(hookPattern)) {
+    return res.status(400).json({ error: `Invalid hookPattern. Allowed: ${VALID_HOOK_PATTERNS.join(', ')}` });
+  }
+  if (publishedSlot && !VALID_PUBLISHED_SLOTS.includes(publishedSlot)) {
+    return res.status(400).json({ error: `Invalid publishedSlot. Allowed: ${VALID_PUBLISHED_SLOTS.join(', ')}` });
+  }
+
   try {
     const result = await marketingOpsService.createContent({
       name: name.trim(),
@@ -125,6 +145,9 @@ router.post('/content', async (req, res) => {
       productFocus: productFocus || null,
       caption: caption || null,
       visualBrief: visualBrief || null,
+      igPillar: igPillar || null,
+      hookPattern: hookPattern || null,
+      publishedSlot: publishedSlot || null,
     });
     res.status(201).json(result);
   } catch (err) {
@@ -143,6 +166,7 @@ router.patch('/content/:id', async (req, res) => {
   const {
     name, status, contentType, channels, publishDate, notes, owner,
     contentPillar, hook, audienceSegment, productFocus, caption, visualBrief,
+    igPillar, hookPattern, publishedSlot,
   } = req.body;
 
   if (Object.keys(req.body).length === 0) {
@@ -192,10 +216,21 @@ router.patch('/content/:id', async (req, res) => {
     return res.status(400).json({ error: 'productFocus must be an array' });
   }
 
+  if (igPillar !== undefined && !VALID_IG_PILLARS.includes(igPillar)) {
+    return res.status(400).json({ error: `Invalid igPillar. Allowed: ${VALID_IG_PILLARS.join(', ')}` });
+  }
+  if (hookPattern !== undefined && !VALID_HOOK_PATTERNS.includes(hookPattern)) {
+    return res.status(400).json({ error: `Invalid hookPattern. Allowed: ${VALID_HOOK_PATTERNS.join(', ')}` });
+  }
+  if (publishedSlot !== undefined && !VALID_PUBLISHED_SLOTS.includes(publishedSlot)) {
+    return res.status(400).json({ error: `Invalid publishedSlot. Allowed: ${VALID_PUBLISHED_SLOTS.join(', ')}` });
+  }
+
   try {
     const result = await marketingOpsService.updateContent(pageId, {
       name, status, contentType, channels, publishDate, notes, owner,
       contentPillar, hook, audienceSegment, productFocus, caption, visualBrief,
+      igPillar, hookPattern, publishedSlot,
     });
     res.json(result);
   } catch (err) {

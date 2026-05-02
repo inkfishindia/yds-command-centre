@@ -1,0 +1,103 @@
+/* ============================================================
+   top-states.css — daily-sales geographic/state table
+   Owns: .ds-geo-* (container, table, thead, th, tbody, tr, state, count,
+         revenue, col-count), .ds-geo-row--drillable,
+         related @media overrides.
+   DO NOT add: mix, stat cards, filter, lens, trend, orders, concerns, dq rules.
+   ============================================================ */
+
+/* ── Geographic table ── */
+.ds-geo-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ds-geo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+}
+
+.ds-geo-table thead tr {
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-geo-table th {
+  padding: 8px 12px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.ds-geo-table th:last-child,
+.ds-geo-table td:last-child {
+  text-align: right;
+}
+
+.ds-geo-table tbody tr {
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-geo-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.ds-geo-state {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.ds-geo-count {
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-geo-revenue {
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* hide order count column on mobile */
+.ds-geo-col-count { display: none; }
+
+/* ── Drillable geo rows ── */
+.ds-geo-row--drillable {
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.ds-geo-row--drillable:hover {
+  background: var(--bg-hover);
+}
+
+.ds-geo-row--drillable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ── prefers-reduced-motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .ds-geo-row--drillable {
+    transition: none !important;
+  }
+}
+
+/* ── State filter search input ── */
+.ds-state-search-input {
+  width: 100%;
+  font-size: 12px;
+}

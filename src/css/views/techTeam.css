@@ -412,3 +412,14 @@
   .tech-filters select,
   .tech-filters input { width: 100%; }
 }
+
+/* === techTeam.html inline-style migration === */
+.tech-empty-text {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.tech-meta-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+}

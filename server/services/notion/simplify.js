@@ -46,6 +46,45 @@ function simplify(properties) {
       case 'url':
         result[key] = prop.url;
         break;
+      case 'formula': {
+        // Formula returns typed sub-object: {type: 'number'|'string'|'boolean'|'date', …}
+        const f = prop.formula;
+        if (!f) { result[key] = null; break; }
+        if (f.type === 'number') result[key] = f.number;
+        else if (f.type === 'string') result[key] = f.string;
+        else if (f.type === 'boolean') result[key] = f.boolean;
+        else if (f.type === 'date') result[key] = f.date ? f.date.start : null;
+        else result[key] = null;
+        break;
+      }
+      case 'rollup': {
+        // Rollup wraps another type — return the inner value for the common single-item case.
+        // array rollups: return array of simplified inner values.
+        const r = prop.rollup;
+        if (!r) { result[key] = null; break; }
+        if (r.type === 'number') { result[key] = r.number; break; }
+        if (r.type === 'date') { result[key] = r.date ? r.date.start : null; break; }
+        if (r.type === 'array') {
+          result[key] = (r.array || []).map(inner => {
+            if (inner.type === 'select') return inner.select ? inner.select.name : null;
+            if (inner.type === 'multi_select') return inner.multi_select.map(s => s.name);
+            if (inner.type === 'rich_text') return inner.rich_text.map(t => t.plain_text).join('');
+            if (inner.type === 'title') return inner.title.map(t => t.plain_text).join('');
+            if (inner.type === 'number') return inner.number;
+            if (inner.type === 'checkbox') return inner.checkbox;
+            return null;
+          });
+          break;
+        }
+        result[key] = null;
+        break;
+      }
+      case 'last_edited_time':
+        result[key] = prop.last_edited_time || null;
+        break;
+      case 'created_time':
+        result[key] = prop.created_time || null;
+        break;
       default:
         result[key] = '[' + prop.type + ']';
     }

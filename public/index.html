@@ -171,6 +171,14 @@
             <span class="nav-icon-emoji" aria-hidden="true">📢</span>
             <span class="nav-label" x-show="sidebarExpanded">Google Ads</span>
           </button>
+          <button class="nav-btn" :class="view === 'mcc' && 'nav-active'" @click="openNavigationTarget('mcc')" aria-label="Marketing Content" :aria-current="view === 'mcc' ? 'page' : false">
+            <span class="nav-icon-emoji" aria-hidden="true">📱</span>
+            <span class="nav-label" x-show="sidebarExpanded">Marketing</span>
+          </button>
+          <button class="nav-btn" :class="view === 'ig' && 'nav-active'" @click="openNavigationTarget('ig')" aria-label="IG Playbook" :aria-current="view === 'ig' ? 'page' : false">
+            <span class="nav-icon-emoji" aria-hidden="true">📸</span>
+            <span class="nav-label" x-show="sidebarExpanded">IG Playbook</span>
+          </button>
           <button class="nav-btn" :class="view === 'ops' && 'nav-active'" @click="openNavigationTarget('ops')" aria-label="Inventory &amp; Sales" :aria-current="view === 'ops' ? 'page' : false">
             <span class="nav-icon-emoji" aria-hidden="true">📦</span>
             <span class="nav-label" x-show="sidebarExpanded">Inventory</span>
@@ -550,7 +558,25 @@
       </div>
     </div>
     <!-- ─── /Google Ads ───────────────────────────────────── -->
-    
+
+    <!-- ─── Marketing Content (MCC) ───────────────────────────── -->
+    <div x-show="view === 'mcc'" class="mcc-view view-panel view-scroll-container">
+      <div x-show="!_partialLoaded['mcc']" class="view-loading">
+        <div class="loading-skeleton skeleton-card"></div>
+        <div class="loading-skeleton skeleton-card"></div>
+      </div>
+    </div>
+    <!-- ─── /Marketing Content ───────────────────────────────── -->
+
+    <!-- ─── IG Playbook ──────────────────────────────────────── -->
+    <div x-show="view === 'ig'" class="ig-view view-panel view-scroll-container">
+      <div x-show="!_partialLoaded['ig']" class="view-loading">
+        <div class="loading-skeleton skeleton-stat-card"></div>
+        <div class="loading-skeleton skeleton-card"></div>
+      </div>
+    </div>
+    <!-- ─── /IG Playbook ─────────────────────────────────────── -->
+
     <!-- ─── Inventory & Sales (Ops) ──────────────────────────────────── -->
     <div x-show="view === 'ops'" class="ops-view view-panel">
       <div x-show="!_partialLoaded.ops" class="view-loading">
@@ -1138,6 +1164,9 @@
       </button>
       <button class="mobile-drawer-nav-btn" :class="view === 'daily-sales' && 'drawer-active'" @click="openNavigationTarget('daily-sales'); closeMobileDrawer()" aria-label="Daily Sales">
         <span class="mobile-drawer-icon" aria-hidden="true">S</span>Daily Sales
+      </button>
+      <button class="mobile-drawer-nav-btn" :class="view === 'ig' && 'drawer-active'" @click="openNavigationTarget('ig'); closeMobileDrawer()" aria-label="IG Playbook">
+        <span class="mobile-drawer-icon" aria-hidden="true">IG</span>IG Playbook
       </button>
     </div>
 

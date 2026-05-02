@@ -87,7 +87,7 @@
                       </div>
                       <span class="queue-item-due" :class="item.isOverdue ? 'overdue' : ''" x-show="item.dueDate" x-text="'Due: ' + formatDate(item.dueDate)"></span>
                       <template x-if="item.assignedNames && item.assignedNames.length > 0">
-                        <div style="display:flex;gap:4px;align-items:center;">
+                        <div class="flex-row-tight">
                           <template x-for="name in item.assignedNames.slice(0, 2)" :key="name">
                             <span class="avatar avatar-sm" :style="`background:${getAvatar(name).color}`" x-text="getAvatar(name).initials" :title="name"></span>
                           </template>
@@ -150,7 +150,7 @@
                       </div>
                       <span class="queue-item-due" :class="item.isOverdue ? 'overdue' : ''" x-show="item.dueDate" x-text="'Due: ' + formatDate(item.dueDate)"></span>
                       <template x-if="item.assignedNames && item.assignedNames.length > 0">
-                        <div style="display:flex;gap:4px;align-items:center;">
+                        <div class="flex-row-tight">
                           <template x-for="name in item.assignedNames.slice(0, 2)" :key="name">
                             <span class="avatar avatar-sm" :style="`background:${getAvatar(name).color}`" x-text="getAvatar(name).initials" :title="name"></span>
                           </template>

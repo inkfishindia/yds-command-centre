@@ -1,0 +1,293 @@
+/* ============================================================
+   concerns.css — daily-sales concerns block + collapsible sections
+   Owns: .ds-concerns*, .ds-concern-* (item, icon, body, number, customer,
+         amount, badge, days, reason, count-pills, count-pill,
+         section, section-header/title/meta/chevron, table-wrap, table,
+         actions, action-btn).
+   DO NOT add: stat cards, filter, lens, trend, mix, geo, orders, dq rules.
+   ============================================================ */
+
+/* ── Concerns Block ── */
+.ds-concerns {
+  background: var(--red-dim);
+  border: 1px solid var(--red);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ds-concerns-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--red-a15);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red);
+}
+
+.ds-concerns-header svg {
+  flex-shrink: 0;
+}
+
+.ds-concerns-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-left: 4px;
+}
+
+.ds-concerns-group-label {
+  padding: 6px 14px 2px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-secondary);
+}
+
+.ds-concern-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--red-a08);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ds-concern-item:last-child { border-bottom: none; }
+
+.ds-concern-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--red);
+}
+
+.ds-concern-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ds-concern-number {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.ds-concern-customer {
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+.ds-concern-amount {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  margin-left: 4px;
+}
+
+.ds-concern-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  background: var(--red-dim);
+  color: var(--red);
+  border: 1px solid var(--red-a30);
+  margin-left: 4px;
+}
+
+.ds-concern-days {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-left: 4px;
+}
+
+/* ── v5 Concerns — collapsible sections ── */
+
+.ds-concern-count-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.ds-concern-count-pill {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ds-concern-count-pill--pending {
+  background: var(--amber-dim);
+  color: var(--amber);
+}
+
+.ds-concern-count-pill--rejected {
+  background: var(--red-dim);
+  color: var(--red);
+}
+
+.ds-concern-count-pill--stuck {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.ds-concerns-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.ds-concerns-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.ds-concerns-section-header:hover {
+  background: var(--bg-hover);
+}
+
+.ds-concerns-section-title {
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+
+.ds-concerns-section-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.ds-concerns-section-chevron {
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.ds-concerns-section-chevron--open {
+  transform: rotate(180deg);
+}
+
+.ds-concerns-table-wrap {
+  overflow-x: auto;
+}
+
+.ds-concerns-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.ds-concerns-table th {
+  padding: 8px 10px;
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  background: var(--bg-secondary);
+}
+
+.ds-concerns-table td {
+  padding: 8px 10px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.ds-concerns-table-row:last-child td {
+  border-bottom: none;
+}
+
+.ds-concerns-table-row--rejected td {
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.ds-concern-reason {
+  color: var(--red);
+  font-size: 11px;
+}
+
+.ds-concerns-actions {
+  display: flex;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.ds-concerns-action-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.ds-concerns-action-btn--accept {
+  background: var(--green-dim);
+  color: var(--green);
+}
+
+.ds-concerns-action-btn--accept:hover {
+  background: var(--green);
+  color: #000;
+}
+
+.ds-concerns-action-btn--reject {
+  background: var(--red-dim);
+  color: var(--red);
+}
+
+.ds-concerns-action-btn--reject:hover {
+  background: var(--red);
+  color: #fff;
+}
+
+.ds-concerns-action-btn--resolve {
+  background: var(--amber-dim);
+  color: var(--amber);
+}
+
+.ds-concerns-action-btn--resolve:hover {
+  background: var(--amber);
+  color: #000;
+}
+
+/* ── Mobile (max 640px) ── */
+@media (max-width: 640px) {
+  .ds-concerns-table th,
+  .ds-concerns-table td {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  .ds-concerns-actions {
+    flex-direction: column;
+  }
+}

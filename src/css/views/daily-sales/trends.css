@@ -1,0 +1,193 @@
+/* ============================================================
+   trends.css — daily-sales 30-day trend chart
+   Owns: .ds-trend-* (section, header, toggle, chart, svg, grid, fill,
+         line, hover, axis, tooltip, legend).
+   DO NOT add: stat cards, filter, lens, mix, geo, orders, concerns, dq rules.
+   ============================================================ */
+
+/* ── 30-day Trend Chart ── */
+.ds-trend-section {}
+
+.ds-trend-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ds-trend-toggle {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px;
+}
+
+.ds-trend-toggle-btn {
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ds-trend-toggle-btn:hover {
+  color: var(--text-primary);
+}
+
+.ds-trend-toggle-btn--active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.ds-trend-chart {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  overflow: hidden;
+}
+
+.ds-trend-svg {
+  width: 100%;
+  height: 250px;
+  display: block;
+}
+
+.ds-trend-grid-line {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.ds-trend-fill--revenue {
+  fill: var(--green);
+  fill-opacity: 0.15;
+}
+
+.ds-trend-fill--orders {
+  fill: var(--accent);
+  fill-opacity: 0.15;
+}
+
+.ds-trend-line--revenue {
+  stroke: var(--green);
+  stroke-width: 2;
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.ds-trend-line--orders {
+  stroke: var(--accent);
+  stroke-width: 2;
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.ds-trend-hover-col {
+  fill: transparent;
+  cursor: crosshair;
+}
+
+.ds-trend-hover-col:hover {
+  fill: var(--border);
+  fill-opacity: 0.3;
+}
+
+.ds-trend-axis-text {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  fill: var(--text-secondary);
+  text-anchor: middle;
+}
+
+.ds-trend-axis-text--left {
+  text-anchor: end;
+  font-size: 9px;
+}
+
+.ds-trend-axis-text--right {
+  text-anchor: start;
+  font-size: 9px;
+}
+
+/* Tooltip */
+.ds-trend-tooltip {
+  position: absolute;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 20;
+  min-width: 140px;
+}
+
+.ds-trend-tooltip-date {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.ds-trend-tooltip-revenue {
+  color: var(--green);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-trend-tooltip-orders {
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.ds-trend-tooltip-metric {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.ds-trend-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.ds-trend-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.ds-trend-legend-dot {
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+.ds-trend-legend-dot--revenue { background: var(--green); }
+.ds-trend-legend-dot--orders  { background: var(--accent); }
+
+/* ── Desktop (≥768px) ── */
+@media (min-width: 768px) {
+  .ds-trend-svg {
+    height: 300px;
+  }
+}

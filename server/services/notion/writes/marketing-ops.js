@@ -14,7 +14,7 @@ const { enqueueWrite } = require('../write-queue');
 /**
  * Create a new content calendar item in CONTENT_CALENDAR.
  */
-async function createContentCalendarItem({ name, status, contentType, channels, publishDate, owner, campaignId, notes, contentPillar, hook, audienceSegment, productFocus, caption, visualBrief }) {
+async function createContentCalendarItem({ name, status, contentType, channels, publishDate, owner, campaignId, notes, contentPillar, hook, audienceSegment, productFocus, caption, visualBrief, igPillar, hookPattern, publishedSlot }) {
   return enqueueWrite(async () => {
     const notion = getClient();
     const properties = {
@@ -78,6 +78,17 @@ async function createContentCalendarItem({ name, status, contentType, channels, 
       properties['Visual Brief'] = { rich_text: [{ text: { content: visualBrief } }] };
     }
 
+    // IG-specific fields (additive — existing callers unaffected)
+    if (igPillar) {
+      properties['Pillar (IG)'] = { select: { name: igPillar } };
+    }
+    if (hookPattern) {
+      properties['Hook Pattern'] = { select: { name: hookPattern } };
+    }
+    if (publishedSlot) {
+      properties['Published Slot'] = { select: { name: publishedSlot } };
+    }
+
     const result = await withRetry(() => notion.pages.create({
       parent: { database_id: DB.CONTENT_CALENDAR },
       properties,
@@ -95,7 +106,7 @@ async function createContentCalendarItem({ name, status, contentType, channels, 
 /**
  * Update properties on an existing content calendar item.
  */
-async function updateContentCalendarItem(pageId, { name, status, contentType, channels, publishDate, notes, owner, contentPillar, hook, audienceSegment, productFocus, caption, visualBrief }) {
+async function updateContentCalendarItem(pageId, { name, status, contentType, channels, publishDate, notes, owner, contentPillar, hook, audienceSegment, productFocus, caption, visualBrief, igPillar, hookPattern, publishedSlot }) {
   return enqueueWrite(async () => {
     const notion = getClient();
     const properties = {};
@@ -150,6 +161,17 @@ async function updateContentCalendarItem(pageId, { name, status, contentType, ch
 
     if (visualBrief !== undefined) {
       properties['Visual Brief'] = { rich_text: [{ text: { content: visualBrief } }] };
+    }
+
+    // IG-specific fields (additive — existing callers unaffected)
+    if (igPillar !== undefined) {
+      properties['Pillar (IG)'] = { select: { name: igPillar } };
+    }
+    if (hookPattern !== undefined) {
+      properties['Hook Pattern'] = { select: { name: hookPattern } };
+    }
+    if (publishedSlot !== undefined) {
+      properties['Published Slot'] = { select: { name: publishedSlot } };
     }
 
     const result = await withRetry(() => notion.pages.update({

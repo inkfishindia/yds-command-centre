@@ -58,6 +58,8 @@ const LAZY_MODULE_FACTORIES = {
   'daily-sales': () => import('./modules/daily-sales.js').then(({ createDailySalesModule }) => createDailySalesModule()),
   'd2c': () => import('./modules/d2c.js').then(({ createD2cModule }) => createD2cModule()),
   'google-ads': () => import('./modules/google-ads.js').then(({ createGoogleAdsModule }) => createGoogleAdsModule()),
+  mcc: () => import('./modules/mcc.js').then(({ createMccModule }) => createMccModule()),
+  ig: () => import('./modules/ig.js').then(({ createIgModule }) => createIgModule()),
 };
 
 function app() {
@@ -115,6 +117,7 @@ _viewStyleFile(name) {
         bmc: 'bmc',
         crm: 'crm',
         ops: 'ops',
+        overview: 'overview',
         d2c: 'd2c',
         'dan-colin': 'dan-colin',
         'daily-sales': 'daily-sales',
@@ -122,6 +125,8 @@ _viewStyleFile(name) {
         status: 'system-status',
         'system-map': 'system-map',
         'claude-usage': 'claude-usage',
+        mcc: 'mcc',
+        ig: 'ig',
       };
       return fileMap[name] || null;
     },
@@ -223,6 +228,7 @@ _viewStyleFile(name) {
         'daily-sales': 'daily-sales-view',
         'd2c': 'd2c-view',
         'google-ads': 'google-ads-view',
+        mcc: 'mcc-view',
       };
       return classMap[name] || name + '-view';
     },

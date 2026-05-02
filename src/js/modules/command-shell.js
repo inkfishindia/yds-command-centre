@@ -71,7 +71,7 @@ export function createCommandShellModule() {
 
     async openNavigationTarget(action) {
       this._clearAllIntervals();
-      const partialViews = ['chat', 'overview', 'dashboard', 'actionQueue', 'focusArea', 'team', 'personView', 'docs', 'notion', 'knowledge', 'decisions', 'projects', 'registry', 'commitments', 'factory', 'marketingOps', 'techTeam', 'bmc', 'crm', 'ops', 'status', 'claude-usage', 'system-map', 'dan-colin', 'daily-sales', 'd2c', 'google-ads'];
+      const partialViews = ['chat', 'overview', 'dashboard', 'actionQueue', 'focusArea', 'team', 'personView', 'docs', 'notion', 'knowledge', 'decisions', 'projects', 'registry', 'commitments', 'factory', 'marketingOps', 'techTeam', 'bmc', 'crm', 'ops', 'status', 'claude-usage', 'system-map', 'dan-colin', 'daily-sales', 'd2c', 'google-ads', 'mcc', 'ig'];
       this.view = action;
       this.tableSelectedRow = -1;
       if (partialViews.includes(action)) {
@@ -127,6 +127,8 @@ export function createCommandShellModule() {
         this.loadD2cProducts();
       }
       else if (action === 'google-ads') this.loadGoogleAds();
+      else if (action === 'mcc') this.initMcc();
+      else if (action === 'ig') this.initIg();
     },
 
     openCmdPalette() {

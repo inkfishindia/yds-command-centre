@@ -168,7 +168,7 @@
             </button>
           </div>
 
-          <div class="empty-state" x-show="mktops && mktops.stats.activeCampaigns === 0 && mktops.stats.contentInPipeline === 0 && !mktopsLoading" style="margin: 1.5rem 0">
+          <div class="empty-state mktops-empty-spaced" x-show="mktops && mktops.stats.activeCampaigns === 0 && mktops.stats.contentInPipeline === 0 && !mktopsLoading">
             <p><strong>Notion databases not connected.</strong></p>
             <p>Share the Campaigns, Content Calendar, Sequences, and Sessions Log databases with your Notion integration to see data here.</p>
           </div>
@@ -538,7 +538,7 @@
 
                 <!-- Empty state -->
                 <template x-if="!calendarLoading && calendarData && calendarData.items && calendarData.items.length === 0">
-                  <div class="empty-state" style="margin: 1.5rem 0">
+                  <div class="empty-state mktops-empty-spaced">
                     <p>No content scheduled for this month.</p>
                     <p>Click any day cell to add a content item.</p>
                   </div>
@@ -546,7 +546,7 @@
 
                 <!-- No data state (API not connected) -->
                 <template x-if="!calendarLoading && !calendarData">
-                  <div class="empty-state" style="margin: 1.5rem 0">
+                  <div class="empty-state mktops-empty-spaced">
                     <p><strong>Content calendar not connected.</strong></p>
                     <p>The calendar endpoint returned no data. Check that the Content Calendar Notion database is shared with your integration.</p>
                   </div>
@@ -879,9 +879,9 @@
                 <div class="bmc-block-header">
                   <span class="bmc-block-title">Customer Psychology</span>
                 </div>
-                <div style="padding: 0.75rem;">
-                  <input type="text" class="filter-search" placeholder="Segment (e.g., corporate gifting buyers)" x-model="mktopsAiInputs.segment" style="width: 100%; margin-bottom: 0.5rem;" />
-                  <input type="text" class="filter-search" placeholder="Context (optional)" x-model="mktopsAiInputs.context" style="width: 100%; margin-bottom: 0.75rem;" />
+                <div class="mktops-bmc-block-body">
+                  <input type="text" class="filter-search mktops-ai-input" placeholder="Segment (e.g., corporate gifting buyers)" x-model="mktopsAiInputs.segment" />
+                  <input type="text" class="filter-search mktops-ai-input-last" placeholder="Context (optional)" x-model="mktopsAiInputs.context" />
                   <button class="filter-pill filter-pill-active" @click="runMarketingAiTool('customer_psychology_generator')" :disabled="!mktopsAiInputs.segment">Analyze</button>
                 </div>
               </div>
@@ -890,9 +890,9 @@
                 <div class="bmc-block-header">
                   <span class="bmc-block-title">Competitor Analysis</span>
                 </div>
-                <div style="padding: 0.75rem;">
-                  <input type="text" class="filter-search" placeholder="Competitor name or URL" x-model="mktopsAiInputs.competitor" style="width: 100%; margin-bottom: 0.5rem;" />
-                  <input type="text" class="filter-search" placeholder="Focus: pricing, marketing, overall..." x-model="mktopsAiInputs.focus" style="width: 100%; margin-bottom: 0.75rem;" />
+                <div class="mktops-bmc-block-body">
+                  <input type="text" class="filter-search mktops-ai-input" placeholder="Competitor name or URL" x-model="mktopsAiInputs.competitor" />
+                  <input type="text" class="filter-search mktops-ai-input-last" placeholder="Focus: pricing, marketing, overall..." x-model="mktopsAiInputs.focus" />
                   <button class="filter-pill filter-pill-active" @click="runMarketingAiTool('competitor_analysis')" :disabled="!mktopsAiInputs.competitor">Analyze</button>
                 </div>
               </div>
@@ -901,10 +901,10 @@
                 <div class="bmc-block-header">
                   <span class="bmc-block-title">Content Strategy</span>
                 </div>
-                <div style="padding: 0.75rem;">
-                  <input type="text" class="filter-search" placeholder="Topic or theme" x-model="mktopsAiInputs.topic" style="width: 100%; margin-bottom: 0.5rem;" />
-                  <input type="text" class="filter-search" placeholder="Audience (optional)" x-model="mktopsAiInputs.audience" style="width: 100%; margin-bottom: 0.5rem;" />
-                  <input type="text" class="filter-search" placeholder="Goal (optional)" x-model="mktopsAiInputs.goal" style="width: 100%; margin-bottom: 0.75rem;" />
+                <div class="mktops-bmc-block-body">
+                  <input type="text" class="filter-search mktops-ai-input" placeholder="Topic or theme" x-model="mktopsAiInputs.topic" />
+                  <input type="text" class="filter-search mktops-ai-input" placeholder="Audience (optional)" x-model="mktopsAiInputs.audience" />
+                  <input type="text" class="filter-search mktops-ai-input-last" placeholder="Goal (optional)" x-model="mktopsAiInputs.goal" />
                   <button class="filter-pill filter-pill-active" @click="runMarketingAiTool('content_strategy_generator')" :disabled="!mktopsAiInputs.topic">Generate</button>
                 </div>
               </div>
@@ -913,10 +913,10 @@
                 <div class="bmc-block-header">
                   <span class="bmc-block-title">Campaign Ideator</span>
                 </div>
-                <div style="padding: 0.75rem;">
-                  <input type="text" class="filter-search" placeholder="Product or service" x-model="mktopsAiInputs.product" style="width: 100%; margin-bottom: 0.5rem;" />
-                  <input type="text" class="filter-search" placeholder="Goal (optional)" x-model="mktopsAiInputs.goal" style="width: 100%; margin-bottom: 0.5rem;" />
-                  <input type="text" class="filter-search" placeholder="Budget range (optional)" x-model="mktopsAiInputs.budget" style="width: 100%; margin-bottom: 0.75rem;" />
+                <div class="mktops-bmc-block-body">
+                  <input type="text" class="filter-search mktops-ai-input" placeholder="Product or service" x-model="mktopsAiInputs.product" />
+                  <input type="text" class="filter-search mktops-ai-input" placeholder="Goal (optional)" x-model="mktopsAiInputs.goal" />
+                  <input type="text" class="filter-search mktops-ai-input-last" placeholder="Budget range (optional)" x-model="mktopsAiInputs.budget" />
                   <button class="filter-pill filter-pill-active" @click="runMarketingAiTool('campaign_ideator')" :disabled="!mktopsAiInputs.product">Generate</button>
                 </div>
               </div>
@@ -928,7 +928,7 @@
 
             <!-- Loading skeleton -->
             <template x-if="mktopsTasksLoading">
-              <div style="display:flex;flex-direction:column;gap:0.75rem;padding:1rem 0">
+              <div class="mktops-skeleton-col">
                 <div class="skeleton skeleton-card" style="height:80px"></div>
                 <div class="skeleton skeleton-card" style="height:340px"></div>
               </div>
@@ -958,14 +958,14 @@
 
                 <!-- Filter bar -->
                 <div class="mktops-filters" style="margin-bottom:1rem">
-                  <select class="filter-search" x-model="mktopsTasksFilter.priority" style="cursor:pointer">
+                  <select class="filter-search mktops-select-pointer" x-model="mktopsTasksFilter.priority">
                     <option value="all">All Priorities</option>
                     <option value="Urgent">Urgent</option>
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>
                     <option value="Low">Low</option>
                   </select>
-                  <select class="filter-search" x-model="mktopsTasksFilter.channel" style="cursor:pointer">
+                  <select class="filter-search mktops-select-pointer" x-model="mktopsTasksFilter.channel">
                     <option value="all">All Channels</option>
                     <option value="Google Ads">Google Ads</option>
                     <option value="Meta Ads">Meta Ads</option>
@@ -976,7 +976,7 @@
                     <option value="SEO">SEO</option>
                     <option value="Cross-channel">Cross-channel</option>
                   </select>
-                  <select class="filter-search" x-model="mktopsTasksFilter.type" style="cursor:pointer">
+                  <select class="filter-search mktops-select-pointer" x-model="mktopsTasksFilter.type">
                     <option value="all">All Types</option>
                     <option value="Deliverable">Deliverable</option>
                     <option value="Review">Review</option>
@@ -1101,7 +1101,7 @@
 
             <!-- Loading skeleton -->
             <template x-if="ciLoading && !ciData">
-              <div style="display:flex;flex-direction:column;gap:0.75rem;padding:1rem 0">
+              <div class="mktops-skeleton-col">
                 <div class="skeleton skeleton-card" style="height:48px;border-radius:6px"></div>
                 <div class="ci-card-grid">
                   <template x-for="i in [1,2,3,4,5,6]" :key="i">
@@ -1158,7 +1158,7 @@
               <!-- Stats strip -->
               <div class="data-card-grid" style="margin-bottom:1rem">
                 <template x-for="tier in (ciData?.byTier || [])" :key="tier.name">
-                  <div class="data-card" style="cursor:pointer" @click="ciTierFilter = ciTierFilter === tier.name ? '' : tier.name">
+                  <div class="data-card mktops-card-pointer" @click="ciTierFilter = ciTierFilter === tier.name ? '' : tier.name">
                     <span class="data-card-label" x-text="tier.name"></span>
                     <span class="data-card-value" x-text="tier.count" :style="`color: ${getTierColor(tier.name)}`"></span>
                   </div>
@@ -1168,7 +1168,7 @@
               <!-- Competitor cards grid -->
               <div class="ci-card-grid">
                 <template x-for="comp in getFilteredCompetitors()" :key="comp.Brand">
-                  <div class="ci-card" @click="loadCiDetail(comp.Brand)" style="cursor:pointer">
+                  <div class="ci-card mktops-card-pointer" @click="loadCiDetail(comp.Brand)">
                     <div class="ci-card-header">
                       <span class="ci-brand-name" x-text="comp.Brand"></span>
                       <span class="ci-tier-badge" :style="`color:${getTierColor(comp.Tier)};background:${getTierBg(comp.Tier)}`" x-text="comp.Tier"></span>
@@ -1341,7 +1341,7 @@
 
               <!-- Loading -->
               <template x-if="ciDetailLoading">
-                <div style="display:flex;flex-direction:column;gap:0.75rem;padding:1rem 0">
+                <div class="mktops-skeleton-col">
                   <div class="skeleton skeleton-card" style="height:80px;border-radius:8px"></div>
                   <div class="skeleton skeleton-card" style="height:200px;border-radius:8px"></div>
                   <div class="skeleton skeleton-card" style="height:160px;border-radius:8px"></div>

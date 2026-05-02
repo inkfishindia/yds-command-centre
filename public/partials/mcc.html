@@ -1,0 +1,173 @@
+<!-- Header -->
+      <div class="view-header-bar">
+        <div class="view-header-left">
+          <span class="view-header-emoji">📱</span>
+          <div class="view-header-text">
+            <h2 class="view-header-title">Marketing Content</h2>
+            <span class="view-header-subtitle" x-text="(getMccTotalPosts() || 0) + ' posts · ' + (getMccScheduledCount() || 0) + ' scheduled'"></span>
+          </div>
+        </div>
+        <div class="view-header-actions">
+          <span class="view-refresh-label" x-show="mccLastRefresh" x-text="mccLastRefresh ? 'Updated ' + new Date(mccLastRefresh).toLocaleTimeString() : ''"></span>
+          <button class="btn btn-small btn-icon" @click="refreshMcc()" title="Refresh">
+            <span class="refresh-icon">&#x21bb;</span> Refresh
+          </button>
+          <button class="btn btn-small btn-primary" @click="openMccComposer('create')">
+            + New Post
+          </button>
+        </div>
+      </div>
+
+      <!-- OAuth Status Bar -->
+      <div class="mcc-oauth-bar" x-show="mccPlatforms?.length > 0">
+        <span class="mcc-oauth-label">Connected:</span>
+        <template x-for="platform in mccPlatforms || []" :key="platform.id">
+          <span class="mcc-oauth-pill" :class="mccOauthStatus[platform.id] ? 'connected' : 'disconnected'">
+            <span class="mcc-oauth-platform-name" x-text="platform.name"></span>
+            <span class="mcc-oauth-status" x-text="mccOauthStatus[platform.id] ? 'Connected' : 'Not connected'"></span>
+            <button class="mcc-oauth-reconnect" @click="connectPlatform(platform.id)" x-show="!mccOauthStatus[platform.id]">
+              Connect
+            </button>
+          </span>
+        </template>
+      </div>
+
+      <!-- Loading -->
+      <template x-if="mccLoading && !mccPosts">
+        <div class="skeleton-stack">
+          <div class="loading-skeleton skeleton-stat-card"></div>
+          <div class="loading-skeleton skeleton-card"></div>
+        </div>
+      </template>
+
+      <template x-if="!mccLoading || mccPosts">
+        <div class="mcc-view">
+          <!-- Status Pipeline (Kanban) -->
+          <div class="mcc-pipeline">
+            <template x-for="status in ['draft', 'scheduled', 'awaiting-approval', 'published', 'failed']" :key="status">
+              <div class="mcc-pipeline-column" :class="'mcc-pipeline-column--' + status">
+                <div class="mcc-pipeline-header">
+                  <span class="mcc-pipeline-title" x-text="getMccStatusLabel(status)"></span>
+                  <span class="mcc-pipeline-count" x-text="mccPostsByStatus[status]?.length || 0"></span>
+                </div>
+                <div class="mcc-pipeline-cards">
+                  <template x-for="post in (mccPostsByStatus[status] || []).slice(0, 10)" :key="post.id">
+                    <div class="mcc-post-card" @click="openMccComposer('edit', post)">
+                      <div class="mcc-post-card-title" x-text="post.title || 'Untitled'"></div>
+                      <div class="mcc-post-card-body" x-text="(post.body || '').slice(0, 60) + (post.body?.length > 60 ? '...' : '')"></div>
+                      <div class="mcc-post-card-meta">
+                        <span class="mcc-post-card-platforms">
+                          <template x-for="p in post.platforms || []" :key="p">
+                            <span class="mcc-platform-badge" :class="'mcc-platform-badge--' + p" x-text="p"></span>
+                          </template>
+                        </span>
+                        <span class="mcc-post-card-date" x-text="post.scheduledFor ? new Date(post.scheduledFor).toLocaleDateString() : ''"></span>
+                      </div>
+                      <div class="mcc-post-card-actions">
+                        <button class="mcc-card-action" @click.stop="publishMccNow(post.id)" x-show="status === 'scheduled'" title="Publish now">
+                          &#x1F680;
+                        </button>
+                        <button class="mcc-card-action mcc-card-action--danger" @click.stop="deleteMccPost(post.id)" x-show="status === 'draft'" title="Delete">
+                          &#x1F5D1;
+                        </button>
+                      </div>
+                    </div>
+                  </template>
+                  <div class="mcc-pipeline-empty" x-show="!mccPostsByStatus[status]?.length">
+                    No posts
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <!-- Composer Modal -->
+      <div class="modal-overlay" x-show="mccComposerOpen" x-transition @click="closeMccComposer()">
+        <div class="modal-content modal-content--wide" @click.stop>
+          <div class="modal-header">
+            <h3 x-text="mccComposerMode === 'edit' ? 'Edit Post' : 'New Post'"></h3>
+            <button class="modal-close" @click="closeMccComposer()">×</button>
+          </div>
+
+          <div class="modal-body">
+            <div class="mcc-composer-grid">
+              <!-- Form -->
+              <div class="mcc-composer-form">
+                <div class="form-group">
+                  <label>Title (internal)</label>
+                  <input type="text" class="form-input" x-model="mccComposerForm.title" placeholder="Post title">
+                </div>
+
+                <div class="form-group">
+                  <label>Post Body</label>
+                  <textarea class="form-textarea" x-model="mccComposerForm.body" rows="6" placeholder="Write your post caption..."></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label>Platforms</label>
+                  <div class="mcc-platform-checkboxes">
+                    <label class="checkbox-label">
+                      <input type="checkbox" value="instagram" x-model="mccComposerForm.platforms">
+                      <span>Instagram</span>
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="checkbox" value="linkedin" x-model="mccComposerForm.platforms">
+                      <span>LinkedIn</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>Brand</label>
+                  <select class="form-select" x-model="mccComposerForm.brand">
+                    <option value="">Select brand</option>
+                    <option value="YDS">YourDesignStore</option>
+                    <option value="Colin">Colin</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label>Media URLs (comma-separated)</label>
+                  <input type="text" class="form-input" x-model="mccComposerForm.mediaUrlsText" placeholder="https://..., https://...">
+                </div>
+
+                <div class="form-group">
+                  <label>Schedule For</label>
+                  <input type="datetime-local" class="form-input" x-model="mccComposerForm.scheduledFor">
+                </div>
+
+                <div class="form-error" x-show="mccComposerError" x-text="mccComposerError"></div>
+
+                <div class="form-actions">
+                  <button class="btn btn-secondary" @click="closeMccComposer()">Cancel</button>
+                  <button class="btn btn-primary" @click="saveMccPost()" :disabled="mccComposerSaving">
+                    <span x-show="mccComposerSaving">Saving...</span>
+                    <span x-show="!mccComposerSaving">Save Post</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Preview -->
+              <div class="mcc-composer-preview">
+                <div class="mcc-preview-header">
+                  <span class="mcc-preview-label">Preview</span>
+                  <div class="mcc-preview-tabs">
+                    <button class="mcc-preview-tab" :class="mccPreviewPlatform === 'instagram' && 'active'" @click="mccPreviewPlatform = 'instagram'">Instagram</button>
+                    <button class="mcc-preview-tab" :class="mccPreviewPlatform === 'linkedin' && 'active'" @click="mccPreviewPlatform = 'linkedin'">LinkedIn</button>
+                  </div>
+                </div>
+                <div class="mcc-preview-content" :class="'mcc-preview-content--' + mccPreviewPlatform">
+                  <div class="mcc-preview-text" x-text="getMccPreviewText() || 'Your post preview will appear here...'"></div>
+                  <div class="mcc-preview-media" x-show="mccComposerForm.mediaUrls?.length > 0">
+                    <template x-for="url in (mccComposerForm.mediaUrls || []).slice(0, 1)" :key="url">
+                      <img :src="url" alt="Preview" class="mcc-preview-image">
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>

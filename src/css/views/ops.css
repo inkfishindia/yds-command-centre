@@ -154,3 +154,56 @@
 
 .ops-status-muted {
   color: var(--text-muted);
+}
+
+/* === ops.html inline-style migration (Set 2) === */
+
+/* Spacing helpers */
+.ops-mb-125 { margin-bottom: 1.25rem; }
+.ops-mb-10  { margin-bottom: 1rem; }
+.ops-mb-15  { margin-bottom: 1.5rem; }
+
+/* Flush card (no padding, clip overflow for inner table borders) */
+.ops-card-flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Card header band — label row above a table */
+.ops-card-header {
+  padding: 0.75rem 1rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Horizontal scroll wrapper for wide tables */
+.ops-scroll-x {
+  overflow-x: auto;
+}
+
+/* Compact table font — used on dense ops tables */
+.data-table.ops-table-sm {
+  font-size: 12px;
+}
+
+/* Empty-state cell centred + muted */
+.ops-empty-cell {
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* data-card-label displayed as block with bottom spacing */
+.ops-card-label-block {
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+/* Cell truncation override (160px vs core.css 140px default) */
+.ops-cell-truncate-160 {
+  max-width: 160px;
+}
+
+/* Monospaced small cell (order numbers, SKUs, codes) */
+.ops-mono-sm {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+}

@@ -1,0 +1,387 @@
+/* ============================================================
+   filter-strip.css — daily-sales filter strip + date inputs
+   Owns: .ds-filter-*, .ds-date-*, .ds-filter-label,
+         .ds-filter-date-panel, .ds-filter-panel-divider,
+         .ds-filter-row, .ds-filter-state-search, .ds-state-search-input,
+         related @media overrides and @keyframes.
+   DO NOT add: lens pills, stat cards, trend, mix, geo, orders, dq rules.
+   ============================================================ */
+
+/* ── Filter strip ── */
+/* Rows stack vertically (4 rows per v5 redesign). overflow must stay visible
+   so dropdown panels can escape — see popover tier (z=200) below. */
+.ds-filter-strip {
+  position: sticky;
+  top: 140px; /* below freshness (60+~40) + lens (100+~40) */
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.ds-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ds-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  min-height: 32px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 150ms ease;
+}
+
+.ds-filter-chip:hover {
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+.ds-filter-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ds-filter-chip--active {
+  background: var(--blue-a08);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ds-filter-chip:disabled,
+.ds-filter-chip[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ds-filter-chip--active-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  margin-left: 2px;
+  background: var(--accent);
+  color: white;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ds-filter-dropdown {
+  position: relative;
+}
+
+.ds-filter-dropdown__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  min-height: 32px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 150ms ease;
+}
+
+.ds-filter-dropdown__trigger:hover {
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+.ds-filter-dropdown__trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ds-filter-dropdown__trigger--active {
+  background: var(--blue-a08);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ds-filter-dropdown__trigger:disabled,
+.ds-filter-dropdown__trigger[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ds-filter-dropdown__trigger-chevron {
+  display: inline-block;
+  transition: transform 150ms ease;
+}
+
+.ds-filter-dropdown__trigger--open .ds-filter-dropdown__trigger-chevron {
+  transform: rotate(180deg);
+}
+
+.ds-filter-dropdown__panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 200; /* popover tier — above sticky-header tier (z=10) */
+  min-width: 200px;
+  max-height: 320px;
+  overflow-y: auto;
+  animation: ds-slideDown 150ms ease-out;
+}
+
+@keyframes ds-slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ds-filter-dropdown__panel-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ds-filter-dropdown__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.ds-filter-dropdown__close:hover {
+  color: var(--text-primary);
+}
+
+.ds-filter-dropdown__item {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 150ms ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ds-filter-dropdown__item:last-child {
+  border-bottom: none;
+}
+
+.ds-filter-dropdown__item:hover {
+  background: var(--bg-hover);
+}
+
+.ds-filter-dropdown__item--selected {
+  background: var(--blue-a08);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.ds-filter-dropdown__item input[type="checkbox"] {
+  margin-right: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.ds-filter-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  min-height: 32px;
+  background: transparent;
+  border: 1px solid var(--red);
+  border-radius: 16px;
+  color: var(--red);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 150ms ease;
+}
+
+.ds-filter-reset:hover {
+  background: var(--red-a08);
+  border-color: var(--red);
+}
+
+.ds-filter-reset:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ds-filter-reset:disabled,
+.ds-filter-reset[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Date inputs inside filter dropdown */
+.ds-date-input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color-scheme: dark;
+}
+
+.ds-date-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+/* ── v5 Filter Strip rows ── */
+
+.ds-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 6px;
+}
+
+.ds-filter-row--dropdowns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+}
+
+/* Reset button accent when active */
+.ds-filter-reset--active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* State dropdown search input */
+.ds-filter-state-search {
+  padding: 8px 10px 4px;
+}
+
+.ds-filter-dropdown__panel--state {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+/* Date range custom-range filter labels */
+.ds-filter-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Custom-range date panel wrapper */
+.ds-filter-date-panel {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Filter panel custom-range divider header */
+.ds-filter-panel-divider {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+/* ── Mobile adjustments (max 640px) ── */
+@media (max-width: 640px) {
+  .ds-filter-strip {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  /* On mobile, filter dropdowns become bottom-sheets */
+  .ds-filter-dropdown__panel {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-height: 70vh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    animation: ds-slideUpPanel 200ms ease-out;
+    margin-top: 0;
+  }
+
+  @keyframes ds-slideUpPanel {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+
+  .ds-filter-chip,
+  .ds-filter-dropdown__trigger {
+    min-height: 44px; /* touch target */
+    padding: 10px 14px;
+  }
+
+  .ds-filter-row--dropdowns {
+    gap: 6px;
+  }
+}
+
+/* ── prefers-reduced-motion overrides for filter elements ── */
+@media (prefers-reduced-motion: reduce) {
+  .ds-filter-chip,
+  .ds-filter-dropdown__trigger,
+  .ds-filter-dropdown__trigger-chevron,
+  .ds-filter-dropdown__item,
+  .ds-filter-reset {
+    transition: none !important;
+  }
+
+  .ds-filter-dropdown__panel {
+    animation: none !important;
+  }
+}

@@ -674,3 +674,18 @@
   /* Brief numbers: compact */
   .brief-number { font-size: 18px; }
 }
+
+/* === dashboard.html inline-style migration === */
+.dashboard-skeleton-stat {
+  min-width: 140px;
+  height: 72px;
+  flex-shrink: 0;
+}
+
+.dashboard-skeleton-chart {
+  height: 200px;
+}
+
+.dashboard-ml-auto {
+  margin-left: auto;
+}

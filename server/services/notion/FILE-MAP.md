@@ -53,6 +53,11 @@ sub-files directly.
 | `getAITeam` | AI team array | tech-team routes |
 | `getMarketingTasks` | task array | task routes |
 | `getTechBacklog` | backlog array | task routes |
+| `getIgPerformance` | IG performance row array | marketing-ig routes |
+| `getHookPatternLog` | hook pattern row array | marketing-ig routes |
+| `getTemplateLibrary` | template row array | marketing-ig routes |
+| `getApprovalsLog` | approval log row array | marketing-ig routes |
+| `getWeeklyOpsLog` | weekly ops log row array | marketing-ig routes |
 | `createCommitment` | created page object | writes, approval gate |
 | `createDecision` | created page object | writes, approval gate |
 | `updateCommitmentStatus` | updated page object | writes, approval gate |
@@ -154,6 +159,14 @@ Owns: `getAITeam`.
 ### `reads/tasks.js` — task reads
 Owns: `getMarketingTasks`, `getTechBacklog`.
 
+### `reads/marketing-ig.js` — IG playbook reads (Phase B, 2026-05-02)
+Owns: `getIgPerformance`, `getHookPatternLog`, `getTemplateLibrary`, `getApprovalsLog`,
+  `getWeeklyOpsLog`.
+DO NOT add: Content Calendar reads (reads/marketing-ops.js), write operations,
+  dashboard composition. All 5 DBs are env-var-gated at runtime — each function
+  throws if its env var is missing. `simplify()` now handles `formula` and `rollup`
+  types required by IG Performance.
+
 ### `writes/commitments.js` — commitment writes
 Owns: `createCommitment`, `createDecision`, `updateCommitmentStatus`,
   `updateCommitmentPriority`, `updateCommitmentDueDate`, `updateCommitmentAssignee`,
@@ -188,6 +201,8 @@ DO NOT add: dashboard data fetching (dashboard-summary.js), cache infra.
 | New Notion DB | `databases.js` (add to `DB` const) |
 | New cached read (existing domain) | matching `reads/<area>.js` |
 | New cached read (new domain) | new `reads/<area>.js` + import + re-export in `index.js` |
+| New IG playbook read | `reads/marketing-ig.js` |
+| New IG playbook write | `writes/marketing-ops.js` (Phase D) |
 | New write through approval gate | `writes/<area>.js` + add to `WRITE_TOOLS` Set in tool-handler |
 | New dashboard aggregation or signal | `dashboard-summary.js` |
 | New morning brief signal (uses existing dashboard data) | `morning-brief.js` |
@@ -218,10 +233,11 @@ reads/focus-areas.js   → databases.js
 reads/people.js        → databases.js
 reads/projects.js      → databases.js
 reads/decisions.js     → databases.js
-reads/marketing-ops.js → databases.js
-reads/tech-team.js     → databases.js
-reads/ai-team.js       → databases.js
-reads/tasks.js         → databases.js
+reads/marketing-ops.js  → databases.js
+reads/marketing-ig.js   → databases.js, client.js, cache.js, retry.js, simplify.js
+reads/tech-team.js      → databases.js
+reads/ai-team.js        → databases.js
+reads/tasks.js          → databases.js
 
 writes/commitments.js   → databases.js, cache-invalidation.js, write-queue.js
 writes/marketing-ops.js → databases.js, write-queue.js

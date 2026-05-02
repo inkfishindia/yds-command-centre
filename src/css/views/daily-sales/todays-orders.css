@@ -1,0 +1,393 @@
+/* ============================================================
+   todays-orders.css — daily-sales today's orders feed + drill sheet
+   Owns: .ds-orders-*, .ds-order-*, .ds-status-badge, .ds-status-*,
+         .ds-channel-pill, .ds-tag-method, .ds-order-state,
+         .ds-drill-* (sheet, skeleton, helper classes),
+         .ds-drill-header-main, .ds-drill-loading-text,
+         .ds-drill-empty-hint, .ds-drill-no-results*, related @media + @keyframes.
+   DO NOT add: stat cards, filter, lens, trend, mix, geo, concerns, dq rules.
+   ============================================================ */
+
+/* ── Today's Orders Feed ── */
+.ds-orders-feed {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ds-orders-feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-secondary);
+}
+
+.ds-orders-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.ds-order-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-ui);
+}
+
+.ds-order-row:last-child { border-bottom: none; }
+
+.ds-order-row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ds-order-number {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.ds-order-customer {
+  font-size: 13px;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.ds-order-amount {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.ds-order-row-bottom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.ds-order-time {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ── v5 Order row background by acceptance ── */
+
+.ds-order-row--awaiting {
+  background: var(--amber-dim) !important;
+  border-left: 2px solid var(--amber);
+}
+
+.ds-order-row--rejected {
+  background: var(--red-dim) !important;
+  border-left: 2px solid var(--red);
+}
+
+/* ── v5 Order row shipping state ── */
+
+.ds-order-state {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Drillable order rows ── */
+.ds-order-row--drillable {
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.ds-order-row--drillable:hover {
+  background: var(--bg-hover);
+}
+
+.ds-order-row--drillable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ── Drill sheet ── */
+.ds-drill-sheet {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  background: var(--overlay-dark);
+}
+
+.ds-drill-sheet__backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  cursor: pointer;
+}
+
+.ds-drill-sheet__panel {
+  position: fixed;
+  z-index: 41;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Mobile: bottom-up */
+.ds-drill-sheet__panel {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80vh;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  animation: ds-slideUpFromBottom 250ms ease-out;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes ds-slideUpFromBottom {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+/* Desktop: right-side slide-in */
+@media (min-width: 768px) {
+  .ds-drill-sheet__panel {
+    top: 0;
+    bottom: 0;
+    right: 0;
+    left: auto;
+    width: 60%;
+    max-width: 600px;
+    height: 100vh;
+    border-radius: 0;
+    animation: ds-slideInRight 250ms ease-out;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
+  }
+
+  @keyframes ds-slideInRight {
+    from { transform: translateX(100%); }
+    to   { transform: translateX(0); }
+  }
+}
+
+.ds-drill-sheet__header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ds-drill-sheet__header-title {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.ds-drill-sheet__header-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-drill-sheet__header-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 150ms ease;
+  flex-shrink: 0;
+}
+
+.ds-drill-sheet__header-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.ds-drill-sheet__header-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ds-drill-sheet__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.ds-drill-sheet__order-row {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+}
+
+.ds-drill-sheet__order-row:last-child {
+  border-bottom: none;
+}
+
+.ds-drill-sheet__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.ds-drill-sheet__empty-icon {
+  width: 32px;
+  height: 32px;
+  opacity: 0.6;
+}
+
+.ds-drill-sheet__empty-text {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Drill skeleton loaders */
+.ds-drill-skeleton {
+  cursor: default;
+}
+
+.ds-drill-skeleton-line {
+  height: 12px;
+  background: var(--bg-card);
+  border-radius: 3px;
+  animation: ds-shimmer 1.5s infinite;
+  margin-bottom: 8px;
+}
+
+.ds-drill-skeleton-line--title {
+  width: 60%;
+}
+
+.ds-drill-skeleton-line--sub {
+  width: 40%;
+  height: 10px;
+  opacity: 0.6;
+  margin-bottom: 0;
+}
+
+@keyframes ds-shimmer {
+  0%   { opacity: 0.6; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* Drill sheet header flex wrapper */
+.ds-drill-header-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Drill sheet loading indicator */
+.ds-drill-loading-text {
+  color: var(--text-muted);
+}
+
+/* Drill sheet empty state hint text */
+.ds-drill-empty-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Drill sheet no-results footer */
+.ds-drill-no-results {
+  padding: 12px 16px;
+  text-align: center;
+}
+
+/* Drill sheet no-results message text */
+.ds-drill-no-results-text {
+  padding: 12px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* ── Desktop (≥768px) ── */
+@media (min-width: 768px) {
+  .ds-order-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ds-order-row-top {
+    flex-wrap: nowrap;
+  }
+}
+
+/* ── Mobile (max 640px) ── */
+@media (max-width: 640px) {
+  .ds-drill-sheet__panel {
+    height: 85vh;
+  }
+
+  .ds-order-row-top {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
+
+/* ── prefers-reduced-motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .ds-order-row--drillable,
+  .ds-drill-sheet__header-close {
+    transition: none !important;
+  }
+
+  .ds-drill-sheet__panel {
+    animation: none !important;
+  }
+
+  .ds-drill-skeleton-line {
+    animation: none !important;
+    opacity: 0.8;
+  }
+}

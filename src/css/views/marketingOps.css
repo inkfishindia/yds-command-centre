@@ -44,16 +44,9 @@
 }
 
 /* mktops-overview-shell, mktops-hero*, mktops-overview-grid,
-   mktops-priority-card* and all mktops-priority-* child rules
-   moved to src/css/core.css — shared by 7+ views. */
-
-.mktops-area-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-/* .mktops-area-metric-card base + tone modifiers moved to core.css — shared by dashboard + ops views */
+   mktops-priority-card*, mktops-area-metrics grid + .mktops-area-metric-card
+   and all mktops-priority-* child rules moved to src/css/core.css —
+   shared by 7+ views. */
 
 @media (max-width: 768px) {
   .mktops-meta-banner {
@@ -562,4 +555,46 @@
   .utm-builder-form {
     grid-template-columns: 1fr;
   }
+}
+
+/* === Inline-style migration === */
+
+/* empty-state with vertical spacing (3 uses: campaigns, calendar) */
+.mktops-empty-spaced {
+  margin: 1.5rem 0;
+}
+
+/* AI tools section: bmc-block inner padding (4 uses) */
+.mktops-bmc-block-body {
+  padding: 0.75rem;
+}
+
+/* AI tools form inputs — non-final (6 uses) */
+.mktops-ai-input {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+/* AI tools form inputs — final in group (4 uses) */
+.mktops-ai-input-last {
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+/* Skeleton loading column layout (3 uses: tasks, competitors, ci-detail) */
+.mktops-skeleton-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 0;
+}
+
+/* Cursor pointer on filter selects (3 uses) */
+.mktops-select-pointer {
+  cursor: pointer;
+}
+
+/* Cursor pointer on clickable cards (2 uses: data-card, ci-card) */
+.mktops-card-pointer {
+  cursor: pointer;
 }

@@ -1,0 +1,254 @@
+/* ============================================================
+   data-quality.css — daily-sales data quality section
+   Owns: .ds-data-quality*, .ds-acceptance-bar* (bar segment, labels),
+         .ds-duplicate-* (list, title, badge, item, number, customer, amount,
+         overflow-note), .ds-acceptance-label, .ds-dq-* (section, title,
+         tag-bar, tag-bar-fill, tag-pct, tag-breakdown, tag-item,
+         warn, danger, warn-icon, link, tag-raw, combo-toggle, combo-table-wrap,
+         combo-table).
+   DO NOT add: stat cards, filter, lens, trend, mix, geo, orders, concerns rules.
+   ============================================================ */
+
+/* ── Data quality section ── */
+.ds-data-quality {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+
+.ds-data-quality-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.ds-data-quality-title svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+/* Duplicate orders list */
+.ds-duplicate-list {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.ds-duplicate-list-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.ds-duplicate-list-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  background: var(--red);
+  color: white;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ds-duplicate-list-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.ds-duplicate-list-item:last-child {
+  border-bottom: none;
+}
+
+.ds-duplicate-list-number {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-duplicate-list-customer {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-duplicate-list-amount {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Duplicate list overflow note */
+.ds-duplicate-overflow-note {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+/* ── v5 Data Quality additions ── */
+
+.ds-dq-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.ds-dq-section--oneliner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ds-dq-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.ds-dq-tag-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ds-dq-tag-bar {
+  height: 8px;
+  background: var(--bg-hover);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ds-dq-tag-bar-fill {
+  height: 100%;
+  background: var(--teal);
+  border-radius: 4px;
+  transition: width var(--transition-slow);
+}
+
+.ds-dq-tag-bar--warn .ds-dq-tag-bar-fill {
+  background: var(--amber);
+}
+
+.ds-dq-tag-bar--danger .ds-dq-tag-bar-fill {
+  background: var(--red);
+}
+
+.ds-dq-tag-pct {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ds-dq-tag-pct--warn {
+  color: var(--amber);
+}
+
+.ds-dq-tag-pct--danger {
+  color: var(--red);
+}
+
+.ds-dq-tag-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ds-dq-tag-item {
+  display: flex;
+  gap: 2px;
+}
+
+.ds-dq-warn {
+  color: var(--amber);
+  font-weight: 600;
+}
+
+.ds-dq-danger {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.ds-dq-warn-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--amber);
+  flex-shrink: 0;
+}
+
+.ds-dq-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 11px;
+}
+
+.ds-dq-link:hover {
+  text-decoration: underline;
+}
+
+.ds-dq-tag-raw {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.ds-dq-combo-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: var(--font-ui);
+  padding: 0;
+}
+
+.ds-dq-combo-toggle:hover {
+  color: var(--text-primary);
+}
+
+.ds-dq-combo-table-wrap {
+  margin-top: 8px;
+  overflow-x: auto;
+}
+
+.ds-dq-combo-table {
+  font-size: 11px;
+}
+
