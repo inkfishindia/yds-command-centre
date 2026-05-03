@@ -35,11 +35,11 @@ const DB = {
   // IG playbook v1 DBs (created 2026-05-02) — hardcoded for parity with existing DBs.
   // See docs/marketing/NOTION-SETUP.md §1 for the source-of-truth registry.
   // Supersedes Decision #98 (env-var gating); env override no longer supported here.
-  IG_PERFORMANCE: '5959753fb4ff4b7a9d16c4e1ec46a811',
-  HOOK_PATTERN_LOG: '3a32a0aea45b4537b73e76015c8ec9e0',
-  TEMPLATE_LIBRARY: 'ff498859fead4048b9d6ea250b4ffc19',
-  APPROVALS_LOG: '352b4779a93742e59553f9247317ed94',
-  WEEKLY_OPS_LOG: '450968bb4a5042d4bab2590d99b3d03d',
+  IG_PERFORMANCE: '21476f909d334661b2f69ec825162ba6',
+  HOOK_PATTERN_LOG: '3d71c78ef5664312bc70d7d72a3cd5a1',
+  TEMPLATE_LIBRARY: '10996869d1e249fdb01d16085f908015',
+  APPROVALS_LOG: 'e305be59e4484d5e899fd4aeb636a7d9',
+  WEEKLY_OPS_LOG: '24e5ae2db9f64f38b11ac7beee4f0357',
   // Hub B — Marketing Log + Campaign Decisions (added Phase B, Decision #102)
   MARKETING_LOG: '3ca17008a2994dcfa662300438a9e295',       // Marketing Log — Type/Area/Tags capture stream
   CAMPAIGN_DECISIONS: '36f79d19dbfe4fddb593f919db15e8b2',  // Campaign Decisions — marketing-scoped decision log
